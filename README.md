@@ -8,3 +8,8 @@
     - Pythonパッケージを用いてセンサデータを処理するためのサーバー
 - [**rikka**](https://github.com/kajiLabTeam/rikka)
     - ロジックに全集中したパッケージリポジトリ
+
+## ブランチ
+
+`999/feat-add-something`
+`イシュー番号/プレフィックス-ブランチ詳細`
