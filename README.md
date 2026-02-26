@@ -1,4 +1,4 @@
-[![](/img/okarin.webp)](https://github.com/kajiLabTeam/okarin)
+[![](/image/okarin.webp)](https://github.com/kajiLabTeam/okarin)
 
 <p align="right">
 © 2026 kanakanho
