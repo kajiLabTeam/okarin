@@ -1,9 +1,10 @@
-# okarin
-- Metaリポジトリ(**okarin**)
+# 全体構成
+
+- **okarin**
     - issueを管理するリポジトリ。issueと各リポジトリのPRを紐づけてアップデートを管理する
-- Node.jsサーバー(**kaede**)
-    - 今回のシステムの基幹リポジトリでモバイルからのデータを取得しPythonサーバーやDBとの接続などを広域的に行う
-- Pythonサーバー(**nozomi**)
-    - natsukiさんが担当しているPythonパッケージを用いてデータを処理するためのサーバー
-- Pythonパッケージ(**rikka**)
+- [**kaede**](https://github.com/kajiLabTeam/kaede)
+    - 今回のシステムの基幹リポジトリでモバイルからのデータを取得しPythonサーバーやDBとの接続などを行う
+- [**nozomi**](https://github.com/kajiLabTeam/nozomi)
+    - Pythonパッケージを用いてセンサデータを処理するためのサーバー
+- [**rikka**](https://github.com/kajiLabTeam/rikka)
     - ロジックに全集中したパッケージリポジトリ
