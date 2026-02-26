@@ -1,1 +1,9 @@
 # okarin
+- Metaリポジトリ(**okarin**)
+    - issueを管理するリポジトリ。issueと各リポジトリのPRを紐づけてアップデートを管理する
+- Node.jsサーバー(担当:ryuki)(**kaede**)
+    - 今回のシステムの基幹リポジトリでモバイルからのデータを取得しPythonサーバーやDBとの接続などを広域的に行う
+- Pythonサーバー(担当:ryuki)(**nozomi**)
+    - natsukiさんが担当しているPythonパッケージを用いてデータを処理するためのサーバー
+- Pythonパッケージ(担当:natsuki)(**rikka**)
+    - ロジックに全集中したパッケージリポジトリ
