@@ -1,3 +1,9 @@
+[![](/img/okarin.webp)](https://github.com/kajiLabTeam/okarin)
+
+<p align="right">
+© 2026 kanakanho
+</p>
+
 # 全体構成
 
 - **okarin**
