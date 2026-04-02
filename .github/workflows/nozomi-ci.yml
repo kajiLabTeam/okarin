@@ -1,14 +1,23 @@
-name: CI
+name: Nozomi CI
 
 on:
   push:
     branches: [main]
+    paths:
+      - "apps/nozomi/**"
+      - ".github/workflows/nozomi-ci.yml"
   pull_request:
     branches: [main]
+    paths:
+      - "apps/nozomi/**"
+      - ".github/workflows/nozomi-ci.yml"
 
 jobs:
-  lint-and-test:
+  lint-and-check:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/nozomi
     steps:
       - uses: actions/checkout@v4
 
