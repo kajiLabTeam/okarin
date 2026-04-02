@@ -1,0 +1,21 @@
+pre-commit:
+  parallel: true
+  commands:
+    kaede-lint:
+      root: "apps/kaede"
+      run: pnpm lint
+    kaede-format:
+      root: "apps/kaede"
+      run: pnpm exec prettier --check .
+    kaede-typecheck:
+      root: "apps/kaede"
+      run: pnpm exec tsc --noEmit
+    nozomi-lint:
+      root: "apps/nozomi"
+      run: uv run ruff check .
+    nozomi-format:
+      root: "apps/nozomi"
+      run: uv run ruff format --check .
+    nozomi-typecheck:
+      root: "apps/nozomi"
+      run: uv run mypy .
