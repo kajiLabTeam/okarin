@@ -12,7 +12,7 @@ pre-commit:
       run: pnpm exec tsc --noEmit
     nozomi-lint:
       root: "apps/nozomi"
-      run: uv run ruff check --fix .
+      run: uv run ruff check .
     nozomi-format:
       root: "apps/nozomi"
       run: uv run ruff format --check .

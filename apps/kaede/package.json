@@ -15,7 +15,7 @@
   },
   "devDependencies": {
     "@hono/eslint-config": "^2.0.6",
-    "@types/node": "^20.11.17",
+    "@types/node": "^22.15.21",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.8.1",

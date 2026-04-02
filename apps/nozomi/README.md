@@ -6,13 +6,15 @@ python versionは`3.14`
 パッケージ管理は`uv`
 
 ## 実行コマンド
+
 ```sh
-$ uv run main.py
+$ uv sync --all-groups
+$ uv run dev
 ```
 
-python fastapiの実行
+本番相当の起動
 ```sh
-$ uv run fastapi dev main.py
+$ uv run start
 ```
 
 ### uvのセットアップ
@@ -20,7 +22,7 @@ $ uv run fastapi dev main.py
 `uv venv`
 `. .venv/bin/activate`
 `uv sync --all-groups`
-`uv run main.py`
+`uv run dev`
 
 ### uvでパッケージの追加
 
@@ -29,6 +31,7 @@ $ uv run fastapi dev main.py
 ## Git Hook
 
 リポジトリルートで`lefthook`を使います。
+`brew install lefthook`
 初回だけルートで`lefthook install`を実行してください。
 
 ## コミット前に以下のコマンドを実行

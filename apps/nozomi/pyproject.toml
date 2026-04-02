@@ -10,6 +10,17 @@ dependencies = [
     "rikka",
 ]
 
+[project.scripts]
+dev = "server:dev"
+start = "server:start"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["main", "server"]
+
 [dependency-groups]
 dev = [
     "ruff>=0.15",
@@ -22,7 +33,7 @@ rikka = { git = "https://github.com/kajiLabTeam/rikka.git" }
 
 [tool.ruff]
 line-length = 88
-target-version = "py313"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = [
