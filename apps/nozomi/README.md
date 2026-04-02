@@ -26,27 +26,32 @@ $ uv run fastapi dev main.py
 
 `uv add hoge`
 
+# Git Hook
+
+リポジトリルートで`lefthook`を使います。
+初回だけルートで`lefthook install`を実行してください。
+
 # コミット前に以下のコマンドをする
 ## フォーマッター
 
 ```sh
-$ uv run ruff format
+$ uv run ruff format --check .
 ```
 
 ## リンター
 
 ```sh
-uv run ruff check
+uv run ruff check .
 ```
 
 ## リンター（自動修正）
 
 ```sh
-uv run ruff check --fix
+uv run ruff check --fix .
 ```
 
 ## 型チェック
 
 ```sh
-uv run mypy src/
+uv run mypy .
 ```

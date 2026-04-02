@@ -23,3 +23,8 @@ pnpm run deploy
 Linterの実行:`pnpm lint`
 Linterの実行時にFixableな箇所を直す:`pnpm lint:fix`
 Formatterを実行:`pnpm format`
+
+## Git Hook
+
+リポジトリルートで`lefthook`を使います。
+初回だけルートで`lefthook install`を実行してください。

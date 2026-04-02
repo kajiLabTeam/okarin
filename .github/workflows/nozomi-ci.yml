@@ -32,5 +32,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-groups
 
-      - name: Run pre-commit
-        run: uv run pre-commit run --all-files
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format Check
+        run: uv run ruff format --check .
+
+      - name: Type Check
+        run: uv run mypy .
