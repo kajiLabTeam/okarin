@@ -3,6 +3,9 @@ import { Hono } from 'hono'
 
 const app = new Hono()
 
+const port = Number(process.env.PORT ?? '3000')
+const host = process.env.HOST ?? '0.0.0.0'
+
 app.get('/', (c) => {
   return c.text('Hello Hono!')
 })
@@ -10,9 +13,10 @@ app.get('/', (c) => {
 serve(
   {
     fetch: app.fetch,
-    port: 3000,
+    port,
+    hostname: host,
   },
   (info) => {
-    console.log(`Server is running on http://localhost:${info.port}`)
+    console.log(`Server is running on http://${host}:${info.port}`)
   }
 )
