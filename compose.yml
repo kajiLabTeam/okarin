@@ -1,0 +1,24 @@
+name: okarin
+
+services:
+  kaede:
+    image: ${KAEDE_IMAGE:-okarin/kaede:latest}
+    restart: unless-stopped
+    env_file:
+      - ${ENV_FILE:-./env/local/common.env}
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+    ports:
+      - "3000:3000"
+
+  nozomi:
+    image: ${NOZOMI_IMAGE:-okarin/nozomi:latest}
+    restart: unless-stopped
+    env_file:
+      - ${ENV_FILE:-./env/local/common.env}
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8000
+    ports:
+      - "8000:8000"

@@ -1,0 +1,51 @@
+services:
+  kaede:
+    build:
+      context: ./apps/kaede
+    image: okarin/kaede:local
+    depends_on:
+      - nozomi
+
+  nozomi:
+    build:
+      context: ./apps/nozomi
+    image: okarin/nozomi:local
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-okarin}
+      POSTGRES_USER: ${POSTGRES_USER:-okarin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-okarin_local_pass}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-okarin} -d ${POSTGRES_DB:-okarin}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:RELEASE.2026-02-14T21-29-45Z
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_local_pass}
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+volumes:
+  postgres_data:
+  minio_data:

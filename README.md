@@ -77,3 +77,51 @@ uv run pytest
 
 - `apps/kaede/**` を変更すると `Kaede CI` が実行されます（lint / format / typecheck）。
 - `apps/nozomi/**` を変更すると `Nozomi CI` が実行されます（lint / format / typecheck / pytest）。
+
+## Docker Compose 構成
+
+- `compose.yml`: 共通定義（`kaede` / `nozomi`）
+- `compose.local.yml`: ローカル用オーバーレイ（`postgres` / `minio` 追加、ローカルビルド）
+- `compose.staging.yml`: staging 用オーバーレイ（環境変数ファイルを staging に切替）
+- `compose.production.yml`: production 用オーバーレイ（環境変数ファイルを production に切替）
+
+### ローカル起動（app + postgresql + object storage）
+
+```sh
+docker compose -f compose.yml -f compose.local.yml up -d --build
+```
+
+停止:
+
+```sh
+docker compose -f compose.yml -f compose.local.yml down
+```
+
+ローカル環境変数は `env/local/common.env` を使います。
+
+### staging / production の環境変数
+
+- `env/staging/common.env.example` と `env/production/common.env.example` をベースに実ファイルを作成してください。
+- `ENV_FILE` で読み込む env ファイルを切り替えます。
+
+### staging 手動デプロイ
+
+```sh
+ENV_FILE=./env/staging/common.env \
+docker compose -f compose.yml -f compose.staging.yml up -d --build
+```
+
+### production 手動デプロイ
+
+```sh
+ENV_FILE=./env/production/common.env \
+APP_TAG=v1.0.0 \
+docker compose -f compose.yml -f compose.production.yml up -d --build --remove-orphans
+```
+
+停止:
+
+```sh
+ENV_FILE=./env/production/common.env \
+docker compose -f compose.yml -f compose.production.yml down
+```
