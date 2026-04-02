@@ -88,13 +88,13 @@ uv run pytest
 ### ローカル起動（app + postgresql + object storage）
 
 ```sh
-make local-up
+make up ENV=local
 ```
 
 停止:
 
 ```sh
-make local-down
+make down ENV=local
 ```
 
 ローカル環境変数は `env/local/common.env` を使います。
@@ -107,17 +107,17 @@ make local-down
 ### staging 手動デプロイ
 
 ```sh
-make staging-up STAGING_ENV=./env/staging/common.env
+make up ENV=staging ENV_FILE=./env/staging/common.env
 ```
 
 ### production 手動デプロイ
 
 ```sh
-make production-up PRODUCTION_ENV=./env/production/common.env APP_TAG=v1.0.0
+make up ENV=production ENV_FILE=./env/production/common.env APP_TAG=v1.0.0
 ```
 
 停止:
 
 ```sh
-make production-down PRODUCTION_ENV=./env/production/common.env
+make down ENV=production ENV_FILE=./env/production/common.env
 ```

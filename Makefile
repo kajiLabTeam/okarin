@@ -1,52 +1,43 @@
 COMPOSE := docker compose
 
-STAGING_ENV ?= ./env/staging/common.env
-PRODUCTION_ENV ?= ./env/production/common.env
+ENV ?= local
 APP_TAG ?= latest
+ENV_FILE ?= ./env/$(ENV)/common.env
 
-.PHONY: help \
-	local-up local-down local-logs local-ps \
-	staging-up staging-down staging-logs staging-ps \
-	production-up production-down production-logs production-ps
+BASE_FILES := -f compose.yml
+
+ifeq ($(ENV),local)
+COMPOSE_FILES := $(BASE_FILES) -f compose.local.yml
+UP_ENVVARS :=
+else ifeq ($(ENV),staging)
+COMPOSE_FILES := $(BASE_FILES) -f compose.staging.yml
+UP_ENVVARS := ENV_FILE=$(ENV_FILE)
+else ifeq ($(ENV),production)
+COMPOSE_FILES := $(BASE_FILES) -f compose.production.yml
+UP_ENVVARS := ENV_FILE=$(ENV_FILE) APP_TAG=$(APP_TAG)
+else
+$(error Unsupported ENV='$(ENV)'. Use local|staging|production)
+endif
+
+.PHONY: help up down logs ps config
 
 help:
-	@echo "Usage:"
-	@echo "  make local-up"
-	@echo "  make staging-up STAGING_ENV=./env/staging/common.env"
-	@echo "  make production-up PRODUCTION_ENV=./env/production/common.env APP_TAG=v1.0.0"
+	@echo "Usage examples:"
+	@echo "  make up ENV=local"
+	@echo "  make up ENV=staging ENV_FILE=./env/staging/common.env"
+	@echo "  make up ENV=production ENV_FILE=./env/production/common.env APP_TAG=v1.0.0"
 
-local-up:
-	$(COMPOSE) -f compose.yml -f compose.local.yml up -d --build
+up:
+	$(UP_ENVVARS) $(COMPOSE) $(COMPOSE_FILES) up -d --build --remove-orphans
 
-local-down:
-	$(COMPOSE) -f compose.yml -f compose.local.yml down
+down:
+	$(UP_ENVVARS) $(COMPOSE) $(COMPOSE_FILES) down
 
-local-logs:
-	$(COMPOSE) -f compose.yml -f compose.local.yml logs -f
+logs:
+	$(UP_ENVVARS) $(COMPOSE) $(COMPOSE_FILES) logs -f
 
-local-ps:
-	$(COMPOSE) -f compose.yml -f compose.local.yml ps
+ps:
+	$(UP_ENVVARS) $(COMPOSE) $(COMPOSE_FILES) ps
 
-staging-up:
-	ENV_FILE=$(STAGING_ENV) $(COMPOSE) -f compose.yml -f compose.staging.yml up -d --build
-
-staging-down:
-	ENV_FILE=$(STAGING_ENV) $(COMPOSE) -f compose.yml -f compose.staging.yml down
-
-staging-logs:
-	ENV_FILE=$(STAGING_ENV) $(COMPOSE) -f compose.yml -f compose.staging.yml logs -f
-
-staging-ps:
-	ENV_FILE=$(STAGING_ENV) $(COMPOSE) -f compose.yml -f compose.staging.yml ps
-
-production-up:
-	ENV_FILE=$(PRODUCTION_ENV) APP_TAG=$(APP_TAG) $(COMPOSE) -f compose.yml -f compose.production.yml up -d --build --remove-orphans
-
-production-down:
-	ENV_FILE=$(PRODUCTION_ENV) $(COMPOSE) -f compose.yml -f compose.production.yml down
-
-production-logs:
-	ENV_FILE=$(PRODUCTION_ENV) $(COMPOSE) -f compose.yml -f compose.production.yml logs -f
-
-production-ps:
-	ENV_FILE=$(PRODUCTION_ENV) $(COMPOSE) -f compose.yml -f compose.production.yml ps
+config:
+	$(UP_ENVVARS) $(COMPOSE) $(COMPOSE_FILES) config
