@@ -16,8 +16,5 @@
 	],
 	"mypy-type-checker.reportingScope": "workspace",
 	"python.analysis.diagnosticMode": "workspace",
-	"python.languageServer": "Pylance",
-	"files.insertFinalNewline": true,
-	"files.trimTrailingWhitespace": true,
-	"files.trimFinalNewlines": true
+	"python.languageServer": "Pylance"
 }
