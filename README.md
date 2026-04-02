@@ -88,13 +88,13 @@ uv run pytest
 ### ローカル起動（app + postgresql + object storage）
 
 ```sh
-docker compose -f compose.yml -f compose.local.yml up -d --build
+make local-up
 ```
 
 停止:
 
 ```sh
-docker compose -f compose.yml -f compose.local.yml down
+make local-down
 ```
 
 ローカル環境変数は `env/local/common.env` を使います。
@@ -107,21 +107,17 @@ docker compose -f compose.yml -f compose.local.yml down
 ### staging 手動デプロイ
 
 ```sh
-ENV_FILE=./env/staging/common.env \
-docker compose -f compose.yml -f compose.staging.yml up -d --build
+make staging-up STAGING_ENV=./env/staging/common.env
 ```
 
 ### production 手動デプロイ
 
 ```sh
-ENV_FILE=./env/production/common.env \
-APP_TAG=v1.0.0 \
-docker compose -f compose.yml -f compose.production.yml up -d --build --remove-orphans
+make production-up PRODUCTION_ENV=./env/production/common.env APP_TAG=v1.0.0
 ```
 
 停止:
 
 ```sh
-ENV_FILE=./env/production/common.env \
-docker compose -f compose.yml -f compose.production.yml down
+make production-down PRODUCTION_ENV=./env/production/common.env
 ```
