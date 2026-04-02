@@ -14,10 +14,6 @@ pnpm install
 pnpm run dev
 ```
 
-```txt
-pnpm run deploy
-```
-
 ## Linter,Formatter
 
 Linterの実行:`pnpm lint`
@@ -27,4 +23,17 @@ Formatterを実行:`pnpm format`
 ## Git Hook
 
 リポジトリルートで`lefthook`を使います。
+
+`lefthook`をインストールしていない場合はインストールをしてください。
+
+brewの場合:`brew install lefthook`
+
 初回だけルートで`lefthook install`を実行してください。
+
+コミット前の確認を手動で行う場合:
+
+```txt
+pnpm lint
+pnpm exec prettier --check .
+pnpm exec tsc --noEmit
+```

@@ -1,6 +1,6 @@
 # nozomi
 
-# 開発コマンド
+## 開発コマンド
 
 python versionは`3.14`
 パッケージ管理は`uv`
@@ -19,23 +19,23 @@ $ uv run fastapi dev main.py
 
 `uv venv`
 `. .venv/bin/activate`
-`uv sync`
+`uv sync --all-groups`
 `uv run main.py`
 
 ### uvでパッケージの追加
 
 `uv add hoge`
 
-# Git Hook
+## Git Hook
 
 リポジトリルートで`lefthook`を使います。
 初回だけルートで`lefthook install`を実行してください。
 
-# コミット前に以下のコマンドをする
+## コミット前に以下のコマンドを実行
 ## フォーマッター
 
 ```sh
-$ uv run ruff format --check .
+uv run ruff format --check .
 ```
 
 ## リンター
