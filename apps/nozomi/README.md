@@ -17,6 +17,12 @@ $ uv run dev
 $ uv run start
 ```
 
+`HOST` と `PORT` は環境変数で上書きできます。
+
+```sh
+$ HOST=0.0.0.0 PORT=8080 uv run start
+```
+
 ### uvのセットアップ
 
 `uv venv`

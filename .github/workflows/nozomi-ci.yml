@@ -40,3 +40,6 @@ jobs:
 
       - name: Type Check
         run: uv run mypy .
+
+      - name: Test
+        run: uv run pytest
