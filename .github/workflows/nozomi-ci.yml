@@ -43,3 +43,6 @@ jobs:
 
       - name: Test
         run: uv run pytest
+
+      - name: Docker Image Build
+        run: docker build -f Dockerfile .

@@ -61,6 +61,7 @@ cd apps/kaede
 pnpm lint
 pnpm exec prettier --check .
 pnpm exec tsc --noEmit
+pnpm build
 ```
 
 `nozomi` を手動で確認する場合:
@@ -75,8 +76,8 @@ uv run pytest
 
 ## CI 対応
 
-- `apps/kaede/**` を変更すると `Kaede CI` が実行されます（lint / format / typecheck）。
-- `apps/nozomi/**` を変更すると `Nozomi CI` が実行されます（lint / format / typecheck / pytest）。
+- `apps/kaede/**` を変更すると `Kaede CI` が実行されます（lint / format / typecheck / build / docker image build）。
+- `apps/nozomi/**` を変更すると `Nozomi CI` が実行されます（lint / format / typecheck / pytest / docker image build）。
 
 ## Docker Compose 構成
 
