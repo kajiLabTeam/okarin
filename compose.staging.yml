@@ -1,0 +1,14 @@
+services:
+  kaede:
+    build:
+      context: ./apps/kaede
+    image: okarin/kaede:staging
+    env_file:
+      - ${ENV_FILE:-./env/staging/common.env}
+
+  nozomi:
+    build:
+      context: ./apps/nozomi
+    image: okarin/nozomi:staging
+    env_file:
+      - ${ENV_FILE:-./env/staging/common.env}

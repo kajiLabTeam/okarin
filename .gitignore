@@ -1,0 +1,4 @@
+env/local/common.env
+env/staging/common.env
+env/production/common.env
+seaweedfs/s3.conf

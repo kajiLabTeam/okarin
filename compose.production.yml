@@ -1,0 +1,14 @@
+services:
+  kaede:
+    build:
+      context: ./apps/kaede
+    image: okarin/kaede:${APP_TAG:-latest}
+    env_file:
+      - ${ENV_FILE:-./env/production/common.env}
+
+  nozomi:
+    build:
+      context: ./apps/nozomi
+    image: okarin/nozomi:${APP_TAG:-latest}
+    env_file:
+      - ${ENV_FILE:-./env/production/common.env}
