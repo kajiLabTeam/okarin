@@ -81,11 +81,18 @@ uv run pytest
 ## Docker Compose 構成
 
 - `compose.yml`: 共通定義（`kaede` / `nozomi`）
-- `compose.local.yml`: ローカル用オーバーレイ（`postgres` / `minio` 追加、ローカルビルド）
+- `compose.local.yml`: ローカル用オーバーレイ（`postgres` / `seaweedfs` 追加、ローカルビルド）
 - `compose.staging.yml`: staging 用オーバーレイ（環境変数ファイルを staging に切替）
 - `compose.production.yml`: production 用オーバーレイ（環境変数ファイルを production に切替）
 
 ### ローカル起動（app + postgresql + object storage）
+
+初回はテンプレートから実ファイルを作成:
+
+```sh
+cp env/local/common.env.example env/local/common.env
+cp seaweedfs/s3.conf.example seaweedfs/s3.conf
+```
 
 ```sh
 make up ENV=local
@@ -98,6 +105,10 @@ make down ENV=local
 ```
 
 ローカル環境変数は `env/local/common.env` を使います。
+
+`seaweedfs/s3.conf` で S3 認証情報（`accessKey` / `secretKey`）を管理しています。  
+キーを変更する場合は `seaweedfs/s3.conf` と `env/local/common.env` の両方を同じ値に更新してください。
+これら実ファイルは `.gitignore` で除外されるため、GitHubには上がりません。
 
 ### staging / production の環境変数
 
