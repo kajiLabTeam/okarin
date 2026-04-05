@@ -42,3 +42,9 @@ jobs:
 
       - name: Type Check
         run: pnpm exec tsc --noEmit
+
+      - name: Build
+        run: pnpm build
+
+      - name: Docker Image Build
+        run: docker build -f Dockerfile .
