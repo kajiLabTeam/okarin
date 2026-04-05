@@ -1,4 +1,5 @@
-COMPOSE := docker compose
+PROJECT_NAME ?= okarin-$(ENV)
+COMPOSE := docker compose -p $(PROJECT_NAME)
 
 ENV ?= local
 APP_TAG ?= latest
@@ -26,6 +27,7 @@ help:
 	@echo "  make up ENV=local"
 	@echo "  make up ENV=staging ENV_FILE=./env/staging/common.env"
 	@echo "  make up ENV=production ENV_FILE=./env/production/common.env APP_TAG=v1.0.0"
+	@echo "  make up ENV=production PROJECT_NAME=okarin-prod-a"
 
 up:
 	$(UP_ENVVARS) $(COMPOSE) $(COMPOSE_FILES) up -d --build --remove-orphans

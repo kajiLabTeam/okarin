@@ -5,6 +5,8 @@ services:
     image: okarin/kaede:local
     depends_on:
       - nozomi
+    ports:
+      - "3000:3000"
 
   nozomi:
     build:
@@ -15,26 +17,30 @@ services:
         condition: service_healthy
       seaweedfs:
         condition: service_started
+    ports:
+      - "8000:8000"
 
   postgres:
     image: ${POSTGRES_IMAGE:-postgres:17-alpine}
     restart: unless-stopped
+    env_file:
+      - ${ENV_FILE:-./env/local/common.env}
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-okarin}
-      POSTGRES_USER: ${POSTGRES_USER:-okarin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-okarin_local_pass}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-okarin} -d ${POSTGRES_DB:-okarin}"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 3s
       retries: 20
 
   seaweedfs:
-    image: ${SEAWEEDFS_IMAGE:-chrislusf/seaweedfs:latest}
+    image: ${SEAWEEDFS_IMAGE:-chrislusf/seaweedfs:4.17}
     restart: unless-stopped
     command: server -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.conf -dir=/data
     ports:

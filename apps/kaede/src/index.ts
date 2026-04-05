@@ -3,7 +3,8 @@ import { Hono } from 'hono'
 
 const app = new Hono()
 
-const port = Number(process.env.PORT ?? '3000')
+const parsedPort = Number.parseInt(process.env.PORT ?? '3000', 10)
+const port = Number.isNaN(parsedPort) ? 3000 : parsedPort
 const host = process.env.HOST ?? '0.0.0.0'
 
 app.get('/', (c) => {
