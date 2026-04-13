@@ -1,21 +1,26 @@
-FROM node:22-bookworm-slim AS builder
-WORKDIR /app
+FROM node:22-slim AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
+WORKDIR /home/node/app
+COPY . .
 
-COPY package.json pnpm-lock.yaml ./
-RUN corepack enable && pnpm install --frozen-lockfile
+FROM base AS prod-deps
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
 
-COPY tsconfig.json eslint.config.mjs ./
-COPY src ./src
+FROM base AS build
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 RUN pnpm run build
 
-FROM node:22-bookworm-slim AS runner
-WORKDIR /app
-ENV NODE_ENV=production
+FROM node:22-slim
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
+WORKDIR /home/node/app
 
-COPY package.json pnpm-lock.yaml ./
-RUN corepack enable && pnpm install --frozen-lockfile --prod
+COPY --chown=node:node . .
+COPY --chown=node:node --from=prod-deps /home/node/app/node_modules ./node_modules
+COPY --chown=node:node --from=build /home/node/app/dist ./dist
 
-COPY --from=builder /app/dist ./dist
-
-EXPOSE 3000
-CMD ["node", "dist/index.js"]
+USER node
+CMD ["pnpm", "start"]
