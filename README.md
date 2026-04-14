@@ -91,8 +91,8 @@ uv run pytest
 初回はテンプレートから実ファイルを作成:
 
 ```sh
-cp env/local/common.env.example env/local/common.env
-cp seaweedfs/s3.conf.example seaweedfs/s3.conf
+cp deploy/env.local.example deploy/env.local
+cp deploy/seaweedfs/s3.local.conf.example deploy/seaweedfs/s3.local.conf
 ```
 
 ```sh
@@ -105,31 +105,32 @@ make up ENV=local
 make down ENV=local
 ```
 
-ローカル環境変数は `env/local/common.env` を使います。
+ローカル環境変数は `deploy/env.local` を使います。
 
-`seaweedfs/s3.conf` で S3 認証情報（`accessKey` / `secretKey`）を管理しています。  
-キーを変更する場合は `seaweedfs/s3.conf` と `env/local/common.env` の両方を同じ値に更新してください。
+`deploy/seaweedfs/s3.local.conf` で S3 認証情報（`accessKey` / `secretKey`）を管理しています。  
+キーを変更する場合は `deploy/seaweedfs/s3.local.conf` と `deploy/env.local` の両方を同じ値に更新してください。
 これら実ファイルは `.gitignore` で除外されるため、GitHubには上がりません。
 
 ### staging / production の環境変数
 
-- `env/staging/common.env.example` と `env/production/common.env.example` をベースに実ファイルを作成してください。
+- `deploy/env.staging.example` と `deploy/env.production.example` をベースに実ファイルを作成してください。
+- `deploy/seaweedfs/s3.staging.conf.example` と `deploy/seaweedfs/s3.production.conf.example` をベースに SeaweedFS の実ファイルを作成してください。
 - `ENV_FILE` で読み込む env ファイルを切り替えます。
 
 ### staging 手動デプロイ
 
 ```sh
-make up ENV=staging ENV_FILE=./env/staging/common.env
+make up ENV=staging ENV_FILE=./deploy/env.staging
 ```
 
 ### production 手動デプロイ
 
 ```sh
-make up ENV=production ENV_FILE=./env/production/common.env APP_TAG=v1.0.0
+make up ENV=production ENV_FILE=./deploy/env.production APP_TAG=v1.0.0
 ```
 
 停止:
 
 ```sh
-make down ENV=production ENV_FILE=./env/production/common.env
+make down ENV=production ENV_FILE=./deploy/env.production
 ```

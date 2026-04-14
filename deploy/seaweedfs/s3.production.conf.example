@@ -1,0 +1,20 @@
+{
+  "identities": [
+    {
+      "name": "okarin-production-app",
+      "credentials": [
+        {
+          "accessKey": "change_me_production_access_key",
+          "secretKey": "change_me_production_secret_key"
+        }
+      ],
+      "actions": [
+        "Admin",
+        "Read",
+        "Write",
+        "List",
+        "Tagging"
+      ]
+    }
+  ]
+}

@@ -1,6 +1,8 @@
-env/local/common.env
-env/staging/common.env
-env/production/common.env
-seaweedfs/s3.conf
+deploy/env.local
+deploy/env.staging
+deploy/env.production
+deploy/seaweedfs/s3.local.conf
+deploy/seaweedfs/s3.staging.conf
+deploy/seaweedfs/s3.production.conf
 
 docs/

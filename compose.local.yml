@@ -25,10 +25,6 @@ services:
     restart: unless-stopped
     env_file:
       - ${ENV_FILE:-./deploy/env.local}
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -48,7 +44,7 @@ services:
       - "9333:9333"
     volumes:
       - seaweedfs_data:/data
-      - ./seaweedfs/s3.conf:/etc/seaweedfs/s3.conf:ro
+      - ./deploy/seaweedfs/s3.local.conf:/etc/seaweedfs/s3.conf:ro
 
 volumes:
   postgres_data:
