@@ -96,13 +96,13 @@ cp deploy/seaweedfs/s3.local.conf.example deploy/seaweedfs/s3.local.conf
 ```
 
 ```sh
-make up ENV=local
+docker compose -p okarin-local -f compose.yml -f compose.local.yml up -d --build --remove-orphans
 ```
 
 停止:
 
 ```sh
-make down ENV=local
+docker compose -p okarin-local -f compose.yml -f compose.local.yml down
 ```
 
 ローカル環境変数は `deploy/env.local` を使います。
@@ -120,17 +120,20 @@ make down ENV=local
 ### staging 手動デプロイ
 
 ```sh
-make up ENV=staging ENV_FILE=./deploy/env.staging
+ENV_FILE=./deploy/env.staging \
+docker compose -p okarin-staging -f compose.yml -f compose.staging.yml up -d --build --remove-orphans
 ```
 
 ### production 手動デプロイ
 
 ```sh
-make up ENV=production ENV_FILE=./deploy/env.production APP_TAG=v1.0.0
+ENV_FILE=./deploy/env.production \
+docker compose -p okarin-production -f compose.yml -f compose.production.yml up -d --build --remove-orphans
 ```
 
 停止:
 
 ```sh
-make down ENV=production ENV_FILE=./deploy/env.production
+ENV_FILE=./deploy/env.production \
+docker compose -p okarin-production -f compose.yml -f compose.production.yml down
 ```
