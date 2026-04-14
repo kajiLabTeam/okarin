@@ -4,11 +4,11 @@ services:
       context: ./apps/kaede
     image: okarin/kaede:production
     env_file:
-      - ${ENV_FILE:-./env/production/common.env}
+      - ${ENV_FILE:-./deploy/env.production}
 
   nozomi:
     build:
       context: ./apps/nozomi
     image: okarin/nozomi:production
     env_file:
-      - ${ENV_FILE:-./env/production/common.env}
+      - ${ENV_FILE:-./deploy/env.production}

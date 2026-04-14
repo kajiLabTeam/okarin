@@ -2,7 +2,7 @@ services:
   kaede:
     restart: unless-stopped
     env_file:
-      - ${ENV_FILE:-./env/local/common.env}
+      - ${ENV_FILE:-./deploy/env.local}
     environment:
       HOST: 0.0.0.0
       PORT: 3000
@@ -10,7 +10,7 @@ services:
   nozomi:
     restart: unless-stopped
     env_file:
-      - ${ENV_FILE:-./env/local/common.env}
+      - ${ENV_FILE:-./deploy/env.local}
     environment:
       HOST: 0.0.0.0
       PORT: 8000

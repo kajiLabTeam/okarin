@@ -24,7 +24,7 @@ services:
     image: ${POSTGRES_IMAGE:-postgres:17-alpine}
     restart: unless-stopped
     env_file:
-      - ${ENV_FILE:-./env/local/common.env}
+      - ${ENV_FILE:-./deploy/env.local}
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
