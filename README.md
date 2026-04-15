@@ -115,7 +115,7 @@ docker compose -p okarin-local -f compose.yml -f compose.local.yml down
 
 - `deploy/env.staging.example` と `deploy/env.production.example` をベースに実ファイルを作成してください。
 - `deploy/seaweedfs/s3.staging.conf.example` と `deploy/seaweedfs/s3.production.conf.example` をベースに SeaweedFS の実ファイルを作成してください。
-- `ENV_FILE` で読み込む env ファイルを切り替えます。
+- 各環境の compose override が対応する `env_file` を持ちます。必要なら `ENV_FILE` で上書きできます。
 
 ### staging 手動デプロイ
 
