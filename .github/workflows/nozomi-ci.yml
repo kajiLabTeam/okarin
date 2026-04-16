@@ -45,4 +45,4 @@ jobs:
         run: uv run pytest
 
       - name: Docker Image Build
-        run: docker build -f Dockerfile .
+        run: DOCKER_BUILDKIT=1 docker build -f Dockerfile .
