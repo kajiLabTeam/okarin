@@ -7,9 +7,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-LABEL org.opencontainers.image.version=$APP_VERSION \
-      org.opencontainers.image.revision=$VCS_REF
-
 COPY --from=ghcr.io/astral-sh/uv:0.11.6 /uv /uvx /bin/
 
 RUN apt-get update \

@@ -2,7 +2,6 @@ PROJECT_NAME ?= okarin-$(ENV)
 COMPOSE := docker compose -p $(PROJECT_NAME)
 
 ENV ?= local
-APP_TAG ?= latest
 ENV_FILE ?= ./deploy/env.$(ENV)
 
 BASE_FILES := -f compose.yml
@@ -16,9 +15,9 @@ COMPOSE_FILES := $(BASE_FILES) -f compose.staging.yml
 UP_ENVVARS := ENV_FILE=$(ENV_FILE)
 UP_ARGS := -d --build --remove-orphans
 else ifeq ($(ENV),production)
-	COMPOSE_FILES := $(BASE_FILES) -f compose.production.yml
-	UP_ENVVARS := ENV_FILE=$(ENV_FILE)
-	UP_ARGS := -d --build --remove-orphans
+COMPOSE_FILES := $(BASE_FILES) -f compose.production.yml
+UP_ENVVARS := ENV_FILE=$(ENV_FILE)
+UP_ARGS := -d --build --remove-orphans
 else
 $(error Unsupported ENV='$(ENV)'. Use local|staging|production)
 endif
