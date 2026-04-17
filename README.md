@@ -91,45 +91,49 @@ uv run pytest
 初回はテンプレートから実ファイルを作成:
 
 ```sh
-cp env/local/common.env.example env/local/common.env
-cp seaweedfs/s3.conf.example seaweedfs/s3.conf
+cp deploy/env.local.example deploy/env.local
+cp deploy/seaweedfs/s3.local.conf.example deploy/seaweedfs/s3.local.conf
 ```
 
 ```sh
-make up ENV=local
+docker compose -p okarin-local -f compose.yml -f compose.local.yml up -d --build --remove-orphans
 ```
 
 停止:
 
 ```sh
-make down ENV=local
+docker compose -p okarin-local -f compose.yml -f compose.local.yml down
 ```
 
-ローカル環境変数は `env/local/common.env` を使います。
+ローカル環境変数は `deploy/env.local` を使います。
 
-`seaweedfs/s3.conf` で S3 認証情報（`accessKey` / `secretKey`）を管理しています。  
-キーを変更する場合は `seaweedfs/s3.conf` と `env/local/common.env` の両方を同じ値に更新してください。
+`deploy/seaweedfs/s3.local.conf` で S3 認証情報（`accessKey` / `secretKey`）を管理しています。  
+キーを変更する場合は `deploy/seaweedfs/s3.local.conf` と `deploy/env.local` の両方を同じ値に更新してください。
 これら実ファイルは `.gitignore` で除外されるため、GitHubには上がりません。
 
 ### staging / production の環境変数
 
-- `env/staging/common.env.example` と `env/production/common.env.example` をベースに実ファイルを作成してください。
-- `ENV_FILE` で読み込む env ファイルを切り替えます。
+- `deploy/env.staging.example` と `deploy/env.production.example` をベースに実ファイルを作成してください。
+- `deploy/seaweedfs/s3.staging.conf.example` と `deploy/seaweedfs/s3.production.conf.example` をベースに SeaweedFS の実ファイルを作成してください。
+- 各環境の compose override が対応する `env_file` を持ちます。必要なら `ENV_FILE` で上書きできます。
 
 ### staging 手動デプロイ
 
 ```sh
-make up ENV=staging ENV_FILE=./env/staging/common.env
+ENV_FILE=./deploy/env.staging \
+docker compose -p okarin-staging -f compose.yml -f compose.staging.yml up -d --build --remove-orphans
 ```
 
 ### production 手動デプロイ
 
 ```sh
-make up ENV=production ENV_FILE=./env/production/common.env APP_TAG=v1.0.0
+ENV_FILE=./deploy/env.production \
+docker compose -p okarin-production -f compose.yml -f compose.production.yml up -d --build --remove-orphans
 ```
 
 停止:
 
 ```sh
-make down ENV=production ENV_FILE=./env/production/common.env
+ENV_FILE=./deploy/env.production \
+docker compose -p okarin-production -f compose.yml -f compose.production.yml down
 ```

@@ -1,22 +1,39 @@
 services:
   kaede:
-    build:
-      context: ./apps/kaede
-    image: ${KAEDE_IMAGE:-okarin/kaede:latest}
     restart: unless-stopped
-    env_file:
-      - ${ENV_FILE:-./env/local/common.env}
+    depends_on:
+      nozomi:
+        condition: service_healthy
     environment:
       HOST: 0.0.0.0
       PORT: 3000
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
 
   nozomi:
-    build:
-      context: ./apps/nozomi
-    image: ${NOZOMI_IMAGE:-okarin/nozomi:latest}
     restart: unless-stopped
-    env_file:
-      - ${ENV_FILE:-./env/local/common.env}
     environment:
       HOST: 0.0.0.0
       PORT: 8000
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/').status == 200 else 1)",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s

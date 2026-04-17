@@ -3,12 +3,51 @@ services:
     build:
       context: ./apps/kaede
     image: okarin/kaede:staging
+    depends_on:
+      nozomi:
+        condition: service_healthy
     env_file:
-      - ${ENV_FILE:-./env/staging/common.env}
+      - ${ENV_FILE:-./deploy/env.staging}
 
   nozomi:
     build:
       context: ./apps/nozomi
     image: okarin/nozomi:staging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
     env_file:
-      - ${ENV_FILE:-./env/staging/common.env}
+      - ${ENV_FILE:-./deploy/env.staging}
+
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:17-alpine}
+    restart: unless-stopped
+    env_file:
+      - ${ENV_FILE:-./deploy/env.staging}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  seaweedfs:
+    image: ${SEAWEEDFS_IMAGE:-chrislusf/seaweedfs:4.17}
+    restart: unless-stopped
+    command: server -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.conf -dir=/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9333/cluster/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    volumes:
+      - seaweedfs_data:/data
+      - ./deploy/seaweedfs/s3.staging.conf:/etc/seaweedfs/s3.conf:ro
+
+volumes:
+  postgres_data:
+  seaweedfs_data:
