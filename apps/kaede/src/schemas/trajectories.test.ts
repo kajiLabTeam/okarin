@@ -7,7 +7,7 @@ import {
 } from './trajectories.js'
 
 describe('trajectory schemas', () => {
-  it('createTrajectoryRequestSchema accepts one start and one waypoint', () => {
+  it('createTrajectoryRequestSchema は start 1 件と waypoint を含む入力を受け入れる', () => {
     const result = createTrajectoryRequestSchema.safeParse({
       constraints: [
         {
@@ -29,7 +29,7 @@ describe('trajectory schemas', () => {
     expect(result.success).toBe(true)
   })
 
-  it('createTrajectoryRequestSchema rejects payload without start', () => {
+  it('createTrajectoryRequestSchema は start を含まない入力を拒否する', () => {
     const result = createTrajectoryRequestSchema.safeParse({
       constraints: [
         {
@@ -45,7 +45,7 @@ describe('trajectory schemas', () => {
     expect(result.success).toBe(false)
   })
 
-  it('createTrajectoryRequestSchema rejects duplicate seq', () => {
+  it('createTrajectoryRequestSchema は重複した seq を拒否する', () => {
     const result = createTrajectoryRequestSchema.safeParse({
       constraints: [
         {
@@ -66,7 +66,7 @@ describe('trajectory schemas', () => {
     expect(result.success).toBe(false)
   })
 
-  it('createTrajectoryRequestSchema rejects multiple goals', () => {
+  it('createTrajectoryRequestSchema は複数の goal を拒否する', () => {
     const result = createTrajectoryRequestSchema.safeParse({
       constraints: [
         {
@@ -93,7 +93,7 @@ describe('trajectory schemas', () => {
     expect(result.success).toBe(false)
   })
 
-  it('callbackRequestSchema accepts completed callback payload', () => {
+  it('callbackRequestSchema は completed callback を受け入れる', () => {
     const result = callbackRequestSchema.safeParse({
       trajectory_id: '33333333-3333-4333-8333-333333333333',
       status: 'completed',
@@ -104,7 +104,7 @@ describe('trajectory schemas', () => {
     expect(result.success).toBe(true)
   })
 
-  it('callbackRequestSchema rejects completed callback without result_object_key', () => {
+  it('callbackRequestSchema は result_object_key のない completed callback を拒否する', () => {
     const result = callbackRequestSchema.safeParse({
       trajectory_id: '33333333-3333-4333-8333-333333333333',
       status: 'completed',
@@ -114,7 +114,7 @@ describe('trajectory schemas', () => {
     expect(result.success).toBe(false)
   })
 
-  it('callbackRequestSchema accepts failed callback payload', () => {
+  it('callbackRequestSchema は failed callback を受け入れる', () => {
     const result = callbackRequestSchema.safeParse({
       trajectory_id: '33333333-3333-4333-8333-333333333333',
       status: 'failed',
@@ -126,7 +126,7 @@ describe('trajectory schemas', () => {
     expect(result.success).toBe(true)
   })
 
-  it('trajectoryIdParamsSchema rejects non-uuid trajectoryId', () => {
+  it('trajectoryIdParamsSchema は UUID でない trajectoryId を拒否する', () => {
     const result = trajectoryIdParamsSchema.safeParse({
       trajectoryId: 'invalid-id',
     })

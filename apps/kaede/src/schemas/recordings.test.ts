@@ -7,7 +7,7 @@ import {
 } from './recordings.js'
 
 describe('recording schemas', () => {
-  it('initRecordingRequestSchema accepts valid recording init payload', () => {
+  it('initRecordingRequestSchema は正しい recording 作成リクエストを受け入れる', () => {
     const result = initRecordingRequestSchema.safeParse({
       pedestrian_id: '11111111-1111-4111-8111-111111111111',
       floor_id: '22222222-2222-4222-8222-222222222222',
@@ -17,7 +17,7 @@ describe('recording schemas', () => {
     expect(result.success).toBe(true)
   })
 
-  it('initRecordingRequestSchema rejects upload_targets without required sensors', () => {
+  it('initRecordingRequestSchema は必須センサーが不足した upload_targets を拒否する', () => {
     const result = initRecordingRequestSchema.safeParse({
       pedestrian_id: '11111111-1111-4111-8111-111111111111',
       floor_id: '22222222-2222-4222-8222-222222222222',
@@ -27,7 +27,7 @@ describe('recording schemas', () => {
     expect(result.success).toBe(false)
   })
 
-  it('recordingIdParamsSchema rejects non-uuid recordingId', () => {
+  it('recordingIdParamsSchema は UUID でない recordingId を拒否する', () => {
     const result = recordingIdParamsSchema.safeParse({
       recordingId: 'not-a-uuid',
     })
@@ -35,7 +35,7 @@ describe('recording schemas', () => {
     expect(result.success).toBe(false)
   })
 
-  it('refreshUploadUrlsRequestSchema accepts one or more targets', () => {
+  it('refreshUploadUrlsRequestSchema は 1 件以上の target を受け入れる', () => {
     const result = refreshUploadUrlsRequestSchema.safeParse({
       targets: ['pressure'],
     })
@@ -43,7 +43,7 @@ describe('recording schemas', () => {
     expect(result.success).toBe(true)
   })
 
-  it('refreshUploadUrlsRequestSchema rejects empty targets', () => {
+  it('refreshUploadUrlsRequestSchema は空の targets を拒否する', () => {
     const result = refreshUploadUrlsRequestSchema.safeParse({
       targets: [],
     })
