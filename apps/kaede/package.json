@@ -12,7 +12,10 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.11",
-    "hono": "^4.12.9"
+    "@hono/swagger-ui": "^0.6.1",
+    "@hono/zod-openapi": "^0.19.10",
+    "hono": "^4.12.9",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@hono/eslint-config": "^2.0.6",
