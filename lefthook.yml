@@ -2,20 +2,24 @@ pre-commit:
   parallel: true
   commands:
     kaede-lint:
-      root: "apps/kaede"
-      run: pnpm lint
+      glob: "apps/kaede/**/*.{ts,tsx,js,mjs,cjs}"
+      run: pnpm --dir apps/kaede exec eslint --fix {staged_files}
+      stage_fixed: true
     kaede-format:
-      root: "apps/kaede"
-      run: pnpm exec prettier --check .
+      glob: "apps/kaede/**/*.{ts,tsx,js,mjs,cjs,json,md,yml,yaml}"
+      run: pnpm --dir apps/kaede exec prettier --write {staged_files}
+      stage_fixed: true
     kaede-typecheck:
       root: "apps/kaede"
       run: pnpm exec tsc --noEmit
     nozomi-lint:
-      root: "apps/nozomi"
-      run: uv run ruff check .
+      glob: "apps/nozomi/**/*.{py,pyi}"
+      run: uv run --directory apps/nozomi ruff check --fix {staged_files}
+      stage_fixed: true
     nozomi-format:
-      root: "apps/nozomi"
-      run: uv run ruff format --check .
+      glob: "apps/nozomi/**/*.{py,pyi}"
+      run: uv run --directory apps/nozomi ruff format {staged_files}
+      stage_fixed: true
     nozomi-typecheck:
       root: "apps/nozomi"
       run: uv run mypy .
