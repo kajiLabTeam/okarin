@@ -1,0 +1,43 @@
+name: Okarin Test Deploy CI
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: okarin-test-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: SSH test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SSH_PROXY_COMMAND: /tmp/cloudflared/cloudflared access ssh --id ${{ secrets.CLOUDFLARED_SSH_ID }} --secret ${{ secrets.CLOUDFLARED_SSH_SECRET }} --hostname %h
+      TARGET_HOST: ${{ secrets.DEPLOY_TEST_SSH_HOST }}
+      TARGET_USER: ${{ secrets.DEPLOY_SSH_USER }}
+    steps:
+      - name: Validate required secrets
+        run: |
+          test -n "$TARGET_HOST"
+          test -n "$TARGET_USER"
+
+      - name: Install cloudflared
+        run: |
+          mkdir -p /tmp/cloudflared
+          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /tmp/cloudflared/cloudflared
+          chmod +x /tmp/cloudflared/cloudflared
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_TEST_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: SSH connection test
+        run: |
+          ssh \
+            -i ~/.ssh/id_rsa \
+            -o StrictHostKeyChecking=no \
+            -o ProxyCommand="$SSH_PROXY_COMMAND" \
+            "$TARGET_USER@$TARGET_HOST"
