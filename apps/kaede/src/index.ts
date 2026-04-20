@@ -1,15 +1,11 @@
 import { serve } from '@hono/node-server'
-import { Hono } from 'hono'
 
-const app = new Hono()
+import { createApp } from './server.js'
 
+const app = createApp()
 const parsedPort = Number.parseInt(process.env.PORT ?? '3000', 10)
 const port = Number.isNaN(parsedPort) ? 3000 : parsedPort
 const host = process.env.HOST ?? '0.0.0.0'
-
-app.get('/', (c) => {
-  return c.text('Hello Hono!')
-})
 
 serve(
   {
