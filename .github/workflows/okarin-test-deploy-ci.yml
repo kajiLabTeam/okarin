@@ -27,17 +27,16 @@ jobs:
           mkdir -p /tmp/cloudflared
           curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /tmp/cloudflared/cloudflared
           chmod +x /tmp/cloudflared/cloudflared
-
+          /tmp/cloudflared/cloudflared --version
       - name: Set up SSH key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_TEST_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-
-      - name: SSH connection test
+      - name: Run SSH command
         run: |
-          ssh \
-            -i ~/.ssh/id_rsa \
+            ssh \
+            -i  ~/.ssh/id_rsa \
             -o StrictHostKeyChecking=no \
             -o ProxyCommand="$SSH_PROXY_COMMAND" \
-            "$TARGET_USER@$TARGET_HOST"
+            ${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_TEST_SSH_HOST}}
