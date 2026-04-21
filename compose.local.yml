@@ -6,7 +6,7 @@ services:
     env_file:
       - ${ENV_FILE:-./deploy/env.local}
     ports:
-      - "3000:3000"
+      - "8080:8080"
 
   nozomi:
     build:
