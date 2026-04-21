@@ -36,6 +36,7 @@ jobs:
       - name: Run SSH command
         run: |
             ssh \
+            -v \
             -i  ~/.ssh/id_rsa \
             -o StrictHostKeyChecking=no \
             -o ProxyCommand="$SSH_PROXY_COMMAND" \
