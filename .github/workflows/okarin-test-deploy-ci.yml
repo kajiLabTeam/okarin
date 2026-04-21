@@ -27,7 +27,7 @@ jobs:
           mkdir -p /tmp/cloudflared
           curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /tmp/cloudflared/cloudflared
           chmod +x /tmp/cloudflared/cloudflared
-
+          /tmp/cloudflared/cloudflared --version
       - name: Set up SSH key
         run: |
           mkdir -p ~/.ssh
