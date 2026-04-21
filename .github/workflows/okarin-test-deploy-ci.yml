@@ -2,6 +2,10 @@ name: Okarin Test Deploy CI
 
 on:
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: Release version or tag name
+        required: true
 
 concurrency:
   group: okarin-test-deploy
@@ -17,8 +21,20 @@ jobs:
       TARGET_HOST: ${{ secrets.DEPLOY_TEST_SSH_HOST }}
       TARGET_USER: ${{ secrets.DEPLOY_SSH_USER }}
     steps:
+      - name: Resolve release version
+        env:
+          INPUT_RELEASE_VERSION: ${{ inputs.release_version }}
+        run: |
+          RELEASE_VERSION="$INPUT_RELEASE_VERSION"
+          if [ -z "$RELEASE_VERSION" ]; then
+            echo "RELEASE_VERSION is empty. Set workflow_dispatch.inputs.release_version." >&2
+            exit 1
+          fi
+          echo "RELEASE_VERSION=$RELEASE_VERSION" >> "$GITHUB_ENV"
+
       - name: Validate required secrets
         run: |
+          test -n "$RELEASE_VERSION"
           test -n "$TARGET_HOST"
           test -n "$TARGET_USER"
 
@@ -35,9 +51,10 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
       - name: Run SSH command
         run: |
-            ssh \
+          ssh \
             -T \
-            -i  ~/.ssh/id_rsa \
+            -i ~/.ssh/id_rsa \
             -o StrictHostKeyChecking=no \
             -o ProxyCommand="$SSH_PROXY_COMMAND" \
-            "$TARGET_USER@$TARGET_HOST"
+            "$TARGET_USER@$TARGET_HOST" \
+            "$RELEASE_VERSION"
