@@ -1,15 +1,15 @@
-name: Okarin Test Deploy CI
+name: Okarin Staging Deploy CI
 
 on:
   workflow_dispatch:
 
 concurrency:
-  group: okarin-test-deploy
+  group: okarin-stg-deploy
   cancel-in-progress: false
 
 jobs:
   deploy:
-    name: SSH test
+    name: SSH stg
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -31,13 +31,13 @@ jobs:
       - name: Set up SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_TEST_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.SSH_STG_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
       - name: Run SSH command
         run: |
-            ssh \
+          ssh \
             -T \
-            -i  ~/.ssh/id_rsa \
+            -i ~/.ssh/id_rsa \
             -o StrictHostKeyChecking=no \
             -o ProxyCommand="$SSH_PROXY_COMMAND" \
             "$TARGET_USER@$TARGET_HOST"
