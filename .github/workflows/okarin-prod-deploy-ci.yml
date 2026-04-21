@@ -1,0 +1,70 @@
+name: Okarin Production Deploy CI
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: Release version or tag name
+        required: false
+
+concurrency:
+  group: okarin-prod-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: SSH prod
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SSH_PROXY_COMMAND: /tmp/cloudflared/cloudflared access ssh --id ${{ secrets.CLOUDFLARED_SSH_ID }} --secret ${{ secrets.CLOUDFLARED_SSH_SECRET }} --hostname %h
+      TARGET_HOST: ${{ secrets.DEPLOY_PROD_SSH_HOST }}
+      TARGET_USER: ${{ secrets.DEPLOY_SSH_USER }}
+    steps:
+      - name: Resolve release version
+        env:
+          INPUT_RELEASE_VERSION: ${{ inputs.release_version }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_REF_TYPE: ${{ github.ref_type }}
+        run: |
+          RELEASE_VERSION="$INPUT_RELEASE_VERSION"
+          if [ -z "$RELEASE_VERSION" ] && [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            RELEASE_VERSION="$GITHUB_REF_NAME"
+          fi
+          if [ -z "$RELEASE_VERSION" ]; then
+            echo "RELEASE_VERSION is empty. Set workflow_dispatch.inputs.release_version or run from a tag push." >&2
+            exit 1
+          fi
+          echo "RELEASE_VERSION=$RELEASE_VERSION" >> "$GITHUB_ENV"
+
+      - name: Validate required secrets
+        run: |
+          test -n "$RELEASE_VERSION"
+          test -n "$TARGET_HOST"
+          test -n "$TARGET_USER"
+
+      - name: Install cloudflared
+        run: |
+          mkdir -p /tmp/cloudflared
+          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /tmp/cloudflared/cloudflared
+          chmod +x /tmp/cloudflared/cloudflared
+          /tmp/cloudflared/cloudflared --version
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PROD_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Run SSH command
+        run: |
+          ssh \
+            -T \
+            -i ~/.ssh/id_rsa \
+            -o StrictHostKeyChecking=no \
+            -o ProxyCommand="$SSH_PROXY_COMMAND" \
+            "$TARGET_USER@$TARGET_HOST" \
+            "$RELEASE_VERSION"
