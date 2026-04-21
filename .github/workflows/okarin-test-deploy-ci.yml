@@ -33,6 +33,10 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_TEST_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
+      - name: Debug DNS
+        run: |
+            /tmp/cloudflared/cloudflared access ssh-config --hostname ${{ env.TARGET_HOST }}
+
       - name: Run SSH command
         run: |
             ssh \
