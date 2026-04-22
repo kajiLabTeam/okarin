@@ -21,6 +21,8 @@ export const recordingsRoutes = new OpenAPIHono()
 const initRecordingRoute = createRoute({
   method: 'post',
   path: '/init',
+  tags: ['Recordings'],
+  description: '新しい recording を作成し、初回アップロード用の URL を返す',
   request: {
     body: {
       content: {
@@ -59,6 +61,8 @@ recordingsRoutes.openapi(initRecordingRoute, (c) => {
 const completeUploadRoute = createRoute({
   method: 'post',
   path: '/{recordingId}/complete-upload',
+  tags: ['Recordings'],
+  description: 'recording に紐づく raw データのアップロード完了を確定する',
   request: {
     params: recordingIdParamsSchema,
   },
@@ -95,6 +99,8 @@ recordingsRoutes.openapi(completeUploadRoute, (c) => {
 const refreshUploadUrlsRoute = createRoute({
   method: 'post',
   path: '/{recordingId}/refresh-upload-urls',
+  tags: ['Recordings'],
+  description: '指定したアップロード対象について署名付き URL を再発行する',
   request: {
     params: recordingIdParamsSchema,
     body: {
@@ -139,6 +145,8 @@ recordingsRoutes.openapi(refreshUploadUrlsRoute, (c) => {
 const createTrajectoryRoute = createRoute({
   method: 'post',
   path: '/{recordingId}/trajectories',
+  tags: ['Recordings'],
+  description: 'recording から trajectory を作成し、解析を開始する',
   request: {
     params: recordingIdParamsSchema,
     body: {
@@ -183,6 +191,8 @@ recordingsRoutes.openapi(createTrajectoryRoute, (c) => {
 const getRecordingRoute = createRoute({
   method: 'get',
   path: '/{recordingId}',
+  tags: ['Recordings'],
+  description: 'recording の基本情報とアップロード状態を返す',
   request: {
     params: recordingIdParamsSchema,
   },
@@ -215,6 +225,8 @@ recordingsRoutes.openapi(getRecordingRoute, (c) => {
 const listRecordingTrajectoriesRoute = createRoute({
   method: 'get',
   path: '/{recordingId}/trajectories',
+  tags: ['Recordings'],
+  description: 'recording に紐づく trajectory の一覧を返す',
   request: {
     params: recordingIdParamsSchema,
   },
@@ -251,6 +263,8 @@ recordingsRoutes.openapi(listRecordingTrajectoriesRoute, (c) => {
 const issueGroundTruthUploadUrlRoute = createRoute({
   method: 'post',
   path: '/{recordingId}/ground-truth/upload-url',
+  tags: ['Recordings'],
+  description: 'recording 単位の ground truth raw をアップロードするための URL を発行する',
   request: {
     params: recordingIdParamsSchema,
   },
@@ -279,6 +293,8 @@ recordingsRoutes.openapi(issueGroundTruthUploadUrlRoute, (c) => {
 const completeGroundTruthUploadRoute = createRoute({
   method: 'post',
   path: '/{recordingId}/ground-truth/complete',
+  tags: ['Recordings'],
+  description: 'recording 単位の ground truth raw の登録完了を反映する',
   request: {
     params: recordingIdParamsSchema,
   },
@@ -307,6 +323,8 @@ recordingsRoutes.openapi(completeGroundTruthUploadRoute, (c) => {
 const deleteRecordingRoute = createRoute({
   method: 'delete',
   path: '/{recordingId}',
+  tags: ['Recordings'],
+  description: '指定した recording を削除する',
   request: {
     params: recordingIdParamsSchema,
   },
