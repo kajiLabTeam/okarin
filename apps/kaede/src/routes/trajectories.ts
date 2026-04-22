@@ -14,6 +14,8 @@ export const trajectoriesRoutes = new OpenAPIHono()
 const callbackRoute = createRoute({
   method: 'post',
   path: '/callback',
+  tags: ['Trajectories'],
+  description: '外部解析基盤からの callback を受け取り、trajectory の状態を更新する',
   request: {
     body: {
       content: {
@@ -52,6 +54,8 @@ trajectoriesRoutes.openapi(callbackRoute, (c) => {
 const getTrajectoryRoute = createRoute({
   method: 'get',
   path: '/{trajectoryId}',
+  tags: ['Trajectories'],
+  description: 'trajectory の解析状態と失敗情報を返す',
   request: {
     params: trajectoryIdParamsSchema,
   },
@@ -84,6 +88,8 @@ trajectoriesRoutes.openapi(getTrajectoryRoute, (c) => {
 const getTrajectoryResultRoute = createRoute({
   method: 'get',
   path: '/{trajectoryId}/result',
+  tags: ['Trajectories'],
+  description: 'trajectory の解析結果を取得する',
   request: {
     params: trajectoryIdParamsSchema,
   },
@@ -112,6 +118,8 @@ trajectoriesRoutes.openapi(getTrajectoryResultRoute, (c) => {
 const getTrajectoryMapDataRoute = createRoute({
   method: 'get',
   path: '/{trajectoryId}/map-data',
+  tags: ['Trajectories'],
+  description: 'trajectory 単位の map data を取得する',
   request: {
     params: trajectoryIdParamsSchema,
   },
@@ -140,6 +148,8 @@ trajectoriesRoutes.openapi(getTrajectoryMapDataRoute, (c) => {
 const batchTrajectoryMapDataRoute = createRoute({
   method: 'post',
   path: '/map-data:batch',
+  tags: ['Trajectories'],
+  description: '複数の trajectory ID を指定して map data をまとめて取得する',
   request: {
     body: {
       content: {
@@ -176,6 +186,8 @@ trajectoriesRoutes.openapi(batchTrajectoryMapDataRoute, (c) => {
 const retryTrajectoryRoute = createRoute({
   method: 'post',
   path: '/{trajectoryId}/retry',
+  tags: ['Trajectories'],
+  description: '既存の constraint をそのまま使って trajectory を再解析する',
   request: {
     params: trajectoryIdParamsSchema,
   },
@@ -204,6 +216,8 @@ trajectoriesRoutes.openapi(retryTrajectoryRoute, (c) => {
 const cloneAndReanalyzeRoute = createRoute({
   method: 'post',
   path: '/{trajectoryId}/clone-and-reanalyze',
+  tags: ['Trajectories'],
+  description: '既存 trajectory を複製し、新しい constraint で再解析する',
   request: {
     params: trajectoryIdParamsSchema,
     body: {
@@ -242,6 +256,8 @@ trajectoriesRoutes.openapi(cloneAndReanalyzeRoute, (c) => {
 const issueManualResultUploadUrlRoute = createRoute({
   method: 'post',
   path: '/{trajectoryId}/manual-result/upload-url',
+  tags: ['Trajectories'],
+  description: '手動生成した解析結果をアップロードするための URL を発行する',
   request: {
     params: trajectoryIdParamsSchema,
   },
@@ -270,6 +286,8 @@ trajectoriesRoutes.openapi(issueManualResultUploadUrlRoute, (c) => {
 const completeManualResultUploadRoute = createRoute({
   method: 'post',
   path: '/{trajectoryId}/manual-result/complete',
+  tags: ['Trajectories'],
+  description: '手動生成した解析結果の登録完了を反映する',
   request: {
     params: trajectoryIdParamsSchema,
   },
@@ -298,6 +316,8 @@ trajectoriesRoutes.openapi(completeManualResultUploadRoute, (c) => {
 const issueGroundTruthUploadUrlRoute = createRoute({
   method: 'post',
   path: '/{trajectoryId}/ground-truth/upload-url',
+  tags: ['Trajectories'],
+  description: 'trajectory 単位の ground truth をアップロードするための URL を発行する',
   request: {
     params: trajectoryIdParamsSchema,
   },
@@ -326,6 +346,8 @@ trajectoriesRoutes.openapi(issueGroundTruthUploadUrlRoute, (c) => {
 const completeGroundTruthUploadRoute = createRoute({
   method: 'post',
   path: '/{trajectoryId}/ground-truth/complete',
+  tags: ['Trajectories'],
+  description: 'trajectory 単位の ground truth の登録完了を反映する',
   request: {
     params: trajectoryIdParamsSchema,
   },
@@ -354,6 +376,8 @@ trajectoriesRoutes.openapi(completeGroundTruthUploadRoute, (c) => {
 const deleteTrajectoryRoute = createRoute({
   method: 'delete',
   path: '/{trajectoryId}',
+  tags: ['Trajectories'],
+  description: '指定した trajectory を削除する',
   request: {
     params: trajectoryIdParamsSchema,
   },

@@ -1,5 +1,5 @@
-import { swaggerUI } from '@hono/swagger-ui'
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
+import { Scalar } from '@scalar/hono-api-reference'
 
 import { registerApiRoutes } from './routes/index.js'
 
@@ -45,7 +45,7 @@ export const createApp = () => {
     })
     .get(
       '/doc',
-      swaggerUI({
+      Scalar({
         url: '/specification',
       })
     )
