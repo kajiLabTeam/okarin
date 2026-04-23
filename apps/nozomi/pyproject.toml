@@ -12,15 +12,16 @@ dependencies = [
 ]
 
 [project.scripts]
-dev = "server:dev"
-start = "server:start"
+dev = "src.server:dev"
+start = "src.server:start"
 
 [build-system]
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-py-modules = ["main", "server"]
+[tool.setuptools.packages.find]
+include = ["src*"]
 
 [dependency-groups]
 dev = [

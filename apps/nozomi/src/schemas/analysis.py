@@ -1,8 +1,6 @@
 from typing import Literal
 from uuid import UUID
 
-from fastapi import FastAPI, status
-from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 
@@ -132,12 +130,6 @@ class AnalyzeRequest(BaseModel):
         return self
 
 
-class HealthResponse(BaseModel):
-    service: Literal["nozomi"]
-    role: Literal["analysis"]
-    status: Literal["ok"]
-
-
 class AnalyzeAcceptedResponse(BaseModel):
     trajectory_id: UUID = Field(description="受理した trajectory の ID")
     status: Literal["accepted"] = Field(description="解析要求を受理した状態")
@@ -146,105 +138,3 @@ class AnalyzeAcceptedResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     detail: str = Field(description="エラー内容")
-
-
-app = FastAPI(
-    title="nozomi API",
-    description=(
-        "nozomi は解析サーバーとして動作する API サーバーであり、"
-        "仲介サーバーから受け取った解析依頼を処理する。"
-    ),
-    version="0.1.0",
-    docs_url=None,
-    redoc_url=None,
-    openapi_url="/specification",
-    openapi_tags=[
-        {
-            "name": "health",
-            "description": "運用監視や疎通確認に使う endpoint 群",
-        },
-        {
-            "name": "analysis",
-            "description": "仲介サーバーからの解析依頼を受け付ける endpoint 群",
-        },
-        {
-            "name": "debug",
-            "description": "rikka 連携の確認用 endpoint 群",
-        },
-    ],
-)
-
-
-def _scalar_fallback_html(openapi_url: str) -> HTMLResponse:
-    return HTMLResponse(
-        f"""<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>nozomi API</title>
-  </head>
-  <body>
-    <script id="api-reference" data-url="{openapi_url}"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
-  </body>
-</html>"""
-    )
-
-
-@app.get(
-    "/",
-    response_model=HealthResponse,
-    status_code=status.HTTP_200_OK,
-    summary="ヘルスチェック",
-    description="解析サーバーとしての疎通確認に使う基本 endpoint。",
-    tags=["health"],
-)
-def read_root() -> HealthResponse:
-    return HealthResponse(service="nozomi", role="analysis", status="ok")
-
-
-@app.get(
-    "/doc",
-    include_in_schema=False,
-    summary="Scalar API reference",
-    description="nozomi API の Scalar ドキュメントを返す。",
-)
-async def scalar_reference() -> HTMLResponse:
-    openapi_url = app.openapi_url or "/specification"
-
-    try:
-        from scalar_fastapi import get_scalar_api_reference
-    except ImportError:  # pragma: no cover - fallback for environments before uv sync
-        return _scalar_fallback_html(openapi_url)
-
-    return get_scalar_api_reference(
-        openapi_url=openapi_url,
-        title="nozomi API",
-        scalar_proxy_url="https://proxy.scalar.com",
-    )
-
-
-@app.post(
-    "/analyze",
-    response_model=AnalyzeAcceptedResponse,
-    status_code=status.HTTP_202_ACCEPTED,
-    summary="解析依頼を受け付ける",
-    description=(
-        "仲介サーバーから raw データ取得用 URL、解析結果保存用 URL、"
-        "callback 情報、制約点情報を受け取り、解析ジョブを受理する。"
-    ),
-    tags=["analysis"],
-    responses={
-        422: {
-            "description": "request body が不正",
-            "model": ErrorResponse,
-        }
-    },
-)
-def analyze(payload: AnalyzeRequest) -> AnalyzeAcceptedResponse:
-    return AnalyzeAcceptedResponse(
-        trajectory_id=payload.trajectory_id,
-        status="accepted",
-        message="analysis request accepted; execution pipeline is not implemented yet",
-    )
