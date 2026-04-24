@@ -8,18 +8,20 @@ dependencies = [
     "fastapi[standard]>=0.135.1",
     "pydantic>=2.12.5",
     "rikka",
+    "scalar-fastapi>=1.4.1",
 ]
 
 [project.scripts]
-dev = "server:dev"
-start = "server:start"
+dev = "src.server:dev"
+start = "src.server:start"
 
 [build-system]
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-py-modules = ["main", "server"]
+[tool.setuptools.packages.find]
+include = ["src*"]
 
 [dependency-groups]
 dev = [
@@ -56,6 +58,7 @@ indent-style = "space"
 
 [tool.mypy]
 python_version = "3.14"
+mypy_path = "$MYPY_CONFIG_FILE_DIR"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
