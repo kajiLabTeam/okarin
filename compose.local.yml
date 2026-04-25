@@ -37,6 +37,22 @@ services:
       timeout: 3s
       retries: 20
 
+  dbmate:
+    image: ghcr.io/amacneil/dbmate:2
+    profiles: ["tools"]
+    env_file:
+      - ${ENV_FILE:-./deploy/env.local}
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable
+      DBMATE_MIGRATIONS_DIR: /db/migrations
+      DBMATE_SCHEMA_FILE: /db/schema.sql
+    depends_on:
+      postgres:
+        condition: service_healthy
+    working_dir: /db
+    volumes:
+      - ./db:/db
+
   seaweedfs:
     image: ${SEAWEEDFS_IMAGE:-chrislusf/seaweedfs:4.17}
     restart: unless-stopped
