@@ -30,3 +30,7 @@ docker run --rm \
   amazon/aws-cli:2 \
   sh ./init_bucket.sh
 ```
+
+## SecretAccessKeyの作成
+
+`openssl rand -hex 32`
