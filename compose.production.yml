@@ -8,6 +8,9 @@ services:
         condition: service_healthy
     env_file:
       - ${ENV_FILE:-./deploy/env.production}
+    environment:
+      S3_ACCESS_KEY_ID: ${KAEDE_S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${KAEDE_S3_SECRET_ACCESS_KEY}
 
   nozomi:
     build:
@@ -20,6 +23,9 @@ services:
         condition: service_healthy
     env_file:
       - ${ENV_FILE:-./deploy/env.production}
+    environment:
+      S3_ACCESS_KEY_ID:
+      S3_SECRET_ACCESS_KEY:
 
   postgres:
     image: ${POSTGRES_IMAGE:-postgres:17-alpine}
@@ -49,6 +55,22 @@ services:
     working_dir: /db
     volumes:
       - ./db:/db
+
+  storage-bootstrap:
+    image: amazon/aws-cli:2
+    profiles: ["tools"]
+    env_file:
+      - ${ENV_FILE:-./deploy/env.production}
+    environment:
+      S3_ACCESS_KEY_ID: ${STORAGE_BOOTSTRAP_S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${STORAGE_BOOTSTRAP_S3_SECRET_ACCESS_KEY}
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+    working_dir: /work
+    command: ["sh", "./init_bucket.sh"]
+    volumes:
+      - ./storage/bootstrap:/work:ro
 
   seaweedfs:
     image: ${SEAWEEDFS_IMAGE:-chrislusf/seaweedfs:4.17}

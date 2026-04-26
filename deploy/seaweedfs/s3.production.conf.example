@@ -1,19 +1,32 @@
 {
   "identities": [
     {
-      "name": "okarin-production-app",
+      "name": "okarin-production-kaede",
       "credentials": [
         {
-          "accessKey": "change_me_production_access_key",
-          "secretKey": "change_me_production_secret_key"
+          "accessKey": "kaede-production",
+          "secretKey": "change_me_production_kaede_secret_key"
+        }
+      ],
+      "actions": [
+        "Read",
+        "Write",
+        "List"
+      ]
+    },
+    {
+      "name": "okarin-production-storage-bootstrap",
+      "credentials": [
+        {
+          "accessKey": "storage-bootstrap-production",
+          "secretKey": "change_me_production_storage_bootstrap_secret_key"
         }
       ],
       "actions": [
         "Admin",
         "Read",
         "Write",
-        "List",
-        "Tagging"
+        "List"
       ]
     }
   ]
