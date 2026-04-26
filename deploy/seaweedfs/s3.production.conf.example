@@ -4,7 +4,7 @@
       "name": "okarin-production-kaede",
       "credentials": [
         {
-          "accessKey": "change_me_production_kaede_access_key",
+          "accessKey": "kaede-production",
           "secretKey": "change_me_production_kaede_secret_key"
         }
       ],
@@ -18,7 +18,7 @@
       "name": "okarin-production-storage-bootstrap",
       "credentials": [
         {
-          "accessKey": "change_me_production_storage_bootstrap_access_key",
+          "accessKey": "storage-bootstrap-production",
           "secretKey": "change_me_production_storage_bootstrap_secret_key"
         }
       ],

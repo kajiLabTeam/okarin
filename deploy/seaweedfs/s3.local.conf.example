@@ -4,7 +4,7 @@
       "name": "okarin-local-kaede",
       "credentials": [
         {
-          "accessKey": "change_me_local_kaede_access_key",
+          "accessKey": "kaede-local",
           "secretKey": "change_me_local_kaede_secret_key"
         }
       ],
@@ -18,7 +18,7 @@
       "name": "okarin-local-storage-bootstrap",
       "credentials": [
         {
-          "accessKey": "change_me_local_storage_bootstrap_access_key",
+          "accessKey": "storage-bootstrap-local",
           "secretKey": "change_me_local_storage_bootstrap_secret_key"
         }
       ],

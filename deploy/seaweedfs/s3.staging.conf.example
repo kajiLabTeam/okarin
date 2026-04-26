@@ -4,7 +4,7 @@
       "name": "okarin-staging-kaede",
       "credentials": [
         {
-          "accessKey": "change_me_staging_kaede_access_key",
+          "accessKey": "kaede-staging",
           "secretKey": "change_me_staging_kaede_secret_key"
         }
       ],
@@ -18,7 +18,7 @@
       "name": "okarin-staging-storage-bootstrap",
       "credentials": [
         {
-          "accessKey": "change_me_staging_storage_bootstrap_access_key",
+          "accessKey": "storage-bootstrap-staging",
           "secretKey": "change_me_staging_storage_bootstrap_secret_key"
         }
       ],
