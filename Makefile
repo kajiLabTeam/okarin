@@ -19,7 +19,7 @@ else
 $(error Unsupported ENV='$(ENV)'. Use local|staging|production)
 endif
 
-.PHONY: help pull up down logs ps config db-status db-up db-down db-dump db-new
+.PHONY: help pull up down logs ps config db-status db-up db-down db-dump db-new storage-init
 
 help:
 	@echo "Usage examples:"
@@ -31,6 +31,7 @@ help:
 	@echo "  make db-status ENV=local"
 	@echo "  make db-up ENV=local"
 	@echo "  make db-new ENV=local NAME=init"
+	@echo "  make storage-init ENV=local"
 
 pull:
 	$(COMPOSE) $(COMPOSE_FILES) pull
@@ -67,3 +68,6 @@ ifndef NAME
 	$(error NAME is required. Use NAME=create_something)
 endif
 	$(COMPOSE) $(COMPOSE_FILES) --profile tools run --rm dbmate new $(NAME)
+
+storage-init:
+	$(COMPOSE) $(COMPOSE_FILES) --profile tools run --rm storage-bootstrap

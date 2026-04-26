@@ -50,6 +50,19 @@ services:
     volumes:
       - ./db:/db
 
+  storage-bootstrap:
+    image: amazon/aws-cli:2
+    profiles: ["tools"]
+    env_file:
+      - ${ENV_FILE:-./deploy/env.production}
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+    working_dir: /work
+    command: ["sh", "./init_bucket.sh"]
+    volumes:
+      - ./storage/bootstrap:/work:ro
+
   seaweedfs:
     image: ${SEAWEEDFS_IMAGE:-chrislusf/seaweedfs:4.17}
     restart: unless-stopped

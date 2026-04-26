@@ -21,3 +21,15 @@
 - `kaede` が署名付き URL を発行する際の保存先規約参照
 - `complete-upload` の存在確認対象の整理
 - `nozomi` が利用する raw / result URL 生成規約の共有
+
+## 想定コマンド
+
+`storage-bootstrap` は Docker Compose サービスとして実行する前提とする。
+
+```sh
+# local 環境を起動
+make up ENV=local
+
+# bucket の存在確認と初期化
+make storage-init ENV=local
+```
