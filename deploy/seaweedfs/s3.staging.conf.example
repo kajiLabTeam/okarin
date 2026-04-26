@@ -1,19 +1,32 @@
 {
   "identities": [
     {
-      "name": "okarin-staging-app",
+      "name": "okarin-staging-kaede",
       "credentials": [
         {
-          "accessKey": "change_me_staging_access_key",
-          "secretKey": "change_me_staging_secret_key"
+          "accessKey": "change_me_staging_kaede_access_key",
+          "secretKey": "change_me_staging_kaede_secret_key"
+        }
+      ],
+      "actions": [
+        "Read",
+        "Write",
+        "List"
+      ]
+    },
+    {
+      "name": "okarin-staging-storage-bootstrap",
+      "credentials": [
+        {
+          "accessKey": "change_me_staging_storage_bootstrap_access_key",
+          "secretKey": "change_me_staging_storage_bootstrap_secret_key"
         }
       ],
       "actions": [
         "Admin",
         "Read",
         "Write",
-        "List",
-        "Tagging"
+        "List"
       ]
     }
   ]

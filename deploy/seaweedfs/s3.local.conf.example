@@ -1,19 +1,32 @@
 {
   "identities": [
     {
-      "name": "okarin-local-app",
+      "name": "okarin-local-kaede",
       "credentials": [
         {
-          "accessKey": "change_me_local_access_key",
-          "secretKey": "change_me_local_secret_key"
+          "accessKey": "change_me_local_kaede_access_key",
+          "secretKey": "change_me_local_kaede_secret_key"
+        }
+      ],
+      "actions": [
+        "Read",
+        "Write",
+        "List"
+      ]
+    },
+    {
+      "name": "okarin-local-storage-bootstrap",
+      "credentials": [
+        {
+          "accessKey": "change_me_local_storage_bootstrap_access_key",
+          "secretKey": "change_me_local_storage_bootstrap_secret_key"
         }
       ],
       "actions": [
         "Admin",
         "Read",
         "Write",
-        "List",
-        "Tagging"
+        "List"
       ]
     }
   ]
