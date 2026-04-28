@@ -48,3 +48,22 @@ make storage-test
 - 必須環境変数が不足した場合に失敗すること
 - bucket が既に存在する場合は作成しないこと
 - bucket が存在しない場合は作成すること
+
+## Filer UI
+
+ローカル環境では SeaweedFS の Filer UI をブラウザで開ける。
+
+```sh
+# local 環境を起動
+make up ENV=local
+```
+
+起動後に以下へアクセスする:
+
+`http://localhost:8888`
+
+補足:
+
+- `8333` は S3 API のため、ブラウザで直接開くと `Access Denied` になる
+- `8888` は Filer UI 用ポート
+- `9333` は SeaweedFS の管理情報確認用ポート
