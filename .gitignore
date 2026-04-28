@@ -1,6 +1,9 @@
 deploy/env.local
+deploy/env.local.storage-bootstrap
 deploy/env.staging
+deploy/env.staging.storage-bootstrap
 deploy/env.production
+deploy/env.production.storage-bootstrap
 deploy/seaweedfs/s3.local.conf
 deploy/seaweedfs/s3.staging.conf
 deploy/seaweedfs/s3.production.conf
