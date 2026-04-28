@@ -33,3 +33,18 @@ make up ENV=local
 # bucket の存在確認と初期化
 make storage-init ENV=local
 ```
+
+## テスト
+
+`init_bucket.sh` の分岐はローカルでテストできる。
+
+```sh
+# bucket 初期化スクリプトのテスト
+make storage-test
+```
+
+確認内容:
+
+- 必須環境変数が不足した場合に失敗すること
+- bucket が既に存在する場合は作成しないこと
+- bucket が存在しない場合は作成すること

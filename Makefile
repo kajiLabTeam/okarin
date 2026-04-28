@@ -19,7 +19,7 @@ else
 $(error Unsupported ENV='$(ENV)'. Use local|staging|production)
 endif
 
-.PHONY: help pull up down logs ps config db-status db-up db-down db-dump db-new storage-init
+.PHONY: help pull up down logs ps config db-status db-up db-down db-dump db-new storage-init storage-test
 
 help:
 	@echo "Usage examples:"
@@ -32,6 +32,7 @@ help:
 	@echo "  make db-up ENV=local"
 	@echo "  make db-new ENV=local NAME=init"
 	@echo "  make storage-init ENV=local"
+	@echo "  make storage-test"
 
 pull:
 	$(COMPOSE) $(COMPOSE_FILES) pull
@@ -71,3 +72,6 @@ endif
 
 storage-init:
 	$(COMPOSE) $(COMPOSE_FILES) --profile tools run --rm storage-bootstrap
+
+storage-test:
+	sh ./storage/bootstrap/test_init_bucket.sh
