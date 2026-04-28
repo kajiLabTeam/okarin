@@ -7,10 +7,8 @@ services:
       nozomi:
         condition: service_healthy
     env_file:
-      - ${ENV_FILE:-./deploy/env.staging}
-    environment:
-      S3_ACCESS_KEY_ID: ${KAEDE_S3_ACCESS_KEY_ID}
-      S3_SECRET_ACCESS_KEY: ${KAEDE_S3_SECRET_ACCESS_KEY}
+      - ${ENV_FILE:-./deploy/env/staging.env}
+      - ${KAEDE_ENV_FILE:-./deploy/apps/kaede.staging.env}
 
   nozomi:
     build:
@@ -22,16 +20,13 @@ services:
       seaweedfs:
         condition: service_healthy
     env_file:
-      - ${ENV_FILE:-./deploy/env.staging}
-    environment:
-      S3_ACCESS_KEY_ID:
-      S3_SECRET_ACCESS_KEY:
+      - ${ENV_FILE:-./deploy/env/staging.env}
 
   postgres:
     image: ${POSTGRES_IMAGE:-postgres:17-alpine}
     restart: unless-stopped
     env_file:
-      - ${ENV_FILE:-./deploy/env.staging}
+      - ${ENV_FILE:-./deploy/env/staging.env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -44,7 +39,7 @@ services:
     image: ghcr.io/amacneil/dbmate:2
     profiles: ["tools"]
     env_file:
-      - ${ENV_FILE:-./deploy/env.staging}
+      - ${ENV_FILE:-./deploy/env/staging.env}
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable
       DBMATE_MIGRATIONS_DIR: /db/migrations
@@ -60,8 +55,8 @@ services:
     image: amazon/aws-cli:2.34.38
     profiles: ["tools"]
     env_file:
-      - ${ENV_FILE:-./deploy/env.staging}
-      - ${STORAGE_BOOTSTRAP_ENV_FILE:-./deploy/env.staging.storage-bootstrap}
+      - ${ENV_FILE:-./deploy/env/staging.env}
+      - ${STORAGE_BOOTSTRAP_ENV_FILE:-./deploy/apps/storage-bootstrap.staging.env}
     depends_on:
       seaweedfs:
         condition: service_healthy

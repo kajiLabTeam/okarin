@@ -117,18 +117,21 @@ recordings/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/ground_truth/uwb.csv
 
 ```text
 trajectories/{trajectory_id}/analyzed/result.csv
+trajectories/{trajectory_id}/ground_truth/result.csv
 ```
 
 例:
 
 ```text
 trajectories/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/analyzed/result.csv
+trajectories/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/ground_truth/result.csv
 ```
 
 ルール:
 
 - `{trajectory_id}` は `trajectories.id`
 - `result.csv` は解析結果の標準出力
+- `ground_truth/result.csv` は trajectory 単位の整形済み ground truth 結果を表す
 - 再解析時は既存結果を上書きせず、新しい `trajectory_id` 配下に保存する
 
 ## 完了判定
@@ -154,6 +157,7 @@ trajectories/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/analyzed/result.csv
 - `recordings/` 配下の raw データ
 - `recordings/` 配下の ground truth
 - `trajectories/` 配下の解析結果
+- `trajectories/` 配下の ground truth 解析結果
 
 署名付き URL 発行対象:
 
@@ -173,6 +177,7 @@ trajectories/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/analyzed/result.csv
 - `recordings/raw` は当面削除しない
 - `recordings/ground_truth` は当面削除しない
 - `trajectories/analyzed/result.csv` は当面削除しない
+- `trajectories/ground_truth/result.csv` は当面削除しない
 
 ## 環境ごとの運用
 

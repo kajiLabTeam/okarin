@@ -24,8 +24,8 @@ Docker で `aws-cli` を使って実行する想定:
 ```sh
 docker run --rm \
   --network okarin-local_default \
-  --env-file ./deploy/env.local \
-  --env-file ./deploy/env.local.storage-bootstrap \
+  --env-file ./deploy/env/local.env \
+  --env-file ./deploy/apps/storage-bootstrap.local.env \
   -v "$PWD/storage/bootstrap:/work:ro" \
   -w /work \
   --entrypoint sh \
@@ -33,8 +33,8 @@ docker run --rm \
   ./init_bucket.sh
 ```
 
-`deploy/env.local` には共通の S3 設定を置き、
-`deploy/env.local.storage-bootstrap` には bootstrap 専用の資格情報を置く。
+`deploy/env/local.env` には共通の S3 設定を置き、
+`deploy/apps/storage-bootstrap.local.env` には bootstrap 専用の資格情報を置く。
 
 ## SecretAccessKeyの作成
 
