@@ -57,7 +57,7 @@ services:
       - ./db:/db
 
   storage-bootstrap:
-    image: amazon/aws-cli:2
+    image: amazon/aws-cli:2.34.38
     profiles: ["tools"]
     env_file:
       - ${ENV_FILE:-./deploy/env.staging}
@@ -68,6 +68,7 @@ services:
       seaweedfs:
         condition: service_healthy
     working_dir: /work
+    entrypoint: []
     command: ["sh", "./init_bucket.sh"]
     volumes:
       - ./storage/bootstrap:/work:ro
