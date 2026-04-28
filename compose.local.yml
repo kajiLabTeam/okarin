@@ -64,9 +64,7 @@ services:
     profiles: ["tools"]
     env_file:
       - ${ENV_FILE:-./deploy/env.local}
-    environment:
-      S3_ACCESS_KEY_ID: ${STORAGE_BOOTSTRAP_S3_ACCESS_KEY_ID}
-      S3_SECRET_ACCESS_KEY: ${STORAGE_BOOTSTRAP_S3_SECRET_ACCESS_KEY}
+      - ${STORAGE_BOOTSTRAP_ENV_FILE:-./deploy/env.local.storage-bootstrap}
     depends_on:
       seaweedfs:
         condition: service_healthy
