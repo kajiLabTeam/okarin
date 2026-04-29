@@ -1,5 +1,4 @@
 import { serve } from '@hono/node-server'
-
 import { createApp } from './server.js'
 
 const app = createApp()

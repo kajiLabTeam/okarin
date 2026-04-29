@@ -1,7 +1,9 @@
 PROJECT_NAME ?= okarin-$(ENV)
 
 ENV ?= local
-ENV_FILE ?= ./deploy/env.$(ENV)
+ENV_FILE ?= ./deploy/env/$(ENV).env
+KAEDE_ENV_FILE ?= ./deploy/apps/kaede.$(ENV).env
+STORAGE_BOOTSTRAP_ENV_FILE ?= ./deploy/apps/storage-bootstrap.$(ENV).env
 COMPOSE = docker compose --env-file $(ENV_FILE) -p $(PROJECT_NAME)
 
 BASE_FILES := -f compose.yml
@@ -19,18 +21,20 @@ else
 $(error Unsupported ENV='$(ENV)'. Use local|staging|production)
 endif
 
-.PHONY: help pull up down logs ps config db-status db-up db-down db-dump db-new
+.PHONY: help pull up down logs ps config db-status db-up db-down db-dump db-new storage-init storage-test
 
 help:
 	@echo "Usage examples:"
 	@echo "  make up ENV=local"
-	@echo "  make up ENV=staging ENV_FILE=./deploy/env.staging"
-	@echo "  make up ENV=production ENV_FILE=./deploy/env.production"
-	@echo "  make pull ENV=production ENV_FILE=./deploy/env.production"
+	@echo "  make up ENV=staging ENV_FILE=./deploy/env/staging.env"
+	@echo "  make up ENV=production ENV_FILE=./deploy/env/production.env"
+	@echo "  make pull ENV=production ENV_FILE=./deploy/env/production.env"
 	@echo "  make up ENV=production PROJECT_NAME=okarin-prod-a"
 	@echo "  make db-status ENV=local"
 	@echo "  make db-up ENV=local"
 	@echo "  make db-new ENV=local NAME=init"
+	@echo "  make storage-init ENV=local"
+	@echo "  make storage-test"
 
 pull:
 	$(COMPOSE) $(COMPOSE_FILES) pull
@@ -67,3 +71,9 @@ ifndef NAME
 	$(error NAME is required. Use NAME=create_something)
 endif
 	$(COMPOSE) $(COMPOSE_FILES) --profile tools run --rm dbmate new $(NAME)
+
+storage-init:
+	$(COMPOSE) $(COMPOSE_FILES) --profile tools run --rm storage-bootstrap
+
+storage-test:
+	sh ./storage/bootstrap/test_init_bucket.sh

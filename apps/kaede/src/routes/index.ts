@@ -1,5 +1,4 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
-
 import { recordingsRoutes } from './recordings.js'
 import { trajectoriesRoutes } from './trajectories.js'
 

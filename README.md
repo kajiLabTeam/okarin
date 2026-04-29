@@ -91,7 +91,9 @@ uv run pytest
 初回はテンプレートから実ファイルを作成:
 
 ```sh
-cp deploy/env.local.example deploy/env.local
+cp deploy/env/local.env.example deploy/env/local.env
+cp deploy/apps/kaede.local.env.example deploy/apps/kaede.local.env
+cp deploy/apps/storage-bootstrap.local.env.example deploy/apps/storage-bootstrap.local.env
 cp deploy/seaweedfs/s3.local.conf.example deploy/seaweedfs/s3.local.conf
 ```
 
@@ -105,35 +107,38 @@ docker compose -p okarin-local -f compose.yml -f compose.local.yml up -d --build
 docker compose -p okarin-local -f compose.yml -f compose.local.yml down
 ```
 
-ローカル環境変数は `deploy/env.local` を使います。
+ローカルの共通環境変数は `deploy/env/local.env` を使います。  
+`kaede` 用の S3 認証情報は `deploy/apps/kaede.local.env`、`storage-bootstrap` 用の認証情報は `deploy/apps/storage-bootstrap.local.env` を使います。
 
 `deploy/seaweedfs/s3.local.conf` で S3 認証情報（`accessKey` / `secretKey`）を管理しています。  
-キーを変更する場合は `deploy/seaweedfs/s3.local.conf` と `deploy/env.local` の両方を同じ値に更新してください。
+キーを変更する場合は `deploy/seaweedfs/s3.local.conf` と `deploy/apps/kaede.local.env` / `deploy/apps/storage-bootstrap.local.env` の対応する値を同じに更新してください。
 これら実ファイルは `.gitignore` で除外されるため、GitHubには上がりません。
 
 ### staging / production の環境変数
 
-- `deploy/env.staging.example` と `deploy/env.production.example` をベースに実ファイルを作成してください。
+- `deploy/env/staging.env.example` と `deploy/env/production.env.example` をベースに共通 env の実ファイルを作成してください。
+- `deploy/apps/kaede.staging.env.example` と `deploy/apps/kaede.production.env.example` をベースに `kaede` 用 env を作成してください。
+- `deploy/apps/storage-bootstrap.staging.env.example` と `deploy/apps/storage-bootstrap.production.env.example` をベースに `storage-bootstrap` 用 env を作成してください。
 - `deploy/seaweedfs/s3.staging.conf.example` と `deploy/seaweedfs/s3.production.conf.example` をベースに SeaweedFS の実ファイルを作成してください。
 - 各環境の compose override が対応する `env_file` を持ちます。必要なら `ENV_FILE` で上書きできます。
 
 ### staging 手動デプロイ
 
 ```sh
-ENV_FILE=./deploy/env.staging \
+ENV_FILE=./deploy/env/staging.env \
 docker compose -p okarin-staging -f compose.yml -f compose.staging.yml up -d --build --remove-orphans
 ```
 
 ### production 手動デプロイ
 
 ```sh
-ENV_FILE=./deploy/env.production \
+ENV_FILE=./deploy/env/production.env \
 docker compose -p okarin-production -f compose.yml -f compose.production.yml up -d --build --remove-orphans
 ```
 
 停止:
 
 ```sh
-ENV_FILE=./deploy/env.production \
+ENV_FILE=./deploy/env/production.env \
 docker compose -p okarin-production -f compose.yml -f compose.production.yml down
 ```

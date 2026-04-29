@@ -1,5 +1,4 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
-
 import { notImplementedResponseSchema } from '../schemas/common.js'
 import {
   callbackRequestSchema,
