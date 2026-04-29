@@ -95,7 +95,8 @@ class AnalyzeRequest(BaseModel):
     recording_id: UUID = Field(description="元になった recording の ID")
     floor_id: UUID = Field(description="解析対象の floor ID")
     constraints: list[Constraint] = Field(
-        min_length=1, description="開始点・経由点・終了点からなる制約点の一覧"
+        default_factory=list,
+        description="開始点・経由点・終了点からなる制約点の一覧。省略時は制約なし",
     )
     raw_data_urls: RawDataUrls = Field(description="raw データ取得用の署名付き URL 群")
     result_upload_url: HttpUrl = Field(
@@ -108,6 +109,9 @@ class AnalyzeRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_constraints(self) -> AnalyzeRequest:
+        if len(self.constraints) == 0:
+            return self
+
         start_count = sum(
             1
             for point in self.constraints

@@ -53,6 +53,24 @@ def test_analyze_request_accepts_valid_payload() -> None:
     assert request.raw_data_urls.wifi is None
 
 
+def test_analyze_request_accepts_payload_without_constraints() -> None:
+    payload = valid_analyze_request()
+    payload.pop("constraints")
+
+    request = AnalyzeRequest.model_validate(payload)
+
+    assert request.constraints == []
+
+
+def test_analyze_request_accepts_payload_with_empty_constraints() -> None:
+    payload = valid_analyze_request()
+    payload["constraints"] = []
+
+    request = AnalyzeRequest.model_validate(payload)
+
+    assert request.constraints == []
+
+
 def test_analyze_request_accepts_payload_without_optional_raw_data_urls() -> None:
     payload = valid_analyze_request()
     payload["raw_data_urls"] = {

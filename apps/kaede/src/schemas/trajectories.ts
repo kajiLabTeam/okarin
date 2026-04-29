@@ -69,14 +69,20 @@ export const trajectoryConstraintSchema = z.discriminatedUnion('point_type', [
 
 export const createTrajectoryRequestSchema = z
   .object({
-    constraints: z.array(trajectoryConstraintSchema).min(1).openapi({
+    constraints: z.array(trajectoryConstraintSchema).default([]).optional().openapi({
       description: '開始点・経由点・終了点からなる制約点の一覧',
     }),
   })
   .superRefine((input, ctx) => {
-    const startCount = input.constraints.filter((point) => point.point_type === 'start').length
-    const goalCount = input.constraints.filter((point) => point.point_type === 'goal').length
-    const seqs = input.constraints.map((point) => point.seq)
+    const constraints = input.constraints ?? []
+
+    if (constraints.length === 0) {
+      return
+    }
+
+    const startCount = constraints.filter((point) => point.point_type === 'start').length
+    const goalCount = constraints.filter((point) => point.point_type === 'goal').length
+    const seqs = constraints.map((point) => point.seq)
 
     if (startCount !== 1) {
       ctx.addIssue({

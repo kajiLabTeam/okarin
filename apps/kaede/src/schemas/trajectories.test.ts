@@ -7,6 +7,20 @@ import {
 } from './trajectories.js'
 
 describe('trajectory schemas', () => {
+  it('createTrajectoryRequestSchema は constraints を省略した入力を受け入れる', () => {
+    const result = createTrajectoryRequestSchema.safeParse({})
+
+    expect(result.success).toBe(true)
+  })
+
+  it('createTrajectoryRequestSchema は空の constraints を受け入れる', () => {
+    const result = createTrajectoryRequestSchema.safeParse({
+      constraints: [],
+    })
+
+    expect(result.success).toBe(true)
+  })
+
   it('createTrajectoryRequestSchema は start 1 件と waypoint を含む入力を受け入れる', () => {
     const result = createTrajectoryRequestSchema.safeParse({
       constraints: [

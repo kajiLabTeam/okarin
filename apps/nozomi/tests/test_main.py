@@ -69,6 +69,27 @@ def test_analyze_accepts_valid_request() -> None:
     }
 
 
+def test_analyze_accepts_request_without_constraints() -> None:
+    response = client.post(
+        "/analyze",
+        json={
+            "trajectory_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+            "recording_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            "floor_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            "raw_data_urls": {
+                "acce": "https://object-storage.example.com/acce.csv",
+                "gyro": "https://object-storage.example.com/gyro.csv",
+            },
+            "result_upload_url": "https://object-storage.example.com/result.csv",
+            "callback_url": "https://mediator.example.com/api/trajectories/callback",
+            "callback_token": "signed-callback-token",
+        },
+    )
+
+    assert response.status_code == 202
+    assert response.json()["status"] == "accepted"
+
+
 def test_analyze_rejects_request_without_start_constraint() -> None:
     response = client.post(
         "/analyze",
