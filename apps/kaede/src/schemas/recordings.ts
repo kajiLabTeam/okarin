@@ -114,5 +114,26 @@ export const recordingTrajectoriesResponseSchema = z.object({
     }),
 })
 
+export const recordingGroundTruthUploadUrlResponseSchema = z.object({
+  recording_id: uuidSchema.openapi({
+    description: 'ground truth raw の upload URL を発行した recording の ID',
+  }),
+  upload_url: z.string().url().openapi({
+    description: 'ground truth raw をアップロードするための署名付き URL',
+  }),
+  expires_at: isoDatetimeSchema.openapi({
+    description: 'upload_url の有効期限',
+  }),
+})
+
+export const recordingGroundTruthCompleteResponseSchema = z.object({
+  recording_id: uuidSchema.openapi({
+    description: 'ground truth raw の登録完了を反映した recording の ID',
+  }),
+  status: z.literal('completed').openapi({
+    description: 'ground truth raw の登録完了状態',
+  }),
+})
+
 export type InitRecordingRequest = z.infer<typeof initRecordingRequestSchema>
 export type RecordingIdParams = z.infer<typeof recordingIdParamsSchema>

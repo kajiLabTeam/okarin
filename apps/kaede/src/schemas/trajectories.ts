@@ -187,5 +187,112 @@ export const trajectoryStatusResponseSchema = z.object({
   }),
 })
 
+export const trajectoryResultResponseSchema = z.object({
+  trajectory_id: uuidSchema.openapi({
+    description: 'result を取得する trajectory の ID',
+  }),
+  download_url: z.string().url().openapi({
+    description: 'result.csv を取得するための署名付き URL',
+  }),
+  expires_at: isoDatetimeSchema.openapi({
+    description: 'download_url の有効期限',
+  }),
+})
+
+const mapPointSchema = z.object({
+  x: finiteNumberSchema.openapi({
+    description: 'フロア座標系での X 座標',
+  }),
+  y: finiteNumberSchema.openapi({
+    description: 'フロア座標系での Y 座標',
+  }),
+  timestamp: z.number().int().min(0).openapi({
+    description: '系列内の時刻',
+  }),
+})
+
+const mapDataKindSchema = z.enum(['analyzed', 'ground_truth']).openapi({
+  description: '地図描画データの種別',
+})
+
+export const trajectoryMapDataResponseSchema = z.object({
+  trajectory_id: uuidSchema.openapi({
+    description: '地図描画対象 trajectory の ID',
+  }),
+  floor_id: uuidSchema.openapi({
+    description: '描画対象 floor の ID',
+  }),
+  kind: mapDataKindSchema,
+  points: z.array(mapPointSchema).openapi({
+    description: '描画用の座標列',
+  }),
+})
+
+export const batchTrajectoryMapDataRequestSchema = z.object({
+  trajectory_ids: z.array(uuidSchema).min(1).openapi({
+    description: 'まとめて取得したい trajectory ID の一覧',
+  }),
+})
+
+export const batchTrajectoryMapDataResponseSchema = z.object({
+  floor_id: uuidSchema.openapi({
+    description: '返却した軌跡群が属する floor の ID',
+  }),
+  trajectories: z
+    .array(
+      z.object({
+        trajectory_id: uuidSchema.openapi({
+          description: 'trajectory の ID',
+        }),
+        kind: mapDataKindSchema,
+        points: z.array(mapPointSchema).openapi({
+          description: '描画用の座標列',
+        }),
+      })
+    )
+    .openapi({
+      description: 'trajectory ごとの描画データ',
+    }),
+})
+
+export const retriedTrajectoryResponseSchema = z.object({
+  source_trajectory_id: uuidSchema.openapi({
+    description: '再解析元の trajectory の ID',
+  }),
+  trajectory_id: uuidSchema.openapi({
+    description: '新しく作成された trajectory の ID',
+  }),
+  recording_id: uuidSchema.openapi({
+    description: '元になった recording の ID',
+  }),
+  status: z.literal('processing').openapi({
+    description: '再解析開始直後の状態',
+  }),
+})
+
+export const uploadUrlWithPathResponseSchema = z.object({
+  trajectory_id: uuidSchema.openapi({
+    description: '対象 trajectory の ID',
+  }),
+  upload_url: z.string().url().openapi({
+    description: 'アップロード用の署名付き URL',
+  }),
+  upload_path: z.string().min(1).openapi({
+    description: 'アップロード先のオブジェクトパス',
+  }),
+  expires_at: isoDatetimeSchema.openapi({
+    description: 'upload_url の有効期限',
+  }),
+})
+
+export const trajectoryCompletionResponseSchema = z.object({
+  trajectory_id: uuidSchema.openapi({
+    description: '完了を反映した trajectory の ID',
+  }),
+  status: z.literal('completed').openapi({
+    description: '完了状態',
+  }),
+})
+
 export type CreateTrajectoryRequest = z.infer<typeof createTrajectoryRequestSchema>
 export type CallbackRequest = z.infer<typeof callbackRequestSchema>

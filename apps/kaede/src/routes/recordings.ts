@@ -5,6 +5,8 @@ import {
   initRecordingRequestSchema,
   initRecordingResponseSchema,
   recordingDetailResponseSchema,
+  recordingGroundTruthCompleteResponseSchema,
+  recordingGroundTruthUploadUrlResponseSchema,
   recordingIdParamsSchema,
   recordingTrajectoriesResponseSchema,
   refreshUploadUrlsRequestSchema,
@@ -269,6 +271,14 @@ const issueGroundTruthUploadUrlRoute = createRoute({
     params: recordingIdParamsSchema,
   },
   responses: {
+    200: {
+      description: 'ground truth raw アップロード URL 発行',
+      content: {
+        'application/json': {
+          schema: recordingGroundTruthUploadUrlResponseSchema,
+        },
+      },
+    },
     501: {
       description: 'not implemented',
       content: {
@@ -299,6 +309,14 @@ const completeGroundTruthUploadRoute = createRoute({
     params: recordingIdParamsSchema,
   },
   responses: {
+    200: {
+      description: 'ground truth raw 登録完了',
+      content: {
+        'application/json': {
+          schema: recordingGroundTruthCompleteResponseSchema,
+        },
+      },
+    },
     501: {
       description: 'not implemented',
       content: {
@@ -329,6 +347,9 @@ const deleteRecordingRoute = createRoute({
     params: recordingIdParamsSchema,
   },
   responses: {
+    204: {
+      description: 'recording 削除完了',
+    },
     501: {
       description: 'not implemented',
       content: {
