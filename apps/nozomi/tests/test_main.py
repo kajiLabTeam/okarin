@@ -63,9 +63,6 @@ def test_analyze_accepts_valid_request() -> None:
     assert response.json() == {
         "trajectory_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
         "status": "accepted",
-        "message": (
-            "analysis request accepted; execution pipeline is not implemented yet"
-        ),
     }
 
 

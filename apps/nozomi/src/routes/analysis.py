@@ -26,5 +26,4 @@ def analyze(payload: AnalyzeRequest) -> AnalyzeAcceptedResponse:
     return AnalyzeAcceptedResponse(
         trajectory_id=payload.trajectory_id,
         status="accepted",
-        message="analysis request accepted; execution pipeline is not implemented yet",
     )
