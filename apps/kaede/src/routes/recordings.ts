@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi'
-import { notImplementedResponseSchema } from '../schemas/common.js'
+import { errorResponseSchema, notImplementedResponseSchema } from '../schemas/common.js'
 import {
   completeUploadResponseSchema,
   initRecordingRequestSchema,
@@ -74,6 +74,22 @@ const completeUploadRoute = createRoute({
       content: {
         'application/json': {
           schema: completeUploadResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: 'recording が存在しない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: '現在状態では upload 完了を確定できない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
         },
       },
     },

@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi'
-import { notImplementedResponseSchema } from '../schemas/common.js'
+import { errorResponseSchema, notImplementedResponseSchema } from '../schemas/common.js'
 import {
   batchTrajectoryMapDataRequestSchema,
   batchTrajectoryMapDataResponseSchema,
@@ -106,6 +106,22 @@ const getTrajectoryResultRoute = createRoute({
       content: {
         'application/json': {
           schema: trajectoryResultResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: 'trajectory が存在しない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: 'trajectory の現在状態では結果を取得できない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
         },
       },
     },
