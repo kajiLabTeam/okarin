@@ -138,6 +138,22 @@ const refreshUploadUrlsRoute = createRoute({
         },
       },
     },
+    404: {
+      description: 'recording が存在しない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: '現在状態では upload URL を再発行できない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
     501: {
       description: 'not implemented',
       content: {
@@ -181,6 +197,38 @@ const createTrajectoryRoute = createRoute({
       content: {
         'application/json': {
           schema: createTrajectoryResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: 'recording が存在しない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: 'recording の現在状態では trajectory を作成できない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    422: {
+      description: 'constraints などの request 内容が不正',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    502: {
+      description: '解析サーバーへの依頼に失敗した',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
         },
       },
     },

@@ -75,6 +75,14 @@ const getTrajectoryRoute = createRoute({
         },
       },
     },
+    404: {
+      description: 'trajectory が存在しない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
     501: {
       description: 'not implemented',
       content: {
