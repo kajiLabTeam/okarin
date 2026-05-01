@@ -10,6 +10,7 @@ import {
   retriedTrajectoryResponseSchema,
   trajectoryIdParamsSchema,
   trajectoryCompletionResponseSchema,
+  trajectoryMapDataQuerySchema,
   trajectoryMapDataResponseSchema,
   trajectoryResultResponseSchema,
   trajectoryStatusResponseSchema,
@@ -202,6 +203,7 @@ const getTrajectoryMapDataRoute = createRoute({
   description: 'trajectory 単位の map data を取得する',
   request: {
     params: trajectoryIdParamsSchema,
+    query: trajectoryMapDataQuerySchema,
   },
   responses: {
     200: {
@@ -225,6 +227,7 @@ const getTrajectoryMapDataRoute = createRoute({
 
 trajectoriesRoutes.openapi(getTrajectoryMapDataRoute, (c) => {
   c.req.valid('param')
+  c.req.valid('query')
 
   return notImplemented(
     c,

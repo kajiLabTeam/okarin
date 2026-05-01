@@ -5,7 +5,9 @@ import {
   callbackRequestSchema,
   callbackErrorCodeSchema,
   createTrajectoryRequestSchema,
+  trajectoryMapDataQuerySchema,
   trajectoryIdParamsSchema,
+  batchTrajectoryMapDataRequestSchema,
 } from './trajectories.js'
 
 describe('trajectory schemas', () => {
@@ -161,6 +163,31 @@ describe('trajectory schemas', () => {
     })
 
     expect(result.success).toBe(true)
+  })
+
+  it('trajectoryMapDataQuerySchema は data_type を必須とする', () => {
+    const result = trajectoryMapDataQuerySchema.safeParse({
+      data_type: 'analyzed',
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('batchTrajectoryMapDataRequestSchema は data_type を必須とする', () => {
+    const result = batchTrajectoryMapDataRequestSchema.safeParse({
+      data_type: 'ground_truth',
+      trajectory_ids: ['33333333-3333-4333-8333-333333333333'],
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('batchTrajectoryMapDataRequestSchema は data_type がない入力を拒否する', () => {
+    const result = batchTrajectoryMapDataRequestSchema.safeParse({
+      trajectory_ids: ['33333333-3333-4333-8333-333333333333'],
+    })
+
+    expect(result.success).toBe(false)
   })
 
   it('trajectoryIdParamsSchema は UUID でない trajectoryId を拒否する', () => {

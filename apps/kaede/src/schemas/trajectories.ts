@@ -246,8 +246,14 @@ const mapPointSchema = z.object({
   }),
 })
 
-const mapDataKindSchema = z.enum(['analyzed', 'ground_truth']).openapi({
+export const mapDataTypeSchema = z.enum(['analyzed', 'ground_truth']).openapi({
   description: '地図描画データの種別',
+})
+
+export const trajectoryMapDataQuerySchema = z.object({
+  data_type: mapDataTypeSchema.openapi({
+    description: '取得したい map data の種別',
+  }),
 })
 
 export const trajectoryMapDataResponseSchema = z.object({
@@ -257,13 +263,16 @@ export const trajectoryMapDataResponseSchema = z.object({
   floor_id: uuidSchema.openapi({
     description: '描画対象 floor の ID',
   }),
-  kind: mapDataKindSchema,
+  data_type: mapDataTypeSchema,
   points: z.array(mapPointSchema).openapi({
     description: '描画用の座標列',
   }),
 })
 
 export const batchTrajectoryMapDataRequestSchema = z.object({
+  data_type: mapDataTypeSchema.openapi({
+    description: 'まとめて取得したい map data の種別',
+  }),
   trajectory_ids: z.array(uuidSchema).min(1).openapi({
     description: 'まとめて取得したい trajectory ID の一覧',
   }),
@@ -279,7 +288,7 @@ export const batchTrajectoryMapDataResponseSchema = z.object({
         trajectory_id: uuidSchema.openapi({
           description: 'trajectory の ID',
         }),
-        kind: mapDataKindSchema,
+        data_type: mapDataTypeSchema,
         points: z.array(mapPointSchema).openapi({
           description: '描画用の座標列',
         }),
