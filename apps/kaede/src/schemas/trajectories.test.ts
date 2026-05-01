@@ -4,6 +4,7 @@ import {
   callbackErrorResponseSchema,
   callbackRequestSchema,
   callbackErrorCodeSchema,
+  cloneAndReanalyzeRequestSchema,
   createTrajectoryRequestSchema,
   trajectoryMapDataQuerySchema,
   trajectoryIdParamsSchema,
@@ -23,6 +24,20 @@ describe('trajectory schemas', () => {
     })
 
     expect(result.success).toBe(true)
+  })
+
+  it('cloneAndReanalyzeRequestSchema は空の constraints を拒否する', () => {
+    const result = cloneAndReanalyzeRequestSchema.safeParse({
+      constraints: [],
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('cloneAndReanalyzeRequestSchema は constraints 省略を拒否する', () => {
+    const result = cloneAndReanalyzeRequestSchema.safeParse({})
+
+    expect(result.success).toBe(false)
   })
 
   it('createTrajectoryRequestSchema は start 1 件と waypoint を含む入力を受け入れる', () => {

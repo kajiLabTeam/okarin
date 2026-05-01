@@ -121,6 +121,55 @@ export const createTrajectoryRequestSchema = z
     }
   })
 
+export const cloneAndReanalyzeRequestSchema = z.object({
+  constraints: z
+    .array(trajectoryConstraintSchema)
+    .min(1)
+    .superRefine((constraints, ctx) => {
+      const startCount = constraints.filter((point) => point.point_type === 'start').length
+      const goalCount = constraints.filter((point) => point.point_type === 'goal').length
+      const seqs = constraints.map((point) => point.seq)
+
+      if (startCount !== 1) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'constraints must contain exactly one start point',
+          path: [],
+        })
+      }
+
+      if (goalCount > 1) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'constraints must contain at most one goal point',
+          path: [],
+        })
+      }
+
+      if (new Set(seqs).size !== seqs.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'constraint seq must be unique',
+          path: [],
+        })
+      }
+
+      for (const [index, seq] of seqs.entries()) {
+        if (seq !== index) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'constraints must be ordered by seq starting at 0 with no gaps',
+            path: [],
+          })
+          break
+        }
+      }
+    })
+    .openapi({
+      description: 'clone-and-reanalyze で指定する新しい制約点一覧。1 件以上必須',
+    }),
+})
+
 export const trajectoryIdParamsSchema = z.object({
   trajectoryId: uuidSchema.openapi({
     description: 'trajectory を一意に識別する ID',

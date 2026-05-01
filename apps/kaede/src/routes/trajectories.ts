@@ -6,7 +6,7 @@ import {
   callbackErrorResponseSchema,
   callbackRequestSchema,
   callbackResponseSchema,
-  createTrajectoryRequestSchema,
+  cloneAndReanalyzeRequestSchema,
   retriedTrajectoryResponseSchema,
   trajectoryIdParamsSchema,
   trajectoryCompletionResponseSchema,
@@ -328,7 +328,7 @@ const cloneAndReanalyzeRoute = createRoute({
     body: {
       content: {
         'application/json': {
-          schema: createTrajectoryRequestSchema,
+          schema: cloneAndReanalyzeRequestSchema,
         },
       },
     },
