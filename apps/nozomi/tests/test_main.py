@@ -1,9 +1,4 @@
-import sys
-from pathlib import Path
-
 from fastapi.testclient import TestClient
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.server import app
 
@@ -132,6 +127,10 @@ def test_openapi_exposes_analysis_endpoint_metadata() -> None:
         "application/json"
     ]["schema"]
     assert request_body_schema["$ref"] == "#/components/schemas/AnalyzeRequest"
+
+    validation_error_schema = schema["components"]["schemas"]["HTTPValidationError"]
+    detail_schema = validation_error_schema["properties"]["detail"]
+    assert detail_schema["type"] == "array"
 
 
 def test_scalar_doc_endpoint_is_available() -> None:

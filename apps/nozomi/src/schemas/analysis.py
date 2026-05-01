@@ -156,7 +156,3 @@ class AnalyzeRequest(BaseModel):
 class AnalyzeAcceptedResponse(BaseModel):
     trajectory_id: UUID = Field(description="受理した trajectory の ID")
     status: Literal["accepted"] = Field(description="解析要求を受理した状態")
-
-
-class ErrorResponse(BaseModel):
-    detail: object = Field(description="FastAPI 標準のエラー詳細")

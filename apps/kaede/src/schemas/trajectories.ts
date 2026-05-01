@@ -70,12 +70,12 @@ export const trajectoryConstraintSchema = z.discriminatedUnion('point_type', [
 
 export const createTrajectoryRequestSchema = z
   .object({
-    constraints: z.array(trajectoryConstraintSchema).default([]).optional().openapi({
+    constraints: z.array(trajectoryConstraintSchema).default([]).openapi({
       description: '開始点・経由点・終了点からなる制約点の一覧',
     }),
   })
   .superRefine((input, ctx) => {
-    const constraints = input.constraints ?? []
+    const constraints = input.constraints
 
     if (constraints.length === 0) {
       return
