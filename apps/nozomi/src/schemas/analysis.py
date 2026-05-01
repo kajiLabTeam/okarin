@@ -5,33 +5,48 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 
 class StartConstraint(BaseModel):
-    seq: int = Field(ge=0, description="constraint の並び順。0 以上の一意な整数")
+    seq: int = Field(
+        ge=0, description="constraint の並び順。0 始まりで欠番なく連続する整数"
+    )
     point_type: Literal["start"] = Field(description="開始地点を表す固定値")
     x: float = Field(description="フロア座標系での X 座標")
     y: float = Field(description="フロア座標系での Y 座標")
     direction: float | None = Field(
-        default=None, description="進行方向。単位は実装側で定義する"
+        default=None,
+        ge=0,
+        lt=360,
+        description="進行方向。度数法で 0 以上 360 未満。0 はフロア座標系の +X 方向",
     )
 
 
 class WaypointConstraint(BaseModel):
-    seq: int = Field(ge=0, description="constraint の並び順。0 以上の一意な整数")
+    seq: int = Field(
+        ge=0, description="constraint の並び順。0 始まりで欠番なく連続する整数"
+    )
     point_type: Literal["waypoint"] = Field(description="経由点を表す固定値")
     x: float = Field(description="フロア座標系での X 座標")
     y: float = Field(description="フロア座標系での Y 座標")
     direction: float | None = Field(
-        default=None, description="進行方向。単位は実装側で定義する"
+        default=None,
+        ge=0,
+        lt=360,
+        description="進行方向。度数法で 0 以上 360 未満。0 はフロア座標系の +X 方向",
     )
     relative_timestamp: int = Field(ge=0, description="開始からの相対時刻")
 
 
 class GoalConstraint(BaseModel):
-    seq: int = Field(ge=0, description="constraint の並び順。0 以上の一意な整数")
+    seq: int = Field(
+        ge=0, description="constraint の並び順。0 始まりで欠番なく連続する整数"
+    )
     point_type: Literal["goal"] = Field(description="終了地点を表す固定値")
     x: float = Field(description="フロア座標系での X 座標")
     y: float = Field(description="フロア座標系での Y 座標")
     direction: float | None = Field(
-        default=None, description="進行方向。単位は実装側で定義する"
+        default=None,
+        ge=0,
+        lt=360,
+        description="進行方向。度数法で 0 以上 360 未満。0 はフロア座標系の +X 方向",
     )
 
 
@@ -130,6 +145,10 @@ class AnalyzeRequest(BaseModel):
             raise ValueError("constraints must contain at most one goal point")
         if len(set(seqs)) != len(seqs):
             raise ValueError("constraint seq must be unique")
+        if seqs != list(range(len(seqs))):
+            raise ValueError(
+                "constraints must be ordered by seq starting at 0 with no gaps"
+            )
 
         return self
 

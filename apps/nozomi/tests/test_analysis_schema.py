@@ -149,6 +149,69 @@ def test_analyze_request_rejects_duplicate_constraint_seq() -> None:
         AnalyzeRequest.model_validate(payload)
 
 
+def test_analyze_request_rejects_constraint_seq_with_gap() -> None:
+    payload = valid_analyze_request()
+    payload["constraints"] = [
+        {
+            "seq": 0,
+            "point_type": "start",
+            "x": 12.34,
+            "y": 56.78,
+        },
+        {
+            "seq": 2,
+            "point_type": "goal",
+            "x": 30.5,
+            "y": 72.4,
+        },
+    ]
+
+    with pytest.raises(
+        ValidationError, match="ordered by seq starting at 0 with no gaps"
+    ):
+        AnalyzeRequest.model_validate(payload)
+
+
+def test_analyze_request_rejects_constraint_array_out_of_seq_order() -> None:
+    payload = valid_analyze_request()
+    payload["constraints"] = [
+        {
+            "seq": 1,
+            "point_type": "waypoint",
+            "x": 18.2,
+            "y": 60.1,
+            "relative_timestamp": 12000,
+        },
+        {
+            "seq": 0,
+            "point_type": "start",
+            "x": 12.34,
+            "y": 56.78,
+        },
+    ]
+
+    with pytest.raises(
+        ValidationError, match="ordered by seq starting at 0 with no gaps"
+    ):
+        AnalyzeRequest.model_validate(payload)
+
+
+def test_analyze_request_rejects_direction_out_of_range() -> None:
+    payload = valid_analyze_request()
+    payload["constraints"] = [
+        {
+            "seq": 0,
+            "point_type": "start",
+            "x": 12.34,
+            "y": 56.78,
+            "direction": 360.0,
+        }
+    ]
+
+    with pytest.raises(ValidationError, match="less than 360"):
+        AnalyzeRequest.model_validate(payload)
+
+
 def test_analyze_request_rejects_waypoint_without_relative_timestamp() -> None:
     payload = valid_analyze_request()
     payload["constraints"] = [

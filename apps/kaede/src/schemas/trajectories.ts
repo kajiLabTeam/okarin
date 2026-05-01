@@ -3,10 +3,11 @@ import { z } from '@hono/zod-openapi'
 import { isoDatetimeSchema, trajectoryStatusSchema, uuidSchema } from './common.js'
 
 const finiteNumberSchema = z.number().finite()
+const directionSchema = finiteNumberSchema.min(0).lt(360)
 
 const startConstraintSchema = z.object({
   seq: z.number().int().min(0).openapi({
-    description: 'constraint の並び順。0 以上の一意な整数',
+    description: 'constraint の並び順。0 始まりで欠番なく連続する整数',
   }),
   point_type: z.literal('start').openapi({
     description: '開始地点を表す固定値',
@@ -17,14 +18,14 @@ const startConstraintSchema = z.object({
   y: finiteNumberSchema.openapi({
     description: 'フロア座標系での Y 座標',
   }),
-  direction: finiteNumberSchema.optional().openapi({
-    description: '進行方向。単位は実装側で定義する',
+  direction: directionSchema.optional().openapi({
+    description: '進行方向。度数法で 0 以上 360 未満。0 はフロア座標系の +X 方向',
   }),
 })
 
 const waypointConstraintSchema = z.object({
   seq: z.number().int().min(0).openapi({
-    description: 'constraint の並び順。0 以上の一意な整数',
+    description: 'constraint の並び順。0 始まりで欠番なく連続する整数',
   }),
   point_type: z.literal('waypoint').openapi({
     description: '経由点を表す固定値',
@@ -35,8 +36,8 @@ const waypointConstraintSchema = z.object({
   y: finiteNumberSchema.openapi({
     description: 'フロア座標系での Y 座標',
   }),
-  direction: finiteNumberSchema.optional().openapi({
-    description: '進行方向。単位は実装側で定義する',
+  direction: directionSchema.optional().openapi({
+    description: '進行方向。度数法で 0 以上 360 未満。0 はフロア座標系の +X 方向',
   }),
   relative_timestamp: z.number().int().min(0).openapi({
     description: '開始からの相対時刻',
@@ -45,7 +46,7 @@ const waypointConstraintSchema = z.object({
 
 const goalConstraintSchema = z.object({
   seq: z.number().int().min(0).openapi({
-    description: 'constraint の並び順。0 以上の一意な整数',
+    description: 'constraint の並び順。0 始まりで欠番なく連続する整数',
   }),
   point_type: z.literal('goal').openapi({
     description: '終了地点を表す固定値',
@@ -56,8 +57,8 @@ const goalConstraintSchema = z.object({
   y: finiteNumberSchema.openapi({
     description: 'フロア座標系での Y 座標',
   }),
-  direction: finiteNumberSchema.optional().openapi({
-    description: '進行方向。単位は実装側で定義する',
+  direction: directionSchema.optional().openapi({
+    description: '進行方向。度数法で 0 以上 360 未満。0 はフロア座標系の +X 方向',
   }),
 })
 
@@ -106,6 +107,17 @@ export const createTrajectoryRequestSchema = z
         message: 'constraint seq must be unique',
         path: ['constraints'],
       })
+    }
+
+    for (const [index, seq] of seqs.entries()) {
+      if (seq !== index) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'constraints must be ordered by seq starting at 0 with no gaps',
+          path: ['constraints'],
+        })
+        break
+      }
     }
   })
 
