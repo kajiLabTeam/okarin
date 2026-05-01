@@ -3,6 +3,7 @@ import { errorResponseSchema, notImplementedResponseSchema } from '../schemas/co
 import {
   batchTrajectoryMapDataRequestSchema,
   batchTrajectoryMapDataResponseSchema,
+  callbackErrorResponseSchema,
   callbackRequestSchema,
   callbackResponseSchema,
   createTrajectoryRequestSchema,
@@ -38,6 +39,46 @@ const callbackRoute = createRoute({
       content: {
         'application/json': {
           schema: callbackResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: 'callback payload が不正',
+      content: {
+        'application/json': {
+          schema: callbackErrorResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: 'callback token を検証できない',
+      content: {
+        'application/json': {
+          schema: callbackErrorResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: 'trajectory が存在しない',
+      content: {
+        'application/json': {
+          schema: callbackErrorResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: 'callback 内容が trajectory の現在状態または想定保存先と矛盾する',
+      content: {
+        'application/json': {
+          schema: callbackErrorResponseSchema,
+        },
+      },
+    },
+    503: {
+      description: '依存先確認または状態更新に失敗したため再送可能',
+      content: {
+        'application/json': {
+          schema: callbackErrorResponseSchema,
         },
       },
     },

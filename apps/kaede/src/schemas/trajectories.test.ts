@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  callbackErrorResponseSchema,
   callbackRequestSchema,
+  callbackErrorCodeSchema,
   createTrajectoryRequestSchema,
   trajectoryIdParamsSchema,
 } from './trajectories.js'
@@ -135,6 +137,27 @@ describe('trajectory schemas', () => {
       callback_token: 'signed-token',
       error_code: 'NOZOMI_ERROR',
       error_message: 'analysis failed',
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('callbackErrorCodeSchema は定義済み callback error code を受け入れる', () => {
+    const result = callbackErrorCodeSchema.safeParse('CALLBACK_TOKEN_EXPIRED')
+
+    expect(result.success).toBe(true)
+  })
+
+  it('callbackErrorCodeSchema は未知の callback error code を拒否する', () => {
+    const result = callbackErrorCodeSchema.safeParse('UNKNOWN_CALLBACK_ERROR')
+
+    expect(result.success).toBe(false)
+  })
+
+  it('callbackErrorResponseSchema は enum に含まれる error_code を受け入れる', () => {
+    const result = callbackErrorResponseSchema.safeParse({
+      error_code: 'CALLBACK_DEPENDENCY_FAILURE',
+      error_message: 'failed to verify object or update trajectory state',
     })
 
     expect(result.success).toBe(true)

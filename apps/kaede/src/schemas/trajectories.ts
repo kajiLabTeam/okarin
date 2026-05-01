@@ -161,6 +161,41 @@ export const callbackRequestSchema = z.discriminatedUnion('status', [
   }),
 ])
 
+export const callbackErrorCodeSchema = z
+  .enum([
+    'CALLBACK_PAYLOAD_INVALID',
+    'CALLBACK_TOKEN_INVALID',
+    'CALLBACK_TOKEN_EXPIRED',
+    'TRAJECTORY_NOT_FOUND',
+    'CALLBACK_TRAJECTORY_MISMATCH',
+    'CALLBACK_RESULT_OBJECT_KEY_MISMATCH',
+    'CALLBACK_ALREADY_FINALIZED',
+    'CALLBACK_DEPENDENCY_FAILURE',
+  ])
+  .openapi({
+    description: 'callback endpoint が返す機械可読エラーコード',
+    'x-enum-descriptions': {
+      CALLBACK_PAYLOAD_INVALID: 'request body shape または必須項目が不正',
+      CALLBACK_TOKEN_INVALID: 'callback token の署名または形式が不正',
+      CALLBACK_TOKEN_EXPIRED: 'callback token の有効期限が切れている',
+      TRAJECTORY_NOT_FOUND: '対象 trajectory が存在しない',
+      CALLBACK_TRAJECTORY_MISMATCH: 'token と body の trajectory_id が一致しない',
+      CALLBACK_RESULT_OBJECT_KEY_MISMATCH: 'result_object_key が想定保存先と一致しない',
+      CALLBACK_ALREADY_FINALIZED: 'すでに終端状態であり今回 payload と矛盾する',
+      CALLBACK_DEPENDENCY_FAILURE: '依存先確認または状態更新に失敗した',
+    },
+  })
+
+export const callbackErrorResponseSchema = z.object({
+  error_code: callbackErrorCodeSchema,
+  error_message: z.string().min(1).openapi({
+    description: 'ログや画面表示に使う説明文',
+  }),
+  details: z.record(z.string(), z.unknown()).optional().openapi({
+    description: '追加情報がある場合のみ返す任意オブジェクト',
+  }),
+})
+
 export const callbackResponseSchema = z.object({
   trajectory_id: uuidSchema.openapi({
     description: 'callback を受理した trajectory の ID',
