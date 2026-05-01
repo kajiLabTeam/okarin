@@ -1,6 +1,7 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi'
 import { errorResponseSchema, notImplementedResponseSchema } from '../schemas/common.js'
 import {
+  recordingGroundTruthRequestSchema,
   completeUploadResponseSchema,
   initRecordingRequestSchema,
   initRecordingResponseSchema,
@@ -333,6 +334,13 @@ const issueGroundTruthUploadUrlRoute = createRoute({
   description: 'recording 単位の ground truth raw をアップロードするための URL を発行する',
   request: {
     params: recordingIdParamsSchema,
+    body: {
+      content: {
+        'application/json': {
+          schema: recordingGroundTruthRequestSchema,
+        },
+      },
+    },
   },
   responses: {
     200: {
@@ -356,6 +364,7 @@ const issueGroundTruthUploadUrlRoute = createRoute({
 
 recordingsRoutes.openapi(issueGroundTruthUploadUrlRoute, (c) => {
   c.req.valid('param')
+  c.req.valid('json')
 
   return notImplemented(
     c,
@@ -371,6 +380,13 @@ const completeGroundTruthUploadRoute = createRoute({
   description: 'recording 単位の ground truth raw の登録完了を反映する',
   request: {
     params: recordingIdParamsSchema,
+    body: {
+      content: {
+        'application/json': {
+          schema: recordingGroundTruthRequestSchema,
+        },
+      },
+    },
   },
   responses: {
     200: {
@@ -394,6 +410,7 @@ const completeGroundTruthUploadRoute = createRoute({
 
 recordingsRoutes.openapi(completeGroundTruthUploadRoute, (c) => {
   c.req.valid('param')
+  c.req.valid('json')
 
   return notImplemented(
     c,

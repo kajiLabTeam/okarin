@@ -16,6 +16,13 @@ const uploadUrlsSchema = z.object({
   wifi: z.string().url().optional().openapi({ description: 'Wi-Fi スキャン用のアップロード URL' }),
 })
 
+export const groundTruthTypeSchema = z.enum(['uwb']).openapi({
+  description: 'recording 単位 ground truth raw の種別',
+  'x-enum-descriptions': {
+    uwb: 'UWB による ground truth raw',
+  },
+})
+
 export const recordingIdParamsSchema = z.object({
   recordingId: uuidSchema.openapi({
     description: 'recording を一意に識別する ID',
@@ -118,17 +125,32 @@ export const recordingGroundTruthUploadUrlResponseSchema = z.object({
   recording_id: uuidSchema.openapi({
     description: 'ground truth raw の upload URL を発行した recording の ID',
   }),
+  truth_type: groundTruthTypeSchema.openapi({
+    description: '今回の upload URL が対象とする ground truth raw の種別',
+  }),
   upload_url: z.string().url().openapi({
     description: 'ground truth raw をアップロードするための署名付き URL',
+  }),
+  upload_path: z.string().min(1).openapi({
+    description: 'ground truth raw のアップロード先オブジェクトパス',
   }),
   expires_at: isoDatetimeSchema.openapi({
     description: 'upload_url の有効期限',
   }),
 })
 
+export const recordingGroundTruthRequestSchema = z.object({
+  truth_type: groundTruthTypeSchema.openapi({
+    description: '対象とする ground truth raw の種別',
+  }),
+})
+
 export const recordingGroundTruthCompleteResponseSchema = z.object({
   recording_id: uuidSchema.openapi({
     description: 'ground truth raw の登録完了を反映した recording の ID',
+  }),
+  truth_type: groundTruthTypeSchema.openapi({
+    description: '登録完了を反映した ground truth raw の種別',
   }),
   status: z.literal('completed').openapi({
     description: 'ground truth raw の登録完了状態',
