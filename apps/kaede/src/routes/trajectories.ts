@@ -520,13 +520,21 @@ const deleteTrajectoryRoute = createRoute({
   method: 'delete',
   path: '/{trajectoryId}',
   tags: ['Trajectories'],
-  description: '指定した trajectory を削除する',
+  description: '指定した trajectory を論理削除する',
   request: {
     params: trajectoryIdParamsSchema,
   },
   responses: {
     204: {
       description: 'trajectory 削除完了',
+    },
+    404: {
+      description: 'trajectory が存在しない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
     },
     501: {
       description: 'not implemented',

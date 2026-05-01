@@ -406,13 +406,21 @@ const deleteRecordingRoute = createRoute({
   method: 'delete',
   path: '/{recordingId}',
   tags: ['Recordings'],
-  description: '指定した recording を削除する',
+  description: '指定した recording を論理削除し、配下 trajectory も論理削除する',
   request: {
     params: recordingIdParamsSchema,
   },
   responses: {
     204: {
       description: 'recording 削除完了',
+    },
+    404: {
+      description: 'recording が存在しない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
     },
     501: {
       description: 'not implemented',
