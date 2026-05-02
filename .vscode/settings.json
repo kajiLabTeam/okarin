@@ -9,4 +9,7 @@
   "[jsonc]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
+  "python.analysis.extraPaths": [
+    "apps/nozomi/src"
+  ]
 }

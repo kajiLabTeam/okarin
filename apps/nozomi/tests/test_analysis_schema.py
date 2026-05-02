@@ -53,6 +53,24 @@ def test_analyze_request_accepts_valid_payload() -> None:
     assert request.raw_data_urls.wifi is None
 
 
+def test_analyze_request_accepts_payload_without_constraints() -> None:
+    payload = valid_analyze_request()
+    payload.pop("constraints")
+
+    request = AnalyzeRequest.model_validate(payload)
+
+    assert request.constraints == []
+
+
+def test_analyze_request_accepts_payload_with_empty_constraints() -> None:
+    payload = valid_analyze_request()
+    payload["constraints"] = []
+
+    request = AnalyzeRequest.model_validate(payload)
+
+    assert request.constraints == []
+
+
 def test_analyze_request_accepts_payload_without_optional_raw_data_urls() -> None:
     payload = valid_analyze_request()
     payload["raw_data_urls"] = {
@@ -128,6 +146,69 @@ def test_analyze_request_rejects_duplicate_constraint_seq() -> None:
     ]
 
     with pytest.raises(ValidationError, match="seq must be unique"):
+        AnalyzeRequest.model_validate(payload)
+
+
+def test_analyze_request_rejects_constraint_seq_with_gap() -> None:
+    payload = valid_analyze_request()
+    payload["constraints"] = [
+        {
+            "seq": 0,
+            "point_type": "start",
+            "x": 12.34,
+            "y": 56.78,
+        },
+        {
+            "seq": 2,
+            "point_type": "goal",
+            "x": 30.5,
+            "y": 72.4,
+        },
+    ]
+
+    with pytest.raises(
+        ValidationError, match="ordered by seq starting at 0 with no gaps"
+    ):
+        AnalyzeRequest.model_validate(payload)
+
+
+def test_analyze_request_rejects_constraint_array_out_of_seq_order() -> None:
+    payload = valid_analyze_request()
+    payload["constraints"] = [
+        {
+            "seq": 1,
+            "point_type": "waypoint",
+            "x": 18.2,
+            "y": 60.1,
+            "relative_timestamp": 12000,
+        },
+        {
+            "seq": 0,
+            "point_type": "start",
+            "x": 12.34,
+            "y": 56.78,
+        },
+    ]
+
+    with pytest.raises(
+        ValidationError, match="ordered by seq starting at 0 with no gaps"
+    ):
+        AnalyzeRequest.model_validate(payload)
+
+
+def test_analyze_request_rejects_direction_out_of_range() -> None:
+    payload = valid_analyze_request()
+    payload["constraints"] = [
+        {
+            "seq": 0,
+            "point_type": "start",
+            "x": 12.34,
+            "y": 56.78,
+            "direction": 360.0,
+        }
+    ]
+
+    with pytest.raises(ValidationError, match="less than 360"):
         AnalyzeRequest.model_validate(payload)
 
 

@@ -77,6 +77,18 @@ export const notImplementedResponseSchema = z.object({
   params: z.record(z.string()).optional(),
 })
 
+export const errorResponseSchema = z.object({
+  error_code: z.string().min(1).openapi({
+    description: 'クライアントが分岐に使う機械可読エラーコード',
+  }),
+  error_message: z.string().min(1).openapi({
+    description: 'ログや画面表示に使う説明文',
+  }),
+  details: z.record(z.string(), z.unknown()).optional().openapi({
+    description: '追加情報がある場合のみ返す任意オブジェクト',
+  }),
+})
+
 export type RecordingUploadStatus = z.infer<typeof recordingUploadStatusSchema>
 export type TrajectoryStatus = z.infer<typeof trajectoryStatusSchema>
 export type UploadTarget = z.infer<typeof uploadTargetSchema>

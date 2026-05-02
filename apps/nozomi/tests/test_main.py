@@ -1,9 +1,4 @@
-import sys
-from pathlib import Path
-
 from fastapi.testclient import TestClient
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.server import app
 
@@ -63,10 +58,28 @@ def test_analyze_accepts_valid_request() -> None:
     assert response.json() == {
         "trajectory_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
         "status": "accepted",
-        "message": (
-            "analysis request accepted; execution pipeline is not implemented yet"
-        ),
     }
+
+
+def test_analyze_accepts_request_without_constraints() -> None:
+    response = client.post(
+        "/analyze",
+        json={
+            "trajectory_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+            "recording_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            "floor_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            "raw_data_urls": {
+                "acce": "https://object-storage.example.com/acce.csv",
+                "gyro": "https://object-storage.example.com/gyro.csv",
+            },
+            "result_upload_url": "https://object-storage.example.com/result.csv",
+            "callback_url": "https://mediator.example.com/api/trajectories/callback",
+            "callback_token": "signed-callback-token",
+        },
+    )
+
+    assert response.status_code == 202
+    assert response.json()["status"] == "accepted"
 
 
 def test_analyze_rejects_request_without_start_constraint() -> None:
@@ -114,6 +127,10 @@ def test_openapi_exposes_analysis_endpoint_metadata() -> None:
         "application/json"
     ]["schema"]
     assert request_body_schema["$ref"] == "#/components/schemas/AnalyzeRequest"
+
+    validation_error_schema = schema["components"]["schemas"]["HTTPValidationError"]
+    detail_schema = validation_error_schema["properties"]["detail"]
+    assert detail_schema["type"] == "array"
 
 
 def test_scalar_doc_endpoint_is_available() -> None:

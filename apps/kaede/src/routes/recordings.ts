@@ -1,10 +1,13 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi'
-import { notImplementedResponseSchema } from '../schemas/common.js'
+import { errorResponseSchema, notImplementedResponseSchema } from '../schemas/common.js'
 import {
+  recordingGroundTruthRequestSchema,
   completeUploadResponseSchema,
   initRecordingRequestSchema,
   initRecordingResponseSchema,
   recordingDetailResponseSchema,
+  recordingGroundTruthCompleteResponseSchema,
+  recordingGroundTruthUploadUrlResponseSchema,
   recordingIdParamsSchema,
   recordingTrajectoriesResponseSchema,
   refreshUploadUrlsRequestSchema,
@@ -75,6 +78,22 @@ const completeUploadRoute = createRoute({
         },
       },
     },
+    404: {
+      description: 'recording が存在しない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: '現在状態では upload 完了を確定できない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
     501: {
       description: 'not implemented',
       content: {
@@ -117,6 +136,22 @@ const refreshUploadUrlsRoute = createRoute({
       content: {
         'application/json': {
           schema: refreshUploadUrlsResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: 'recording が存在しない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: '現在状態では upload URL を再発行できない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
         },
       },
     },
@@ -163,6 +198,38 @@ const createTrajectoryRoute = createRoute({
       content: {
         'application/json': {
           schema: createTrajectoryResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: 'recording が存在しない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: 'recording の現在状態では trajectory を作成できない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    422: {
+      description: 'constraints などの request 内容が不正',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    502: {
+      description: '解析サーバーへの依頼に失敗した',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
         },
       },
     },
@@ -267,8 +334,23 @@ const issueGroundTruthUploadUrlRoute = createRoute({
   description: 'recording 単位の ground truth raw をアップロードするための URL を発行する',
   request: {
     params: recordingIdParamsSchema,
+    body: {
+      content: {
+        'application/json': {
+          schema: recordingGroundTruthRequestSchema,
+        },
+      },
+    },
   },
   responses: {
+    200: {
+      description: 'ground truth raw アップロード URL 発行',
+      content: {
+        'application/json': {
+          schema: recordingGroundTruthUploadUrlResponseSchema,
+        },
+      },
+    },
     501: {
       description: 'not implemented',
       content: {
@@ -282,6 +364,7 @@ const issueGroundTruthUploadUrlRoute = createRoute({
 
 recordingsRoutes.openapi(issueGroundTruthUploadUrlRoute, (c) => {
   c.req.valid('param')
+  c.req.valid('json')
 
   return notImplemented(
     c,
@@ -297,8 +380,23 @@ const completeGroundTruthUploadRoute = createRoute({
   description: 'recording 単位の ground truth raw の登録完了を反映する',
   request: {
     params: recordingIdParamsSchema,
+    body: {
+      content: {
+        'application/json': {
+          schema: recordingGroundTruthRequestSchema,
+        },
+      },
+    },
   },
   responses: {
+    200: {
+      description: 'ground truth raw 登録完了',
+      content: {
+        'application/json': {
+          schema: recordingGroundTruthCompleteResponseSchema,
+        },
+      },
+    },
     501: {
       description: 'not implemented',
       content: {
@@ -312,6 +410,7 @@ const completeGroundTruthUploadRoute = createRoute({
 
 recordingsRoutes.openapi(completeGroundTruthUploadRoute, (c) => {
   c.req.valid('param')
+  c.req.valid('json')
 
   return notImplemented(
     c,
@@ -324,11 +423,22 @@ const deleteRecordingRoute = createRoute({
   method: 'delete',
   path: '/{recordingId}',
   tags: ['Recordings'],
-  description: '指定した recording を削除する',
+  description: '指定した recording を論理削除し、配下 trajectory も論理削除する',
   request: {
     params: recordingIdParamsSchema,
   },
   responses: {
+    204: {
+      description: 'recording 削除完了',
+    },
+    404: {
+      description: 'recording が存在しない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
     501: {
       description: 'not implemented',
       content: {

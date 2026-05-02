@@ -1,6 +1,6 @@
 from fastapi import APIRouter, status
 
-from src.schemas.analysis import AnalyzeAcceptedResponse, AnalyzeRequest, ErrorResponse
+from src.schemas.analysis import AnalyzeAcceptedResponse, AnalyzeRequest
 
 analysis_router = APIRouter()
 
@@ -15,16 +15,9 @@ analysis_router = APIRouter()
         "callback 情報、制約点情報を受け取り、解析ジョブを受理する。"
     ),
     tags=["analysis"],
-    responses={
-        422: {
-            "description": "request body が不正",
-            "model": ErrorResponse,
-        }
-    },
 )
 def analyze(payload: AnalyzeRequest) -> AnalyzeAcceptedResponse:
     return AnalyzeAcceptedResponse(
         trajectory_id=payload.trajectory_id,
         status="accepted",
-        message="analysis request accepted; execution pipeline is not implemented yet",
     )

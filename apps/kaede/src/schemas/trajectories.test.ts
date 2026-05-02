@@ -1,12 +1,45 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  callbackErrorResponseSchema,
   callbackRequestSchema,
+  callbackErrorCodeSchema,
+  cloneAndReanalyzeRequestSchema,
   createTrajectoryRequestSchema,
+  trajectoryMapDataQuerySchema,
   trajectoryIdParamsSchema,
+  batchTrajectoryMapDataRequestSchema,
 } from './trajectories.js'
 
 describe('trajectory schemas', () => {
+  it('createTrajectoryRequestSchema は constraints を省略した入力を受け入れる', () => {
+    const result = createTrajectoryRequestSchema.safeParse({})
+
+    expect(result.success).toBe(true)
+  })
+
+  it('createTrajectoryRequestSchema は空の constraints を受け入れる', () => {
+    const result = createTrajectoryRequestSchema.safeParse({
+      constraints: [],
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('cloneAndReanalyzeRequestSchema は空の constraints を拒否する', () => {
+    const result = cloneAndReanalyzeRequestSchema.safeParse({
+      constraints: [],
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('cloneAndReanalyzeRequestSchema は constraints 省略を拒否する', () => {
+    const result = cloneAndReanalyzeRequestSchema.safeParse({})
+
+    expect(result.success).toBe(false)
+  })
+
   it('createTrajectoryRequestSchema は start 1 件と waypoint を含む入力を受け入れる', () => {
     const result = createTrajectoryRequestSchema.safeParse({
       constraints: [
@@ -93,6 +126,65 @@ describe('trajectory schemas', () => {
     expect(result.success).toBe(false)
   })
 
+  it('createTrajectoryRequestSchema は seq に欠番がある入力を拒否する', () => {
+    const result = createTrajectoryRequestSchema.safeParse({
+      constraints: [
+        {
+          seq: 0,
+          point_type: 'start',
+          x: 0,
+          y: 0,
+        },
+        {
+          seq: 2,
+          point_type: 'goal',
+          x: 2,
+          y: 2,
+        },
+      ],
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('createTrajectoryRequestSchema は配列順と seq が一致しない入力を拒否する', () => {
+    const result = createTrajectoryRequestSchema.safeParse({
+      constraints: [
+        {
+          seq: 1,
+          point_type: 'waypoint',
+          x: 1,
+          y: 1,
+          relative_timestamp: 1000,
+        },
+        {
+          seq: 0,
+          point_type: 'start',
+          x: 0,
+          y: 0,
+        },
+      ],
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('createTrajectoryRequestSchema は 360 度以上の direction を拒否する', () => {
+    const result = createTrajectoryRequestSchema.safeParse({
+      constraints: [
+        {
+          seq: 0,
+          point_type: 'start',
+          x: 0,
+          y: 0,
+          direction: 360,
+        },
+      ],
+    })
+
+    expect(result.success).toBe(false)
+  })
+
   it('callbackRequestSchema は completed callback を受け入れる', () => {
     const result = callbackRequestSchema.safeParse({
       trajectory_id: '33333333-3333-4333-8333-333333333333',
@@ -124,6 +216,52 @@ describe('trajectory schemas', () => {
     })
 
     expect(result.success).toBe(true)
+  })
+
+  it('callbackErrorCodeSchema は定義済み callback error code を受け入れる', () => {
+    const result = callbackErrorCodeSchema.safeParse('CALLBACK_TOKEN_EXPIRED')
+
+    expect(result.success).toBe(true)
+  })
+
+  it('callbackErrorCodeSchema は未知の callback error code を拒否する', () => {
+    const result = callbackErrorCodeSchema.safeParse('UNKNOWN_CALLBACK_ERROR')
+
+    expect(result.success).toBe(false)
+  })
+
+  it('callbackErrorResponseSchema は enum に含まれる error_code を受け入れる', () => {
+    const result = callbackErrorResponseSchema.safeParse({
+      error_code: 'CALLBACK_DEPENDENCY_FAILURE',
+      error_message: 'failed to verify object or update trajectory state',
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('trajectoryMapDataQuerySchema は data_type を必須とする', () => {
+    const result = trajectoryMapDataQuerySchema.safeParse({
+      data_type: 'analyzed',
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('batchTrajectoryMapDataRequestSchema は data_type を必須とする', () => {
+    const result = batchTrajectoryMapDataRequestSchema.safeParse({
+      data_type: 'ground_truth',
+      trajectory_ids: ['33333333-3333-4333-8333-333333333333'],
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('batchTrajectoryMapDataRequestSchema は data_type がない入力を拒否する', () => {
+    const result = batchTrajectoryMapDataRequestSchema.safeParse({
+      trajectory_ids: ['33333333-3333-4333-8333-333333333333'],
+    })
+
+    expect(result.success).toBe(false)
   })
 
   it('trajectoryIdParamsSchema は UUID でない trajectoryId を拒否する', () => {

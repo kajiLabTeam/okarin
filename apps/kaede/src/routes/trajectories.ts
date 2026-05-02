@@ -1,10 +1,20 @@
-import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
-import { notImplementedResponseSchema } from '../schemas/common.js'
+import { createRoute, OpenAPIHono } from '@hono/zod-openapi'
+import { errorResponseSchema, notImplementedResponseSchema } from '../schemas/common.js'
 import {
+  batchTrajectoryMapDataRequestSchema,
+  batchTrajectoryMapDataResponseSchema,
+  callbackErrorResponseSchema,
   callbackRequestSchema,
   callbackResponseSchema,
+  cloneAndReanalyzeRequestSchema,
+  retriedTrajectoryResponseSchema,
   trajectoryIdParamsSchema,
+  trajectoryCompletionResponseSchema,
+  trajectoryMapDataQuerySchema,
+  trajectoryMapDataResponseSchema,
+  trajectoryResultResponseSchema,
   trajectoryStatusResponseSchema,
+  uploadUrlWithPathResponseSchema,
 } from '../schemas/trajectories.js'
 import { notImplemented } from '../utils/not-implemented.js'
 
@@ -30,6 +40,46 @@ const callbackRoute = createRoute({
       content: {
         'application/json': {
           schema: callbackResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: 'callback payload が不正',
+      content: {
+        'application/json': {
+          schema: callbackErrorResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: 'callback token を検証できない',
+      content: {
+        'application/json': {
+          schema: callbackErrorResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: 'trajectory が存在しない',
+      content: {
+        'application/json': {
+          schema: callbackErrorResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: 'callback 内容が trajectory の現在状態または想定保存先と矛盾する',
+      content: {
+        'application/json': {
+          schema: callbackErrorResponseSchema,
+        },
+      },
+    },
+    503: {
+      description: '依存先確認または状態更新に失敗したため再送可能',
+      content: {
+        'application/json': {
+          schema: callbackErrorResponseSchema,
         },
       },
     },
@@ -67,6 +117,14 @@ const getTrajectoryRoute = createRoute({
         },
       },
     },
+    404: {
+      description: 'trajectory が存在しない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
     501: {
       description: 'not implemented',
       content: {
@@ -93,6 +151,30 @@ const getTrajectoryResultRoute = createRoute({
     params: trajectoryIdParamsSchema,
   },
   responses: {
+    200: {
+      description: 'trajectory 結果取得 URL',
+      content: {
+        'application/json': {
+          schema: trajectoryResultResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: 'trajectory が存在しない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: 'trajectory の現在状態では結果を取得できない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
     501: {
       description: 'not implemented',
       content: {
@@ -121,8 +203,17 @@ const getTrajectoryMapDataRoute = createRoute({
   description: 'trajectory 単位の map data を取得する',
   request: {
     params: trajectoryIdParamsSchema,
+    query: trajectoryMapDataQuerySchema,
   },
   responses: {
+    200: {
+      description: 'trajectory 地図表示用データ',
+      content: {
+        'application/json': {
+          schema: trajectoryMapDataResponseSchema,
+        },
+      },
+    },
     501: {
       description: 'not implemented',
       content: {
@@ -136,6 +227,7 @@ const getTrajectoryMapDataRoute = createRoute({
 
 trajectoriesRoutes.openapi(getTrajectoryMapDataRoute, (c) => {
   c.req.valid('param')
+  c.req.valid('query')
 
   return notImplemented(
     c,
@@ -153,14 +245,20 @@ const batchTrajectoryMapDataRoute = createRoute({
     body: {
       content: {
         'application/json': {
-          schema: z.object({
-            trajectory_ids: z.array(z.string().uuid()).min(1),
-          }),
+          schema: batchTrajectoryMapDataRequestSchema,
         },
       },
     },
   },
   responses: {
+    200: {
+      description: '複数 trajectory 地図表示用データ',
+      content: {
+        'application/json': {
+          schema: batchTrajectoryMapDataResponseSchema,
+        },
+      },
+    },
     501: {
       description: 'not implemented',
       content: {
@@ -191,6 +289,14 @@ const retryTrajectoryRoute = createRoute({
     params: trajectoryIdParamsSchema,
   },
   responses: {
+    200: {
+      description: 'trajectory 再解析受付',
+      content: {
+        'application/json': {
+          schema: retriedTrajectoryResponseSchema,
+        },
+      },
+    },
     501: {
       description: 'not implemented',
       content: {
@@ -222,14 +328,20 @@ const cloneAndReanalyzeRoute = createRoute({
     body: {
       content: {
         'application/json': {
-          schema: z.object({
-            constraints: z.array(z.unknown()).min(1),
-          }),
+          schema: cloneAndReanalyzeRequestSchema,
         },
       },
     },
   },
   responses: {
+    200: {
+      description: 'trajectory 複製再解析受付',
+      content: {
+        'application/json': {
+          schema: retriedTrajectoryResponseSchema,
+        },
+      },
+    },
     501: {
       description: 'not implemented',
       content: {
@@ -261,6 +373,14 @@ const issueManualResultUploadUrlRoute = createRoute({
     params: trajectoryIdParamsSchema,
   },
   responses: {
+    200: {
+      description: '手動推定軌跡アップロード URL 発行',
+      content: {
+        'application/json': {
+          schema: uploadUrlWithPathResponseSchema,
+        },
+      },
+    },
     501: {
       description: 'not implemented',
       content: {
@@ -291,6 +411,14 @@ const completeManualResultUploadRoute = createRoute({
     params: trajectoryIdParamsSchema,
   },
   responses: {
+    200: {
+      description: '手動推定軌跡登録完了',
+      content: {
+        'application/json': {
+          schema: trajectoryCompletionResponseSchema,
+        },
+      },
+    },
     501: {
       description: 'not implemented',
       content: {
@@ -321,6 +449,14 @@ const issueGroundTruthUploadUrlRoute = createRoute({
     params: trajectoryIdParamsSchema,
   },
   responses: {
+    200: {
+      description: 'trajectory 単位 ground truth アップロード URL 発行',
+      content: {
+        'application/json': {
+          schema: uploadUrlWithPathResponseSchema,
+        },
+      },
+    },
     501: {
       description: 'not implemented',
       content: {
@@ -351,6 +487,14 @@ const completeGroundTruthUploadRoute = createRoute({
     params: trajectoryIdParamsSchema,
   },
   responses: {
+    200: {
+      description: 'trajectory 単位 ground truth 登録完了',
+      content: {
+        'application/json': {
+          schema: trajectoryCompletionResponseSchema,
+        },
+      },
+    },
     501: {
       description: 'not implemented',
       content: {
@@ -376,11 +520,22 @@ const deleteTrajectoryRoute = createRoute({
   method: 'delete',
   path: '/{trajectoryId}',
   tags: ['Trajectories'],
-  description: '指定した trajectory を削除する',
+  description: '指定した trajectory を論理削除する',
   request: {
     params: trajectoryIdParamsSchema,
   },
   responses: {
+    204: {
+      description: 'trajectory 削除完了',
+    },
+    404: {
+      description: 'trajectory が存在しない',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
     501: {
       description: 'not implemented',
       content: {

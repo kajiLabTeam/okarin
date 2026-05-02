@@ -90,6 +90,7 @@ CREATE TABLE public.recordings (
     upload_targets text[] NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    deleted_at timestamp with time zone,
     CONSTRAINT recordings_upload_status_chk CHECK ((upload_status = ANY (ARRAY['accepted'::text, 'ready'::text, 'failed'::text]))),
     CONSTRAINT recordings_upload_targets_nonempty_chk CHECK ((cardinality(upload_targets) >= 1))
 );
@@ -118,6 +119,7 @@ CREATE TABLE public.trajectories (
     failed_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    deleted_at timestamp with time zone,
     CONSTRAINT trajectories_failed_at_chk CHECK ((((status = 'failed'::text) AND (failed_at IS NOT NULL)) OR ((status <> 'failed'::text) AND (failed_at IS NULL)))),
     CONSTRAINT trajectories_status_chk CHECK ((status = ANY (ARRAY['accepted'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
 );
@@ -208,31 +210,31 @@ CREATE INDEX floors_building_id_idx ON public.floors USING btree (building_id);
 
 
 --
--- Name: recordings_floor_id_created_at_idx; Type: INDEX; Schema: public; Owner: -
+-- Name: recordings_floor_id_created_at_active_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX recordings_floor_id_created_at_idx ON public.recordings USING btree (floor_id, created_at DESC);
-
-
---
--- Name: recordings_pedestrian_id_created_at_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX recordings_pedestrian_id_created_at_idx ON public.recordings USING btree (pedestrian_id, created_at DESC);
+CREATE INDEX recordings_floor_id_created_at_active_idx ON public.recordings USING btree (floor_id, created_at DESC) WHERE (deleted_at IS NULL);
 
 
 --
--- Name: trajectories_recording_id_created_at_idx; Type: INDEX; Schema: public; Owner: -
+-- Name: recordings_pedestrian_id_created_at_active_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX trajectories_recording_id_created_at_idx ON public.trajectories USING btree (recording_id, created_at DESC);
+CREATE INDEX recordings_pedestrian_id_created_at_active_idx ON public.recordings USING btree (pedestrian_id, created_at DESC) WHERE (deleted_at IS NULL);
 
 
 --
--- Name: trajectories_status_created_at_idx; Type: INDEX; Schema: public; Owner: -
+-- Name: trajectories_recording_id_created_at_active_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX trajectories_status_created_at_idx ON public.trajectories USING btree (status, created_at DESC);
+CREATE INDEX trajectories_recording_id_created_at_active_idx ON public.trajectories USING btree (recording_id, created_at DESC) WHERE (deleted_at IS NULL);
+
+
+--
+-- Name: trajectories_status_created_at_active_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX trajectories_status_created_at_active_idx ON public.trajectories USING btree (status, created_at DESC) WHERE (deleted_at IS NULL);
 
 
 --
@@ -344,4 +346,5 @@ ALTER TABLE ONLY public.trajectory_constraints
 --
 
 INSERT INTO public.schema_migrations (version) VALUES
-    ('20260425120000');
+    ('20260425120000'),
+    ('20260501110000');

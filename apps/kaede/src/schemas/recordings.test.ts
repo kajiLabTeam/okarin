@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  groundTruthTypeSchema,
   initRecordingRequestSchema,
   recordingIdParamsSchema,
+  recordingGroundTruthRequestSchema,
   refreshUploadUrlsRequestSchema,
 } from './recordings.js'
 
@@ -47,6 +49,20 @@ describe('recording schemas', () => {
     const result = refreshUploadUrlsRequestSchema.safeParse({
       targets: [],
     })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('recordingGroundTruthRequestSchema は truth_type=uwb を受け入れる', () => {
+    const result = recordingGroundTruthRequestSchema.safeParse({
+      truth_type: 'uwb',
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('groundTruthTypeSchema は未知の truth_type を拒否する', () => {
+    const result = groundTruthTypeSchema.safeParse('beacon')
 
     expect(result.success).toBe(false)
   })

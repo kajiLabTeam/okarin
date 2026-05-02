@@ -5,33 +5,48 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 
 class StartConstraint(BaseModel):
-    seq: int = Field(ge=0, description="constraint の並び順。0 以上の一意な整数")
+    seq: int = Field(
+        ge=0, description="constraint の並び順。0 始まりで欠番なく連続する整数"
+    )
     point_type: Literal["start"] = Field(description="開始地点を表す固定値")
     x: float = Field(description="フロア座標系での X 座標")
     y: float = Field(description="フロア座標系での Y 座標")
     direction: float | None = Field(
-        default=None, description="進行方向。単位は実装側で定義する"
+        default=None,
+        ge=0,
+        lt=360,
+        description="進行方向。度数法で 0 以上 360 未満。0 はフロア座標系の +X 方向",
     )
 
 
 class WaypointConstraint(BaseModel):
-    seq: int = Field(ge=0, description="constraint の並び順。0 以上の一意な整数")
+    seq: int = Field(
+        ge=0, description="constraint の並び順。0 始まりで欠番なく連続する整数"
+    )
     point_type: Literal["waypoint"] = Field(description="経由点を表す固定値")
     x: float = Field(description="フロア座標系での X 座標")
     y: float = Field(description="フロア座標系での Y 座標")
     direction: float | None = Field(
-        default=None, description="進行方向。単位は実装側で定義する"
+        default=None,
+        ge=0,
+        lt=360,
+        description="進行方向。度数法で 0 以上 360 未満。0 はフロア座標系の +X 方向",
     )
     relative_timestamp: int = Field(ge=0, description="開始からの相対時刻")
 
 
 class GoalConstraint(BaseModel):
-    seq: int = Field(ge=0, description="constraint の並び順。0 以上の一意な整数")
+    seq: int = Field(
+        ge=0, description="constraint の並び順。0 始まりで欠番なく連続する整数"
+    )
     point_type: Literal["goal"] = Field(description="終了地点を表す固定値")
     x: float = Field(description="フロア座標系での X 座標")
     y: float = Field(description="フロア座標系での Y 座標")
     direction: float | None = Field(
-        default=None, description="進行方向。単位は実装側で定義する"
+        default=None,
+        ge=0,
+        lt=360,
+        description="進行方向。度数法で 0 以上 360 未満。0 はフロア座標系の +X 方向",
     )
 
 
@@ -95,7 +110,8 @@ class AnalyzeRequest(BaseModel):
     recording_id: UUID = Field(description="元になった recording の ID")
     floor_id: UUID = Field(description="解析対象の floor ID")
     constraints: list[Constraint] = Field(
-        min_length=1, description="開始点・経由点・終了点からなる制約点の一覧"
+        default_factory=list,
+        description="開始点・経由点・終了点からなる制約点の一覧。省略時は制約なし",
     )
     raw_data_urls: RawDataUrls = Field(description="raw データ取得用の署名付き URL 群")
     result_upload_url: HttpUrl = Field(
@@ -108,6 +124,9 @@ class AnalyzeRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_constraints(self) -> AnalyzeRequest:
+        if len(self.constraints) == 0:
+            return self
+
         start_count = sum(
             1
             for point in self.constraints
@@ -126,6 +145,10 @@ class AnalyzeRequest(BaseModel):
             raise ValueError("constraints must contain at most one goal point")
         if len(set(seqs)) != len(seqs):
             raise ValueError("constraint seq must be unique")
+        if seqs != list(range(len(seqs))):
+            raise ValueError(
+                "constraints must be ordered by seq starting at 0 with no gaps"
+            )
 
         return self
 
@@ -133,8 +156,3 @@ class AnalyzeRequest(BaseModel):
 class AnalyzeAcceptedResponse(BaseModel):
     trajectory_id: UUID = Field(description="受理した trajectory の ID")
     status: Literal["accepted"] = Field(description="解析要求を受理した状態")
-    message: str = Field(description="現在の実装状態を含む補足メッセージ")
-
-
-class ErrorResponse(BaseModel):
-    detail: str = Field(description="エラー内容")
