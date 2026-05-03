@@ -1,0 +1,22 @@
+export { createDb, db } from './client.js'
+export type {
+  Building,
+  BuildingUpdate,
+  Database,
+  Floor,
+  FloorUpdate,
+  NewBuilding,
+  NewFloor,
+  NewPedestrian,
+  NewRecording,
+  NewTrajectory,
+  NewTrajectoryConstraint,
+  Pedestrian,
+  PedestrianUpdate,
+  Recording,
+  RecordingUpdate,
+  Trajectory,
+  TrajectoryConstraint,
+  TrajectoryConstraintUpdate,
+  TrajectoryUpdate,
+} from './types.js'
