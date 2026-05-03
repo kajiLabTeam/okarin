@@ -8,6 +8,7 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "db:codegen": "kysely-codegen --dialect postgres --default-schema public --exclude-pattern public.schema_migrations --out-file ./src/services/db/generated.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write ."
@@ -28,6 +29,7 @@
     "@vitest/ui": "3.2.4",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^10.1.8",
+    "kysely-codegen": "^0.20.0",
     "prettier": "^3.8.1",
     "tsx": "^4.7.1",
     "typescript": "^5.8.3",
