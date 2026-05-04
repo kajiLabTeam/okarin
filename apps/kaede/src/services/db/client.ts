@@ -1,8 +1,6 @@
 import { Kysely, PostgresDialect } from 'kysely'
-import pg from 'pg'
+import { Pool } from 'pg'
 import type { DB } from './generated.js'
-
-const { Pool } = pg
 
 const getDatabaseUrl = () => {
   const databaseUrl = process.env.DATABASE_URL

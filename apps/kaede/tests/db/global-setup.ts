@@ -37,13 +37,18 @@ interface SetupContext {
 
 export default async function setup({ provide }: SetupContext) {
   const container = await new PostgreSqlContainer('postgres:17-alpine').start()
-  const databaseUrl = container.getConnectionUri()
+  try {
+    const databaseUrl = container.getConnectionUri()
 
-  await applySchema(databaseUrl)
-  provide('databaseUrl', databaseUrl)
+    await applySchema(databaseUrl)
+    provide('databaseUrl', databaseUrl)
 
-  return async () => {
+    return async () => {
+      await container.stop()
+    }
+  } catch (error) {
     await container.stop()
+    throw error
   }
 }
 

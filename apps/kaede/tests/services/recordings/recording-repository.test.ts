@@ -11,7 +11,7 @@ const db = createDb()
 
 describe('recording repository', () => {
   beforeEach(async () => {
-    await resetDatabase()
+    await resetDatabase(db)
   })
 
   afterAll(async () => {

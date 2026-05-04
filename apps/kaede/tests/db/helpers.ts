@@ -1,23 +1,16 @@
 import { sql } from 'kysely'
-import { createDb } from '../../src/services/db/client.js'
+import type { Kysely } from 'kysely'
+import type { DB } from '../../src/services/db/generated.js'
 
-export const createTestDb = () => createDb()
-
-export const resetDatabase = async () => {
-  const db = createTestDb()
-
-  try {
-    await sql`
-      TRUNCATE TABLE
-        trajectory_constraints,
-        trajectories,
-        recordings,
-        pedestrians,
-        floors,
-        buildings
-      RESTART IDENTITY CASCADE
-    `.execute(db)
-  } finally {
-    await db.destroy()
-  }
+export const resetDatabase = async (db: Kysely<DB>) => {
+  await sql`
+    TRUNCATE TABLE
+      trajectory_constraints,
+      trajectories,
+      recordings,
+      pedestrians,
+      floors,
+      buildings
+    RESTART IDENTITY CASCADE
+  `.execute(db)
 }

@@ -5,5 +5,6 @@ export default defineConfig({
     globalSetup: ['./tests/db/global-setup.ts'],
     setupFiles: ['./tests/db/setup.ts'],
     include: ['tests/**/*.test.ts'],
+    fileParallelism: false,
   },
 })
