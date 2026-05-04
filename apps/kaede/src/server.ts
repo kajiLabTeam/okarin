@@ -49,5 +49,9 @@ export const createApp = () => {
       })
     )
 
+  app.get('/debug-sentry', () => {
+    throw new Error('My first sentry Error!')
+  })
+
   return app
 }

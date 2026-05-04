@@ -14,13 +14,13 @@ services:
     build:
       context: ./apps/nozomi
     image: okarin/nozomi:production
+    env_file:
+      - ${ENV_FILE:-./deploy/env/production.env}
     depends_on:
       postgres:
         condition: service_healthy
       seaweedfs:
         condition: service_healthy
-    env_file:
-      - ${ENV_FILE:-./deploy/env/production.env}
 
   postgres:
     image: ${POSTGRES_IMAGE:-postgres:17-alpine}

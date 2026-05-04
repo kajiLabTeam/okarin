@@ -2,7 +2,13 @@ import baseConfig from '@hono/eslint-config'
 import eslintConfigPrettier from 'eslint-config-prettier'
 export default [
   {
-    ignores: ['eslint.config.mjs', 'dist/**', 'node_modules/**', 'src/services/db/generated.ts'],
+    ignores: [
+      'eslint.config.mjs',
+      'instrument.mjs',
+      'dist/**',
+      'node_modules/**',
+      'src/services/db/generated.ts',
+    ],
   },
   ...baseConfig,
   {

@@ -1,8 +1,11 @@
 import os
 
+import sentry_sdk
 import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
 
 from src.routes.analysis import analysis_router
 from src.routes.health import health_router
@@ -34,6 +37,42 @@ def _port() -> int:
         return int(os.getenv("PORT", "8000"))
     except ValueError:
         return 8000
+
+
+def _sentry_enabled() -> bool:
+    dsn = os.getenv("SENTRY_DSN")
+    return dsn is not None and dsn.strip() != ""
+
+
+def _sentry_traces_sample_rate() -> float:
+    raw = os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")
+
+    try:
+        parsed = float(raw)
+    except ValueError:
+        return 0.1
+
+    if parsed < 0 or parsed > 1:
+        return 0.1
+
+    return parsed
+
+
+def _sentry_send_default_pii() -> bool:
+    return os.getenv("SENTRY_SEND_DEFAULT_PII", "false").lower() == "true"
+
+
+if _sentry_enabled():
+    sentry_sdk.init(
+        dsn=os.environ["SENTRY_DSN"],
+        environment=os.getenv("APP_ENV", "local"),
+        traces_sample_rate=_sentry_traces_sample_rate(),
+        send_default_pii=_sentry_send_default_pii(),
+        integrations=[
+            StarletteIntegration(),
+            FastApiIntegration(),
+        ],
+    )
 
 
 def dev() -> None:
