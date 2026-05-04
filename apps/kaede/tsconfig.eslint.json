@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "."
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "tests/**/*.ts",
+    "vitest.config.ts",
+    "vitest.db.config.ts"
+  ],
+  "exclude": ["node_modules"]
+}
