@@ -8,7 +8,7 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:db": "vitest run --config vitest.db.config.ts",
-    "test:watch": "vitest",
+    "test:watch": "vitest --config vitest.config.ts",
     "db:codegen": "kysely-codegen --dialect postgres --default-schema public --exclude-pattern public.schema_migrations --out-file ./src/services/db/generated.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
