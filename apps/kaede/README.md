@@ -14,6 +14,22 @@ pnpm install
 pnpm run dev
 ```
 
+## Database
+
+`kaede` の DB アクセスは `Kysely` を使い、型定義は実 DB スキーマから codegen する。
+
+スキーマ変更時の基本手順:
+
+```txt
+make up ENV=local
+make db-up ENV=local
+pnpm run db:codegen
+```
+
+- migration の正本はリポジトリルートの `db/migrations/*.sql`
+- `pnpm run db:codegen` は local PostgreSQL に接続して `src/services/db/generated.ts` を更新する
+- migration 追加後や `db/schema.sql` 更新後は codegen もあわせて実行する
+
 ## Linter,Formatter
 
 Linterの実行:`pnpm lint`
