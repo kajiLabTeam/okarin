@@ -7,6 +7,11 @@ import { registerApiRoutes } from './routes/index.js'
 export const createApp = () => {
   const app = new OpenAPIHono()
 
+  app.use(async (_c, next) => {
+    Sentry.setTag('service', 'kaede')
+    await next()
+  })
+
   app.onError((err, c) => {
     Sentry.captureException(err)
 

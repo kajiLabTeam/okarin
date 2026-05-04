@@ -110,6 +110,12 @@ app = FastAPI(
 )
 
 
+@app.middleware("http")
+async def bind_sentry_tags(request, call_next):
+    sentry_sdk.set_tag("service", "nozomi")
+    return await call_next(request)
+
+
 @app.get(
     "/doc",
     include_in_schema=False,
