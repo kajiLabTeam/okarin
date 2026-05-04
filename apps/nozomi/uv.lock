@@ -538,6 +538,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "rikka" },
     { name = "scalar-fastapi" },
+    { name = "sentry-sdk" },
 ]
 
 [package.dev-dependencies]
@@ -553,6 +554,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "rikka", git = "https://github.com/kajiLabTeam/rikka.git" },
     { name = "scalar-fastapi", specifier = ">=1.4.1" },
+    { name = "sentry-sdk", specifier = ">=2.54.0" },
 ]
 
 [package.metadata.requires-dev]
