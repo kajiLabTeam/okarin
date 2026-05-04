@@ -1,0 +1,38 @@
+name: Kaede DB CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/kaede/**"
+      - ".github/workflows/kaede-db-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/kaede/**"
+      - ".github/workflows/kaede-db-ci.yml"
+
+jobs:
+  db-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/kaede
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/kaede/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: DB Test
+        run: pnpm run test:db
