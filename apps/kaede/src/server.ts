@@ -71,9 +71,12 @@ export const createApp = () => {
       })
     )
 
-  app.get('/debug-sentry', () => {
-    throw new Error('My first sentry Error!')
-  })
+  const appEnv = process.env.APP_ENV ?? 'local'
+  if (appEnv === 'local' || appEnv === 'staging') {
+    app.get('/debug-sentry', () => {
+      throw new Error(`test error for sentry from ${appEnv}`)
+    })
+  }
 
   return app
 }
