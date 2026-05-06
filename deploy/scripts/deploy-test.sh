@@ -46,6 +46,67 @@ require_clean_tree() {
   fi
 }
 
+dump_compose_state() {
+  ENV_FILE="$ENV_FILE" \
+  KAEDE_ENV_FILE="$KAEDE_ENV_FILE" \
+  STORAGE_BOOTSTRAP_ENV_FILE="$STORAGE_BOOTSTRAP_ENV_FILE" \
+  docker compose \
+    --env-file "$ENV_FILE" \
+    -p "$PROJECT_NAME" \
+    -f compose.yml \
+    -f "$COMPOSE_FILE" \
+    ps || true
+
+  ENV_FILE="$ENV_FILE" \
+  KAEDE_ENV_FILE="$KAEDE_ENV_FILE" \
+  STORAGE_BOOTSTRAP_ENV_FILE="$STORAGE_BOOTSTRAP_ENV_FILE" \
+  docker compose \
+    --env-file "$ENV_FILE" \
+    -p "$PROJECT_NAME" \
+    -f compose.yml \
+    -f "$COMPOSE_FILE" \
+    logs --tail 100 kaede nozomi postgres seaweedfs || true
+}
+
+wait_for_healthy() {
+  service=$1
+  attempts=${2:-60}
+  interval=${3:-2}
+
+  container_id=$(
+    ENV_FILE="$ENV_FILE" \
+    KAEDE_ENV_FILE="$KAEDE_ENV_FILE" \
+    STORAGE_BOOTSTRAP_ENV_FILE="$STORAGE_BOOTSTRAP_ENV_FILE" \
+    docker compose \
+      --env-file "$ENV_FILE" \
+      -p "$PROJECT_NAME" \
+      -f compose.yml \
+      -f "$COMPOSE_FILE" \
+      ps -q "$service"
+  )
+
+  [ -n "$container_id" ] || fail "container not found for service: $service"
+
+  i=0
+  while [ "$i" -lt "$attempts" ]; do
+    status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null || true)
+    if [ "$status" = "healthy" ] || [ "$status" = "running" ]; then
+      return 0
+    fi
+
+    if [ "$status" = "unhealthy" ] || [ "$status" = "exited" ] || [ "$status" = "dead" ]; then
+      dump_compose_state
+      fail "service $service entered bad state: $status"
+    fi
+
+    sleep "$interval"
+    i=$((i + 1))
+  done
+
+  dump_compose_state
+  fail "timed out waiting for service $service to become healthy"
+}
+
 TARGET_REF=$(resolve_ref "${1:-}")
 ENV_FILE="$REPO_DIR/deploy/env/test.env"
 KAEDE_ENV_FILE="$REPO_DIR/deploy/apps/kaede.test.env"
@@ -124,5 +185,11 @@ docker compose \
   -f compose.yml \
   -f "$COMPOSE_FILE" \
   up -d --build --remove-orphans
+
+log "Waiting for services to become healthy for env: test"
+wait_for_healthy postgres
+wait_for_healthy seaweedfs
+wait_for_healthy nozomi
+wait_for_healthy kaede
 
 log "Deploy completed for test at $(git rev-parse --short HEAD)"
