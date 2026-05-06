@@ -155,13 +155,14 @@ log "Running database migrations for env: test"
 ENV_FILE="$ENV_FILE" \
 KAEDE_ENV_FILE="$KAEDE_ENV_FILE" \
 STORAGE_BOOTSTRAP_ENV_FILE="$STORAGE_BOOTSTRAP_ENV_FILE" \
-docker compose \
-  --env-file "$ENV_FILE" \
-  -p "$PROJECT_NAME" \
-  -f compose.yml \
-  -f "$COMPOSE_FILE" \
-  --profile tools \
-  run --rm dbmate up
+  docker compose \
+    --env-file "$ENV_FILE" \
+    -p "$PROJECT_NAME" \
+    -f compose.yml \
+    -f "$COMPOSE_FILE" \
+    --profile tools \
+    -e DBMATE_SCHEMA_FILE=/tmp/schema.sql \
+    run --rm dbmate up
 
 log "Initializing object storage for env: test"
 ENV_FILE="$ENV_FILE" \
