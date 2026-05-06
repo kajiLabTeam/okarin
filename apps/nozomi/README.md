@@ -12,6 +12,8 @@ $ uv sync --all-groups
 $ uv run dev
 ```
 
+Sentry を使う場合は `SENTRY_DSN` を設定してください。必要に応じて `SENTRY_TRACES_SAMPLE_RATE` と `SENTRY_SEND_DEFAULT_PII` も使えます。
+
 本番相当の起動
 ```sh
 $ uv run start

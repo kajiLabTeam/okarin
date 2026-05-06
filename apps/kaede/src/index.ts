@@ -1,3 +1,4 @@
+import '../instrument.mjs'
 import { serve } from '@hono/node-server'
 import { createApp } from './server.js'
 

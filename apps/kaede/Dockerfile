@@ -4,6 +4,7 @@ ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 WORKDIR /home/node/app
 COPY package.json pnpm-lock.yaml .npmrc ./
+COPY instrument.mjs ./instrument.mjs
 
 FROM base AS prod-deps
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
@@ -18,6 +19,7 @@ FROM node:22-slim
 WORKDIR /home/node/app
 
 COPY --chown=node:node package.json ./package.json
+COPY --chown=node:node --from=base /home/node/app/instrument.mjs ./instrument.mjs
 COPY --chown=node:node --from=prod-deps /home/node/app/node_modules ./node_modules
 COPY --chown=node:node --from=build /home/node/app/dist ./dist
 

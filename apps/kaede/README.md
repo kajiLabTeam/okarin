@@ -14,6 +14,8 @@ pnpm install
 pnpm run dev
 ```
 
+Sentry を使う場合は `SENTRY_DSN` を設定してください。必要に応じて `SENTRY_TRACES_SAMPLE_RATE` と `SENTRY_SEND_DEFAULT_PII` も使えます。
+
 ## Database
 
 `kaede` の DB アクセスは `Kysely` を使い、型定義は実 DB スキーマから codegen する。

@@ -1,9 +1,31 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 import { Scalar } from '@scalar/hono-api-reference'
+import * as Sentry from '@sentry/node'
+import { HTTPException } from 'hono/http-exception'
 import { registerApiRoutes } from './routes/index.js'
 
 export const createApp = () => {
   const app = new OpenAPIHono()
+
+  app.use(async (_c, next) => {
+    Sentry.setTag('service', 'kaede')
+    await next()
+  })
+
+  app.onError((err, c) => {
+    Sentry.captureException(err)
+
+    if (err instanceof HTTPException) {
+      return err.getResponse()
+    }
+
+    return c.json(
+      {
+        error: 'Internal server error',
+      },
+      500
+    )
+  })
 
   const healthRoute = createRoute({
     method: 'get',
@@ -48,6 +70,13 @@ export const createApp = () => {
         url: '/specification',
       })
     )
+
+  const appEnv = process.env.APP_ENV ?? 'local'
+  if (appEnv === 'local' || appEnv === 'staging') {
+    app.get('/debug-sentry', () => {
+      throw new Error(`test error for sentry from ${appEnv}`)
+    })
+  }
 
   return app
 }
