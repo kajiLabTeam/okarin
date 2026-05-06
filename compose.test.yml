@@ -1,0 +1,82 @@
+services:
+  kaede:
+    build:
+      context: ./apps/kaede
+    image: okarin/kaede:test
+    env_file:
+      - ${ENV_FILE:-./deploy/env/test.env}
+      - ${KAEDE_ENV_FILE:-./deploy/apps/kaede.test.env}
+
+  nozomi:
+    build:
+      context: ./apps/nozomi
+    image: okarin/nozomi:test
+    env_file:
+      - ${ENV_FILE:-./deploy/env/test.env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
+
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:17-alpine}
+    restart: unless-stopped
+    env_file:
+      - ${ENV_FILE:-./deploy/env/test.env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  dbmate:
+    image: ghcr.io/amacneil/dbmate:2
+    profiles: ["tools"]
+    env_file:
+      - ${ENV_FILE:-./deploy/env/test.env}
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable
+      DBMATE_MIGRATIONS_DIR: /db/migrations
+      DBMATE_SCHEMA_FILE: /db/schema.sql
+    depends_on:
+      postgres:
+        condition: service_healthy
+    working_dir: /db
+    volumes:
+      - ./db:/db
+
+  storage-bootstrap:
+    image: amazon/aws-cli:2.34.38
+    profiles: ["tools"]
+    env_file:
+      - ${ENV_FILE:-./deploy/env/test.env}
+      - ${STORAGE_BOOTSTRAP_ENV_FILE:-./deploy/apps/storage-bootstrap.test.env}
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+    working_dir: /work
+    entrypoint: []
+    command: ["sh", "./init_bucket.sh"]
+    volumes:
+      - ./storage/bootstrap:/work:ro
+
+  seaweedfs:
+    image: ${SEAWEEDFS_IMAGE:-chrislusf/seaweedfs:4.17}
+    restart: unless-stopped
+    command: server -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.conf -dir=/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9333/cluster/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    volumes:
+      - seaweedfs_data:/data
+      - ./deploy/seaweedfs/s3.test.conf:/etc/seaweedfs/s3.conf:ro
+
+volumes:
+  postgres_data:
+  seaweedfs_data:

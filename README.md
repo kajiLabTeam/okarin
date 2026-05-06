@@ -83,6 +83,7 @@ uv run pytest
 
 - `compose.yml`: 共通定義（`kaede` / `nozomi`）
 - `compose.local.yml`: ローカル用オーバーレイ（`postgres` / `seaweedfs` 追加、ローカルビルド）
+- `compose.test.yml`: test 用オーバーレイ（ローカルに近い構成で test 用 env を使用）
 - `compose.staging.yml`: staging 用オーバーレイ（環境変数ファイルを staging に切替）
 - `compose.production.yml`: production 用オーバーレイ（環境変数ファイルを production に切替）
 
@@ -114,13 +115,31 @@ docker compose -p okarin-local -f compose.yml -f compose.local.yml down
 キーを変更する場合は `deploy/seaweedfs/s3.local.conf` と `deploy/apps/kaede.local.env` / `deploy/apps/storage-bootstrap.local.env` の対応する値を同じに更新してください。
 これら実ファイルは `.gitignore` で除外されるため、GitHubには上がりません。
 
-### staging / production の環境変数
+### test / staging / production の環境変数
 
+- `deploy/env/test.env.example` をベースに test 用の共通 env 実ファイルを作成してください。
+- `deploy/apps/kaede.test.env.example` をベースに test 用の `kaede` env を作成してください。
+- `deploy/apps/storage-bootstrap.test.env.example` をベースに test 用の `storage-bootstrap` env を作成してください。
+- `deploy/seaweedfs/s3.test.conf.example` をベースに test 用の SeaweedFS 実ファイルを作成してください。
 - `deploy/env/staging.env.example` と `deploy/env/production.env.example` をベースに共通 env の実ファイルを作成してください。
 - `deploy/apps/kaede.staging.env.example` と `deploy/apps/kaede.production.env.example` をベースに `kaede` 用 env を作成してください。
 - `deploy/apps/storage-bootstrap.staging.env.example` と `deploy/apps/storage-bootstrap.production.env.example` をベースに `storage-bootstrap` 用 env を作成してください。
 - `deploy/seaweedfs/s3.staging.conf.example` と `deploy/seaweedfs/s3.production.conf.example` をベースに SeaweedFS の実ファイルを作成してください。
 - 各環境の compose override が対応する `env_file` を持ちます。必要なら `ENV_FILE` で上書きできます。
+
+### test 手動デプロイ
+
+```sh
+ENV_FILE=./deploy/env/test.env \
+docker compose -p okarin-test -f compose.yml -f compose.test.yml up -d --build --remove-orphans
+```
+
+停止:
+
+```sh
+ENV_FILE=./deploy/env/test.env \
+docker compose -p okarin-test -f compose.yml -f compose.test.yml down
+```
 
 ### staging 手動デプロイ
 
@@ -148,12 +167,14 @@ docker compose -p okarin-production -f compose.yml -f compose.production.yml dow
 環境ごとにデプロイスクリプトを分ける想定です。
 
 ```sh
-./deploy-test.sh [release_version]
-./deploy-staging.sh [release_version]
-./deploy-production.sh [release_version]
+./deploy/scripts/deploy-test.sh [release_version]
+./deploy/scripts/deploy-staging.sh [release_version]
+./deploy/scripts/deploy-production.sh [release_version]
 ```
 
 - 各スクリプト内で対象環境を固定しています
 - 各スクリプトは `docker compose` を直接実行します
+- `postgres` と `seaweedfs` だけを pull し、`kaede` と `nozomi` は `up --build` で更新します
+- 各スクリプトは `postgres` / `seaweedfs` 起動後に `dbmate up` と `storage-bootstrap` を実行してからアプリを起動します
 - 引数が空なら `SSH_ORIGINAL_COMMAND` を使います
 - それも空なら `main` を deploy 対象にします

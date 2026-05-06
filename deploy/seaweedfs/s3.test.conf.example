@@ -1,0 +1,33 @@
+{
+  "identities": [
+    {
+      "name": "okarin-test-kaede",
+      "credentials": [
+        {
+          "accessKey": "kaede-test",
+          "secretKey": "change_me_test_kaede_secret_key"
+        }
+      ],
+      "actions": [
+        "Read",
+        "Write",
+        "List"
+      ]
+    },
+    {
+      "name": "okarin-test-storage-bootstrap",
+      "credentials": [
+        {
+          "accessKey": "storage-bootstrap-test",
+          "secretKey": "change_me_test_storage_bootstrap_secret_key"
+        }
+      ],
+      "actions": [
+        "Admin",
+        "Read",
+        "Write",
+        "List"
+      ]
+    }
+  ]
+}
