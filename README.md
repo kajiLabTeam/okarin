@@ -142,3 +142,18 @@ docker compose -p okarin-production -f compose.yml -f compose.production.yml up 
 ENV_FILE=./deploy/env/production.env \
 docker compose -p okarin-production -f compose.yml -f compose.production.yml down
 ```
+
+## SSH デプロイスクリプト
+
+環境ごとにデプロイスクリプトを分ける想定です。
+
+```sh
+./deploy-test.sh [release_version]
+./deploy-staging.sh [release_version]
+./deploy-production.sh [release_version]
+```
+
+- 各スクリプト内で対象環境を固定しています
+- 各スクリプトは `docker compose` を直接実行します
+- 引数が空なら `SSH_ORIGINAL_COMMAND` を使います
+- それも空なら `main` を deploy 対象にします

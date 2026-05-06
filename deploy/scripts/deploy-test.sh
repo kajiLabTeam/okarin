@@ -1,0 +1,128 @@
+#!/bin/sh
+
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+REPO_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
+PROJECT_NAME=okarin-test
+COMPOSE_FILE=compose.test.yml
+
+log() {
+  printf '%s\n' "$*"
+}
+
+fail() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
+resolve_ref() {
+  if [ "$#" -gt 0 ] && [ -n "$1" ]; then
+    printf '%s\n' "$1"
+    return
+  fi
+
+  if [ -n "${SSH_ORIGINAL_COMMAND:-}" ]; then
+    printf '%s\n' "$SSH_ORIGINAL_COMMAND"
+    return
+  fi
+
+  printf 'main\n'
+}
+
+require_file() {
+  if [ ! -f "$1" ]; then
+    fail "required file not found: $1"
+  fi
+}
+
+require_clean_tree() {
+  if ! git diff --quiet --ignore-submodules HEAD --; then
+    fail "tracked working tree has local changes"
+  fi
+
+  if ! git diff --cached --quiet --ignore-submodules HEAD --; then
+    fail "index has staged changes"
+  fi
+}
+
+TARGET_REF=$(resolve_ref "${1:-}")
+ENV_FILE="$REPO_DIR/deploy/env/test.env"
+KAEDE_ENV_FILE="$REPO_DIR/deploy/apps/kaede.test.env"
+STORAGE_BOOTSTRAP_ENV_FILE="$REPO_DIR/deploy/apps/storage-bootstrap.test.env"
+SEAWEEDFS_CONFIG_FILE="$REPO_DIR/deploy/seaweedfs/s3.test.conf"
+COMPOSE_OVERRIDE="$REPO_DIR/$COMPOSE_FILE"
+
+require_file "$ENV_FILE"
+require_file "$KAEDE_ENV_FILE"
+require_file "$STORAGE_BOOTSTRAP_ENV_FILE"
+require_file "$SEAWEEDFS_CONFIG_FILE"
+require_file "$COMPOSE_OVERRIDE"
+
+cd "$REPO_DIR"
+
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || fail "script must run inside the repository"
+require_clean_tree
+
+log "Fetching origin for ref: $TARGET_REF"
+git fetch --prune --tags origin "$TARGET_REF"
+git checkout --detach FETCH_HEAD
+
+log "Pulling external images for env: test"
+ENV_FILE="$ENV_FILE" \
+KAEDE_ENV_FILE="$KAEDE_ENV_FILE" \
+STORAGE_BOOTSTRAP_ENV_FILE="$STORAGE_BOOTSTRAP_ENV_FILE" \
+docker compose \
+  --env-file "$ENV_FILE" \
+  -p "$PROJECT_NAME" \
+  -f compose.yml \
+  -f "$COMPOSE_FILE" \
+  pull postgres seaweedfs
+
+log "Starting dependent services for env: test"
+ENV_FILE="$ENV_FILE" \
+KAEDE_ENV_FILE="$KAEDE_ENV_FILE" \
+STORAGE_BOOTSTRAP_ENV_FILE="$STORAGE_BOOTSTRAP_ENV_FILE" \
+docker compose \
+  --env-file "$ENV_FILE" \
+  -p "$PROJECT_NAME" \
+  -f compose.yml \
+  -f "$COMPOSE_FILE" \
+  up -d postgres seaweedfs
+
+log "Running database migrations for env: test"
+ENV_FILE="$ENV_FILE" \
+KAEDE_ENV_FILE="$KAEDE_ENV_FILE" \
+STORAGE_BOOTSTRAP_ENV_FILE="$STORAGE_BOOTSTRAP_ENV_FILE" \
+docker compose \
+  --env-file "$ENV_FILE" \
+  -p "$PROJECT_NAME" \
+  -f compose.yml \
+  -f "$COMPOSE_FILE" \
+  --profile tools \
+  run --rm dbmate up
+
+log "Initializing object storage for env: test"
+ENV_FILE="$ENV_FILE" \
+KAEDE_ENV_FILE="$KAEDE_ENV_FILE" \
+STORAGE_BOOTSTRAP_ENV_FILE="$STORAGE_BOOTSTRAP_ENV_FILE" \
+docker compose \
+  --env-file "$ENV_FILE" \
+  -p "$PROJECT_NAME" \
+  -f compose.yml \
+  -f "$COMPOSE_FILE" \
+  --profile tools \
+  run --rm storage-bootstrap
+
+log "Starting application services for env: test"
+ENV_FILE="$ENV_FILE" \
+KAEDE_ENV_FILE="$KAEDE_ENV_FILE" \
+STORAGE_BOOTSTRAP_ENV_FILE="$STORAGE_BOOTSTRAP_ENV_FILE" \
+docker compose \
+  --env-file "$ENV_FILE" \
+  -p "$PROJECT_NAME" \
+  -f compose.yml \
+  -f "$COMPOSE_FILE" \
+  up -d --build --remove-orphans
+
+log "Deploy completed for test at $(git rev-parse --short HEAD)"
