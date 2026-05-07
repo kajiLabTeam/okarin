@@ -50,6 +50,30 @@ resolve_ref() {
   printf 'main\n'
 }
 
+resolve_revision() {
+  ref=$1
+
+  revision=$(git rev-parse --verify "${ref}^{commit}" 2>/dev/null || true)
+  if [ -n "$revision" ]; then
+    printf '%s\n' "$revision"
+    return 0
+  fi
+
+  revision=$(git rev-parse --verify "origin/${ref}^{commit}" 2>/dev/null || true)
+  if [ -n "$revision" ]; then
+    printf '%s\n' "$revision"
+    return 0
+  fi
+
+  revision=$(git rev-parse --verify "refs/tags/${ref}^{commit}" 2>/dev/null || true)
+  if [ -n "$revision" ]; then
+    printf '%s\n' "$revision"
+    return 0
+  fi
+
+  return 1
+}
+
 require_file() {
   if [ ! -f "$1" ]; then
     fail "required file not found: $1"
@@ -132,7 +156,7 @@ require_clean_tree
 log "Fetching origin refs"
 git fetch --prune --tags origin
 
-TARGET_REVISION=$(git rev-parse --verify "${TARGET_REF}^{commit}" 2>/dev/null || true)
+TARGET_REVISION=$(resolve_revision "$TARGET_REF" || true)
 [ -n "$TARGET_REVISION" ] || fail "could not resolve ref or revision: $TARGET_REF"
 
 log "Checking out revision: $TARGET_REVISION"
