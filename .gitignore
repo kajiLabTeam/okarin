@@ -1,7 +1,5 @@
 deploy/env/*.env
 deploy/apps/*.env
-deploy/seaweedfs/s3.local.conf
-deploy/seaweedfs/s3.staging.conf
-deploy/seaweedfs/s3.production.conf
+deploy/seaweedfs/*.conf
 
 docs/
