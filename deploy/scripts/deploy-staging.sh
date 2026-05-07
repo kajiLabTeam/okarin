@@ -8,6 +8,7 @@ PROJECT_NAME=okarin-staging
 COMPOSE_FILE=compose.staging.yml
 REVISION_DIR=/var/tmp/okarin/revisions
 REVISION_FILE="$REVISION_DIR/staging.last_successful"
+DOCKER_COMPOSE_BIN=${DOCKER_COMPOSE_BIN:-sudo docker compose}
 
 log() {
   printf '%s\n' "$*"
@@ -16,6 +17,18 @@ log() {
 fail() {
   printf 'error: %s\n' "$*" >&2
   exit 1
+}
+
+compose_cmd() {
+  ENV_FILE="$ENV_FILE" \
+  KAEDE_ENV_FILE="$KAEDE_ENV_FILE" \
+  STORAGE_BOOTSTRAP_ENV_FILE="$STORAGE_BOOTSTRAP_ENV_FILE" \
+  sh -c 'exec "$@"' _ $DOCKER_COMPOSE_BIN \
+    --env-file "$ENV_FILE" \
+    -p "$PROJECT_NAME" \
+    -f compose.yml \
+    -f "$COMPOSE_FILE" \
+    "$@"
 }
 
 resolve_ref() {
@@ -56,25 +69,9 @@ require_clean_tree() {
 }
 
 dump_compose_state() {
-  ENV_FILE="$ENV_FILE" \
-  KAEDE_ENV_FILE="$KAEDE_ENV_FILE" \
-  STORAGE_BOOTSTRAP_ENV_FILE="$STORAGE_BOOTSTRAP_ENV_FILE" \
-  docker compose \
-    --env-file "$ENV_FILE" \
-    -p "$PROJECT_NAME" \
-    -f compose.yml \
-    -f "$COMPOSE_FILE" \
-    ps || true
+  compose_cmd ps || true
 
-  ENV_FILE="$ENV_FILE" \
-  KAEDE_ENV_FILE="$KAEDE_ENV_FILE" \
-  STORAGE_BOOTSTRAP_ENV_FILE="$STORAGE_BOOTSTRAP_ENV_FILE" \
-  docker compose \
-    --env-file "$ENV_FILE" \
-    -p "$PROJECT_NAME" \
-    -f compose.yml \
-    -f "$COMPOSE_FILE" \
-    logs --tail 100 kaede nozomi postgres seaweedfs || true
+  compose_cmd logs --tail 100 kaede nozomi postgres seaweedfs || true
 }
 
 wait_for_healthy() {
@@ -83,15 +80,7 @@ wait_for_healthy() {
   interval=${3:-2}
 
   container_id=$(
-    ENV_FILE="$ENV_FILE" \
-    KAEDE_ENV_FILE="$KAEDE_ENV_FILE" \
-    STORAGE_BOOTSTRAP_ENV_FILE="$STORAGE_BOOTSTRAP_ENV_FILE" \
-    docker compose \
-      --env-file "$ENV_FILE" \
-      -p "$PROJECT_NAME" \
-      -f compose.yml \
-      -f "$COMPOSE_FILE" \
-      ps -q "$service"
+    compose_cmd ps -q "$service"
   )
 
   [ -n "$container_id" ] || fail "container not found for service: $service"
@@ -139,62 +128,24 @@ git fetch --prune --tags origin "$TARGET_REF"
 git checkout --detach FETCH_HEAD
 
 log "Pulling external images for env: staging"
-ENV_FILE="$ENV_FILE" \
-KAEDE_ENV_FILE="$KAEDE_ENV_FILE" \
-STORAGE_BOOTSTRAP_ENV_FILE="$STORAGE_BOOTSTRAP_ENV_FILE" \
-docker compose \
-  --env-file "$ENV_FILE" \
-  -p "$PROJECT_NAME" \
-  -f compose.yml \
-  -f "$COMPOSE_FILE" \
-  pull postgres seaweedfs
+compose_cmd pull postgres seaweedfs
 
 log "Starting dependent services for env: staging"
-ENV_FILE="$ENV_FILE" \
-KAEDE_ENV_FILE="$KAEDE_ENV_FILE" \
-STORAGE_BOOTSTRAP_ENV_FILE="$STORAGE_BOOTSTRAP_ENV_FILE" \
-docker compose \
-  --env-file "$ENV_FILE" \
-  -p "$PROJECT_NAME" \
-  -f compose.yml \
-  -f "$COMPOSE_FILE" \
-  up -d postgres seaweedfs
+compose_cmd up -d postgres seaweedfs
 
 log "Running database migrations for env: staging"
-ENV_FILE="$ENV_FILE" \
-KAEDE_ENV_FILE="$KAEDE_ENV_FILE" \
-STORAGE_BOOTSTRAP_ENV_FILE="$STORAGE_BOOTSTRAP_ENV_FILE" \
-  docker compose \
-    --env-file "$ENV_FILE" \
-    -p "$PROJECT_NAME" \
-    -f compose.yml \
-    -f "$COMPOSE_FILE" \
-    --profile tools \
-    -e DBMATE_SCHEMA_FILE=/tmp/schema.sql \
-    run --rm dbmate up
+compose_cmd \
+  --profile tools \
+  -e DBMATE_SCHEMA_FILE=/tmp/schema.sql \
+  run --rm dbmate up
 
 log "Initializing object storage for env: staging"
-ENV_FILE="$ENV_FILE" \
-KAEDE_ENV_FILE="$KAEDE_ENV_FILE" \
-STORAGE_BOOTSTRAP_ENV_FILE="$STORAGE_BOOTSTRAP_ENV_FILE" \
-docker compose \
-  --env-file "$ENV_FILE" \
-  -p "$PROJECT_NAME" \
-  -f compose.yml \
-  -f "$COMPOSE_FILE" \
+compose_cmd \
   --profile tools \
   run --rm storage-bootstrap
 
 log "Starting application services for env: staging"
-ENV_FILE="$ENV_FILE" \
-KAEDE_ENV_FILE="$KAEDE_ENV_FILE" \
-STORAGE_BOOTSTRAP_ENV_FILE="$STORAGE_BOOTSTRAP_ENV_FILE" \
-docker compose \
-  --env-file "$ENV_FILE" \
-  -p "$PROJECT_NAME" \
-  -f compose.yml \
-  -f "$COMPOSE_FILE" \
-  up -d --build --remove-orphans
+compose_cmd up -d --build --remove-orphans
 
 log "Waiting for services to become healthy for env: staging"
 wait_for_healthy postgres
