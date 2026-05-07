@@ -6,6 +6,8 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
 PROJECT_NAME=okarin-test
 COMPOSE_FILE=compose.test.yml
+REVISION_DIR=/var/tmp/okarin/revisions
+REVISION_FILE="$REVISION_DIR/test.last_successful"
 
 log() {
   printf '%s\n' "$*"
@@ -33,6 +35,13 @@ resolve_ref() {
 require_file() {
   if [ ! -f "$1" ]; then
     fail "required file not found: $1"
+  fi
+}
+
+ensure_dir() {
+  dir=$1
+  if [ ! -d "$dir" ]; then
+    mkdir -p "$dir"
   fi
 }
 
@@ -192,5 +201,12 @@ wait_for_healthy postgres
 wait_for_healthy seaweedfs
 wait_for_healthy nozomi
 wait_for_healthy kaede
+
+ensure_dir "$REVISION_DIR"
+cat >"$REVISION_FILE" <<EOF
+REVISION=$(git rev-parse HEAD)
+REF=$TARGET_REF
+DEPLOYED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+EOF
 
 log "Deploy completed for test at $(git rev-parse --short HEAD)"

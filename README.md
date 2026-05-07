@@ -176,5 +176,32 @@ docker compose -p okarin-production -f compose.yml -f compose.production.yml dow
 - 各スクリプトは `docker compose` を直接実行します
 - `postgres` と `seaweedfs` だけを pull し、`kaede` と `nozomi` は `up --build` で更新します
 - 各スクリプトは `postgres` / `seaweedfs` 起動後に `dbmate up` と `storage-bootstrap` を実行してからアプリを起動します
+- deploy 成功時の revision は `/var/tmp/okarin/revisions/*.last_successful` に保存します
 - 引数が空なら `SSH_ORIGINAL_COMMAND` を使います
 - それも空なら `main` を deploy 対象にします
+
+### rollback 手順
+
+直前に成功した revision は以下で確認できます。
+
+```sh
+cat /var/tmp/okarin/revisions/staging.last_successful
+cat /var/tmp/okarin/revisions/production.last_successful
+```
+
+手動 rollback は、保存済みの `REVISION` をそのまま deploy スクリプトへ渡して実行します。
+
+```sh
+REVISION=$(sed -n 's/^REVISION=//p' /var/tmp/okarin/revisions/staging.last_successful)
+./deploy/scripts/deploy-staging.sh "$REVISION"
+```
+
+```sh
+REVISION=$(sed -n 's/^REVISION=//p' /var/tmp/okarin/revisions/production.last_successful)
+./deploy/scripts/deploy-production.sh "$REVISION"
+```
+
+注意:
+
+- DB migration を含むため、rollback 対象 revision が現在の DB スキーマと互換かを確認してください
+- deploy 失敗時は `docker compose ps` と各サービスログを確認してから rollback を判断してください
