@@ -106,6 +106,7 @@ wait_for_healthy() {
 }
 
 TARGET_REF=$(resolve_ref "${1:-}")
+TARGET_REVISION=
 ENV_FILE="$REPO_DIR/deploy/env/staging.env"
 KAEDE_ENV_FILE="$REPO_DIR/deploy/apps/kaede.staging.env"
 STORAGE_BOOTSTRAP_ENV_FILE="$REPO_DIR/deploy/apps/storage-bootstrap.staging.env"
@@ -123,9 +124,14 @@ cd "$REPO_DIR"
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || fail "script must run inside the repository"
 require_clean_tree
 
-log "Fetching origin for ref: $TARGET_REF"
-git fetch --prune --tags origin "$TARGET_REF"
-git checkout --detach FETCH_HEAD
+log "Fetching origin refs"
+git fetch --prune --tags origin
+
+TARGET_REVISION=$(git rev-parse --verify "${TARGET_REF}^{commit}" 2>/dev/null || true)
+[ -n "$TARGET_REVISION" ] || fail "could not resolve ref or revision: $TARGET_REF"
+
+log "Checking out revision: $TARGET_REVISION"
+git checkout --detach "$TARGET_REVISION"
 
 log "Pulling external images for env: staging"
 compose_cmd pull postgres seaweedfs
@@ -155,7 +161,7 @@ wait_for_healthy kaede
 
 ensure_dir "$REVISION_DIR"
 cat >"$REVISION_FILE" <<EOF
-REVISION=$(git rev-parse HEAD)
+REVISION=$TARGET_REVISION
 REF=$TARGET_REF
 DEPLOYED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 EOF

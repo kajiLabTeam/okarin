@@ -108,10 +108,10 @@ docker compose -p okarin-local -f compose.yml -f compose.local.yml up -d --build
 docker compose -p okarin-local -f compose.yml -f compose.local.yml down
 ```
 
-ローカルの共通環境変数は `deploy/env/local.env` を使います。  
+ローカルの共通環境変数は `deploy/env/local.env` を使います。
 `kaede` と `nozomi` で共有する Sentry 設定は `deploy/env/local.env`、`kaede` 用の S3 設定は `deploy/apps/kaede.local.env`、`storage-bootstrap` 用の認証情報は `deploy/apps/storage-bootstrap.local.env` を使います。
 
-`deploy/seaweedfs/s3.local.conf` で S3 認証情報（`accessKey` / `secretKey`）を管理しています。  
+`deploy/seaweedfs/s3.local.conf` で S3 認証情報（`accessKey` / `secretKey`）を管理しています。
 キーを変更する場合は `deploy/seaweedfs/s3.local.conf` と `deploy/apps/kaede.local.env` / `deploy/apps/storage-bootstrap.local.env` の対応する値を同じに更新してください。
 これら実ファイルは `.gitignore` で除外されるため、GitHubには上がりません。
 
@@ -167,9 +167,9 @@ docker compose -p okarin-production -f compose.yml -f compose.production.yml dow
 環境ごとにデプロイスクリプトを分ける想定です。
 
 ```sh
-./deploy/scripts/deploy-test.sh [release_version]
-./deploy/scripts/deploy-staging.sh [release_version]
-./deploy/scripts/deploy-production.sh [release_version]
+./deploy/scripts/deploy-test.sh [release_ref]
+./deploy/scripts/deploy-staging.sh [release_ref]
+./deploy/scripts/deploy-production.sh [release_ref]
 ```
 
 - 各スクリプト内で対象環境を固定しています
@@ -190,7 +190,7 @@ cat /var/tmp/okarin/revisions/staging.last_successful
 cat /var/tmp/okarin/revisions/production.last_successful
 ```
 
-手動 rollback は、保存済みの `REVISION` をそのまま deploy スクリプトへ渡して実行します。
+手動 rollback は、保存済みの `REVISION` をそのまま deploy スクリプトへ渡して実行します。deploy スクリプトは branch / tag / commit SHA のいずれも受け付けます。
 
 ```sh
 REVISION=$(sed -n 's/^REVISION=//p' /var/tmp/okarin/revisions/staging.last_successful)
