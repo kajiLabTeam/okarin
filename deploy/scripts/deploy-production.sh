@@ -145,15 +145,10 @@ log "Starting dependent services for env: production"
 compose_cmd up -d postgres seaweedfs
 
 log "Running database migrations for env: production"
-compose_cmd \
-  --profile tools \
-  -e DBMATE_SCHEMA_FILE=/tmp/schema.sql \
-  run --rm dbmate up
+compose_cmd --profile tools run --rm -e DBMATE_SCHEMA_FILE=/tmp/schema.sql dbmate up
 
 log "Initializing object storage for env: production"
-compose_cmd \
-  --profile tools \
-  run --rm storage-bootstrap
+compose_cmd --profile tools run --rm storage-bootstrap
 
 log "Starting application services for env: production"
 compose_cmd up -d --build --remove-orphans
