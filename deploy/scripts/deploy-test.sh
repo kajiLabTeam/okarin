@@ -159,6 +159,9 @@ git fetch --prune --tags origin
 TARGET_REVISION=$(resolve_revision "$TARGET_REF" || true)
 [ -n "$TARGET_REVISION" ] || fail "could not resolve ref or revision: $TARGET_REF"
 
+log "Starting deploy for env: test"
+log "Requested ref: $TARGET_REF"
+log "Resolved revision: $TARGET_REVISION"
 log "Checking out revision: $TARGET_REVISION"
 git checkout --detach "$TARGET_REVISION"
 
