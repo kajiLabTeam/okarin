@@ -175,6 +175,7 @@ docker compose -p okarin-production -f compose.yml -f compose.production.yml dow
 - 各スクリプト内で対象環境を固定しています
 - 各スクリプトは `docker compose` を直接実行します
 - 既定では `sudo docker compose` を使います。不要な環境では `DOCKER_COMPOSE_BIN='docker compose'` で上書きしてください
+- `docker inspect` も既定では `sudo /usr/bin/docker` を使います。不要な環境では `DOCKER_BIN='docker'` で上書きしてください
 - `postgres` と `seaweedfs` だけを pull し、`kaede` と `nozomi` は `up --build` で更新します
 - 各スクリプトは `postgres` / `seaweedfs` 起動後に `dbmate up` と `storage-bootstrap` を実行してからアプリを起動します
 - deploy 成功時の revision は `/var/tmp/okarin/revisions/*.last_successful` に保存します

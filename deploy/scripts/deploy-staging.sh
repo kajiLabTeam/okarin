@@ -9,6 +9,7 @@ COMPOSE_FILE=compose.staging.yml
 REVISION_DIR=/var/tmp/okarin/revisions
 REVISION_FILE="$REVISION_DIR/staging.last_successful"
 DOCKER_COMPOSE_BIN=${DOCKER_COMPOSE_BIN:-sudo docker compose}
+DOCKER_BIN=${DOCKER_BIN:-sudo /usr/bin/docker}
 
 log() {
   printf '%s\n' "$*"
@@ -17,6 +18,10 @@ log() {
 fail() {
   printf 'error: %s\n' "$*" >&2
   exit 1
+}
+
+docker_cmd() {
+  sh -c 'exec "$@"' _ $DOCKER_BIN "$@"
 }
 
 compose_cmd() {
@@ -87,7 +92,7 @@ wait_for_healthy() {
 
   i=0
   while [ "$i" -lt "$attempts" ]; do
-    status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null || true)
+    status=$(docker_cmd inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null || true)
     if [ "$status" = "healthy" ] || [ "$status" = "running" ]; then
       return 0
     fi
