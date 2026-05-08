@@ -53,12 +53,6 @@ resolve_ref() {
 resolve_revision() {
   ref=$1
 
-  revision=$(git rev-parse --verify "${ref}^{commit}" 2>/dev/null || true)
-  if [ -n "$revision" ]; then
-    printf '%s\n' "$revision"
-    return 0
-  fi
-
   revision=$(git rev-parse --verify "origin/${ref}^{commit}" 2>/dev/null || true)
   if [ -n "$revision" ]; then
     printf '%s\n' "$revision"
@@ -66,6 +60,12 @@ resolve_revision() {
   fi
 
   revision=$(git rev-parse --verify "refs/tags/${ref}^{commit}" 2>/dev/null || true)
+  if [ -n "$revision" ]; then
+    printf '%s\n' "$revision"
+    return 0
+  fi
+
+  revision=$(git rev-parse --verify "${ref}^{commit}" 2>/dev/null || true)
   if [ -n "$revision" ]; then
     printf '%s\n' "$revision"
     return 0
