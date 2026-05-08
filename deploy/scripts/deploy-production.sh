@@ -50,6 +50,30 @@ resolve_ref() {
   printf 'main\n'
 }
 
+resolve_revision() {
+  ref=$1
+
+  revision=$(git rev-parse --verify "${ref}^{commit}" 2>/dev/null || true)
+  if [ -n "$revision" ]; then
+    printf '%s\n' "$revision"
+    return 0
+  fi
+
+  revision=$(git rev-parse --verify "origin/${ref}^{commit}" 2>/dev/null || true)
+  if [ -n "$revision" ]; then
+    printf '%s\n' "$revision"
+    return 0
+  fi
+
+  revision=$(git rev-parse --verify "refs/tags/${ref}^{commit}" 2>/dev/null || true)
+  if [ -n "$revision" ]; then
+    printf '%s\n' "$revision"
+    return 0
+  fi
+
+  return 1
+}
+
 require_file() {
   if [ ! -f "$1" ]; then
     fail "required file not found: $1"
@@ -132,9 +156,12 @@ require_clean_tree
 log "Fetching origin refs"
 git fetch --prune --tags origin
 
-TARGET_REVISION=$(git rev-parse --verify "${TARGET_REF}^{commit}" 2>/dev/null || true)
+TARGET_REVISION=$(resolve_revision "$TARGET_REF" || true)
 [ -n "$TARGET_REVISION" ] || fail "could not resolve ref or revision: $TARGET_REF"
 
+log "Starting deploy for env: production"
+log "Requested ref: $TARGET_REF"
+log "Resolved revision: $TARGET_REVISION"
 log "Checking out revision: $TARGET_REVISION"
 git checkout --detach "$TARGET_REVISION"
 
@@ -145,15 +172,10 @@ log "Starting dependent services for env: production"
 compose_cmd up -d postgres seaweedfs
 
 log "Running database migrations for env: production"
-compose_cmd \
-  --profile tools \
-  -e DBMATE_SCHEMA_FILE=/tmp/schema.sql \
-  run --rm dbmate up
+compose_cmd --profile tools run --rm -e DBMATE_SCHEMA_FILE=/tmp/schema.sql dbmate up
 
 log "Initializing object storage for env: production"
-compose_cmd \
-  --profile tools \
-  run --rm storage-bootstrap
+compose_cmd --profile tools run --rm storage-bootstrap
 
 log "Starting application services for env: production"
 compose_cmd up -d --build --remove-orphans
