@@ -8,6 +8,8 @@ PROJECT_NAME=okarin-production
 COMPOSE_FILE=compose.production.yml
 REVISION_DIR=/var/tmp/okarin/revisions
 REVISION_FILE="$REVISION_DIR/production.last_successful"
+RUNTIME_DIR=/var/tmp/okarin/runtime
+DEPLOY_META_FILE="$RUNTIME_DIR/production.env"
 DOCKER_COMPOSE_BIN=${DOCKER_COMPOSE_BIN:-sudo docker compose}
 DOCKER_BIN=${DOCKER_BIN:-sudo /usr/bin/docker}
 
@@ -28,6 +30,7 @@ compose_cmd() {
   ENV_FILE="$ENV_FILE" \
   KAEDE_ENV_FILE="$KAEDE_ENV_FILE" \
   STORAGE_BOOTSTRAP_ENV_FILE="$STORAGE_BOOTSTRAP_ENV_FILE" \
+  DEPLOY_META_FILE="$DEPLOY_META_FILE" \
   sh -c 'exec "$@"' _ $DOCKER_COMPOSE_BIN \
     --env-file "$ENV_FILE" \
     -p "$PROJECT_NAME" \
@@ -164,6 +167,13 @@ log "Requested ref: $TARGET_REF"
 log "Resolved revision: $TARGET_REVISION"
 log "Checking out revision: $TARGET_REVISION"
 git checkout --detach "$TARGET_REVISION"
+
+ensure_dir "$RUNTIME_DIR"
+cat >"$DEPLOY_META_FILE" <<EOF
+APP_DEPLOY_REF=$TARGET_REF
+APP_REVISION=$TARGET_REVISION
+APP_DEPLOYED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+EOF
 
 log "Pulling external images for env: production"
 compose_cmd pull postgres seaweedfs

@@ -129,8 +129,16 @@ docker compose -p okarin-local -f compose.yml -f compose.local.yml down
 
 ### test 手動デプロイ
 
+手動で `docker compose` を直接実行する場合は、runtime metadata 用ファイルを先に作成してください。
+
+```sh
+mkdir -p /var/tmp/okarin/runtime
+touch /var/tmp/okarin/runtime/test.env
+```
+
 ```sh
 ENV_FILE=./deploy/env/test.env \
+DEPLOY_META_FILE=/var/tmp/okarin/runtime/test.env \
 docker compose -p okarin-test -f compose.yml -f compose.test.yml up -d --build --remove-orphans
 ```
 
@@ -138,20 +146,33 @@ docker compose -p okarin-test -f compose.yml -f compose.test.yml up -d --build -
 
 ```sh
 ENV_FILE=./deploy/env/test.env \
+DEPLOY_META_FILE=/var/tmp/okarin/runtime/test.env \
 docker compose -p okarin-test -f compose.yml -f compose.test.yml down
 ```
 
 ### staging 手動デプロイ
 
 ```sh
+mkdir -p /var/tmp/okarin/runtime
+touch /var/tmp/okarin/runtime/staging.env
+```
+
+```sh
 ENV_FILE=./deploy/env/staging.env \
+DEPLOY_META_FILE=/var/tmp/okarin/runtime/staging.env \
 docker compose -p okarin-staging -f compose.yml -f compose.staging.yml up -d --build --remove-orphans
 ```
 
 ### production 手動デプロイ
 
 ```sh
+mkdir -p /var/tmp/okarin/runtime
+touch /var/tmp/okarin/runtime/production.env
+```
+
+```sh
 ENV_FILE=./deploy/env/production.env \
+DEPLOY_META_FILE=/var/tmp/okarin/runtime/production.env \
 docker compose -p okarin-production -f compose.yml -f compose.production.yml up -d --build --remove-orphans
 ```
 
@@ -159,6 +180,7 @@ docker compose -p okarin-production -f compose.yml -f compose.production.yml up 
 
 ```sh
 ENV_FILE=./deploy/env/production.env \
+DEPLOY_META_FILE=/var/tmp/okarin/runtime/production.env \
 docker compose -p okarin-production -f compose.yml -f compose.production.yml down
 ```
 
@@ -179,6 +201,15 @@ docker compose -p okarin-production -f compose.yml -f compose.production.yml dow
 - `postgres` と `seaweedfs` だけを pull し、`kaede` と `nozomi` は `up --build` で更新します
 - 各スクリプトは `postgres` / `seaweedfs` 起動後に `dbmate up` と `storage-bootstrap` を実行してからアプリを起動します
 - deploy 成功時の revision は `/var/tmp/okarin/revisions/*.last_successful` に保存します
+- deploy 成功時の runtime metadata は `/var/tmp/okarin/runtime/*.env` に保存します
+- `deploy/scripts/*.sh` 経由のデプロイでは runtime metadata ファイルも自動で作成します
+- 外部公開している `kaede` では `GET /` の応答に `deploy_ref` / `revision` / `deployed_at` が含まれるため、外から現在のデプロイ内容を確認できます
+
+例:
+
+```sh
+curl http://<kaede-host>:8080/
+```
 - 引数が空なら `SSH_ORIGINAL_COMMAND` を使います
 - それも空なら `main` を deploy 対象にします
 
