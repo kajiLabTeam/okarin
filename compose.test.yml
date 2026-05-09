@@ -7,6 +7,8 @@ services:
       - ${ENV_FILE:-./deploy/env/test.env}
       - ${KAEDE_ENV_FILE:-./deploy/apps/kaede.test.env}
       - ${DEPLOY_META_FILE:-/var/tmp/okarin/runtime/test.env}
+    ports:
+      - "8080:8080"
 
   nozomi:
     build:
@@ -74,6 +76,8 @@ services:
       timeout: 3s
       retries: 20
       start_period: 5s
+    ports:
+      - "127.0.0.1:8888:8888"
     volumes:
       - seaweedfs_data:/data
       - ./deploy/seaweedfs/s3.test.conf:/etc/seaweedfs/s3.conf:ro

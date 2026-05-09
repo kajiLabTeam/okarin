@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       deploy_ref:
-        description: "Branch name or tag name to deploy (default: main)"
+        description: "Branch name or tag name to deploy (default: current branch)"
         required: false
 
 concurrency:
@@ -24,8 +24,12 @@ jobs:
       - name: Resolve deploy ref
         env:
           INPUT_DEPLOY_REF: ${{ inputs.deploy_ref }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
         run: |
           DEPLOY_REF="$INPUT_DEPLOY_REF"
+          if [ -z "$DEPLOY_REF" ]; then
+            DEPLOY_REF="$GITHUB_REF_NAME"
+          fi
           if [ -z "$DEPLOY_REF" ]; then
             DEPLOY_REF="main"
           fi
