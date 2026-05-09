@@ -168,6 +168,13 @@ log "Resolved revision: $TARGET_REVISION"
 log "Checking out revision: $TARGET_REVISION"
 git checkout --detach "$TARGET_REVISION"
 
+ensure_dir "$RUNTIME_DIR"
+cat >"$DEPLOY_META_FILE" <<EOF
+APP_DEPLOY_REF=$TARGET_REF
+APP_REVISION=$TARGET_REVISION
+APP_DEPLOYED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+EOF
+
 log "Pulling external images for env: test"
 compose_cmd pull postgres seaweedfs
 
@@ -179,13 +186,6 @@ compose_cmd --profile tools run --rm -e DBMATE_SCHEMA_FILE=/tmp/schema.sql dbmat
 
 log "Initializing object storage for env: test"
 compose_cmd --profile tools run --rm storage-bootstrap
-
-ensure_dir "$RUNTIME_DIR"
-cat >"$DEPLOY_META_FILE" <<EOF
-APP_DEPLOY_REF=$TARGET_REF
-APP_REVISION=$TARGET_REVISION
-APP_DEPLOYED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-EOF
 
 log "Starting application services for env: test"
 compose_cmd up -d --build --remove-orphans
