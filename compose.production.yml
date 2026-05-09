@@ -10,6 +10,8 @@ services:
       - ${ENV_FILE:-./deploy/env/production.env}
       - ${KAEDE_ENV_FILE:-./deploy/apps/kaede.production.env}
       - ${DEPLOY_META_FILE:-/var/tmp/okarin/runtime/production.env}
+    ports:
+      - "8080:8080"
 
   nozomi:
     build:

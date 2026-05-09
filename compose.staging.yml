@@ -10,6 +10,8 @@ services:
       - ${ENV_FILE:-./deploy/env/staging.env}
       - ${KAEDE_ENV_FILE:-./deploy/apps/kaede.staging.env}
       - ${DEPLOY_META_FILE:-/var/tmp/okarin/runtime/staging.env}
+    ports:
+      - "8080:8080"
 
   nozomi:
     build:
