@@ -6,6 +6,9 @@ import { registerApiRoutes } from './routes/index.js'
 
 export const createApp = () => {
   const app = new OpenAPIHono()
+  const deployRef = process.env.APP_DEPLOY_REF ?? 'unknown'
+  const revision = process.env.APP_REVISION ?? 'unknown'
+  const deployedAt = process.env.APP_DEPLOYED_AT ?? 'unknown'
 
   app.use(async (_c, next) => {
     Sentry.setTag('service', 'kaede')
@@ -39,6 +42,9 @@ export const createApp = () => {
               service: z.literal('kaede'),
               role: z.literal('mediator'),
               status: z.literal('ok'),
+              deploy_ref: z.string(),
+              revision: z.string(),
+              deployed_at: z.string(),
             }),
           },
         },
@@ -51,6 +57,9 @@ export const createApp = () => {
       service: 'kaede',
       role: 'mediator',
       status: 'ok',
+      deploy_ref: deployRef,
+      revision,
+      deployed_at: deployedAt,
     })
   })
 
