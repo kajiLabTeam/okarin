@@ -179,6 +179,14 @@ docker compose -p okarin-production -f compose.yml -f compose.production.yml dow
 - `postgres` と `seaweedfs` だけを pull し、`kaede` と `nozomi` は `up --build` で更新します
 - 各スクリプトは `postgres` / `seaweedfs` 起動後に `dbmate up` と `storage-bootstrap` を実行してからアプリを起動します
 - deploy 成功時の revision は `/var/tmp/okarin/revisions/*.last_successful` に保存します
+- deploy 成功時の runtime metadata は `/var/tmp/okarin/runtime/*.env` に保存します
+- 外部公開している `kaede` では `GET /` の応答に `deploy_ref` / `revision` / `deployed_at` が含まれるため、外から現在のデプロイ内容を確認できます
+
+例:
+
+```sh
+curl http://<kaede-host>:8080/
+```
 - 引数が空なら `SSH_ORIGINAL_COMMAND` を使います
 - それも空なら `main` を deploy 対象にします
 

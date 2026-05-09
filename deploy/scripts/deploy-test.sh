@@ -8,6 +8,8 @@ PROJECT_NAME=okarin-test
 COMPOSE_FILE=compose.test.yml
 REVISION_DIR=/var/tmp/okarin/revisions
 REVISION_FILE="$REVISION_DIR/test.last_successful"
+RUNTIME_DIR=/var/tmp/okarin/runtime
+DEPLOY_META_FILE="$RUNTIME_DIR/test.env"
 DOCKER_COMPOSE_BIN=${DOCKER_COMPOSE_BIN:-sudo docker compose}
 DOCKER_BIN=${DOCKER_BIN:-sudo /usr/bin/docker}
 
@@ -28,6 +30,7 @@ compose_cmd() {
   ENV_FILE="$ENV_FILE" \
   KAEDE_ENV_FILE="$KAEDE_ENV_FILE" \
   STORAGE_BOOTSTRAP_ENV_FILE="$STORAGE_BOOTSTRAP_ENV_FILE" \
+  DEPLOY_META_FILE="$DEPLOY_META_FILE" \
   sh -c 'exec "$@"' _ $DOCKER_COMPOSE_BIN \
     --env-file "$ENV_FILE" \
     -p "$PROJECT_NAME" \
@@ -176,6 +179,13 @@ compose_cmd --profile tools run --rm -e DBMATE_SCHEMA_FILE=/tmp/schema.sql dbmat
 
 log "Initializing object storage for env: test"
 compose_cmd --profile tools run --rm storage-bootstrap
+
+ensure_dir "$RUNTIME_DIR"
+cat >"$DEPLOY_META_FILE" <<EOF
+APP_DEPLOY_REF=$TARGET_REF
+APP_REVISION=$TARGET_REVISION
+APP_DEPLOYED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+EOF
 
 log "Starting application services for env: test"
 compose_cmd up -d --build --remove-orphans

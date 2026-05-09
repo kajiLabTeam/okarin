@@ -6,6 +6,7 @@ services:
     env_file:
       - ${ENV_FILE:-./deploy/env/test.env}
       - ${KAEDE_ENV_FILE:-./deploy/apps/kaede.test.env}
+      - ${DEPLOY_META_FILE:-/var/tmp/okarin/runtime/test.env}
 
   nozomi:
     build:
