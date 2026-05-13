@@ -7,24 +7,7 @@ import {
 } from '../../schemas/recordings.js'
 import { db } from '../../services/db/index.js'
 import { insertRecording } from '../../services/recordings/index.js'
-
-const uploadUrlTtlSeconds = 15 * 60
-
-const buildUploadUrl = (recordingId: string, target: string) => {
-  const fileName = `${target}.csv`
-
-  return new URL(
-    `/recordings/${recordingId}/raw/${fileName}?expires_in=${uploadUrlTtlSeconds}`,
-    'https://storage.example.invalid'
-  ).toString()
-}
-
-interface UploadUrls {
-  acce?: string
-  gyro?: string
-  pressure?: string
-  wifi?: string
-}
+import { issueRecordingUploadUrls } from '../../services/storage/index.js'
 
 export const registerInitRecordingRoute = (app: OpenAPIHono) => {
   const route = createRoute({
@@ -104,12 +87,10 @@ export const registerInitRecordingRoute = (app: OpenAPIHono) => {
       floor_id: payload.floor_id,
       upload_targets: payload.upload_targets,
     })
-    const expiresAt = new Date(Date.now() + uploadUrlTtlSeconds * 1000).toISOString()
-    const uploadUrls: UploadUrls = {}
-
-    for (const target of payload.upload_targets) {
-      uploadUrls[target] = buildUploadUrl(recording.id, target)
-    }
+    const { expiresAt, uploadUrls } = await issueRecordingUploadUrls(
+      recording.id,
+      payload.upload_targets
+    )
 
     return c.json(
       {
