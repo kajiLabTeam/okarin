@@ -1,21 +1,19 @@
-name: Kaede CI
+name: Kaede S3 CI
 
 on:
   push:
     branches: [main]
     paths:
       - "apps/kaede/**"
-      - ".github/workflows/kaede-ci.yml"
       - ".github/workflows/kaede-s3-ci.yml"
   pull_request:
     branches: [main]
     paths:
       - "apps/kaede/**"
-      - ".github/workflows/kaede-ci.yml"
       - ".github/workflows/kaede-s3-ci.yml"
 
 jobs:
-  checks-and-build:
+  s3-test:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -36,20 +34,5 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm lint
-
-      - name: Format Check
-        run: pnpm exec prettier --check .
-
-      - name: Type Check
-        run: pnpm exec tsc --noEmit
-
-      - name: Test
-        run: pnpm test
-
-      - name: Build
-        run: pnpm build
-
-      - name: Docker Image Build
-        run: DOCKER_BUILDKIT=1 docker build -f Dockerfile .
+      - name: S3 Test
+        run: pnpm run test:s3
