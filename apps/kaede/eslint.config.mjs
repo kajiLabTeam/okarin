@@ -8,6 +8,7 @@ export default [
       'dist/**',
       'node_modules/**',
       'src/services/db/generated.ts',
+      'vitest.s3.config.js',
     ],
   },
   ...baseConfig,
