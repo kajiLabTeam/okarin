@@ -15,6 +15,7 @@ interface StorageConfig {
   accessKeyId: string
   bucket: string
   endpoint: string
+  publicEndpoint: string
   region: string
   secretAccessKey: string
 }
@@ -31,10 +32,13 @@ const getRequiredEnv = (name: string) => {
 }
 
 const getStorageConfig = (): StorageConfig => {
+  const endpoint = getRequiredEnv('S3_ENDPOINT')
+
   return {
     accessKeyId: getRequiredEnv('S3_ACCESS_KEY_ID'),
     bucket: getRequiredEnv('S3_BUCKET'),
-    endpoint: getRequiredEnv('S3_ENDPOINT'),
+    endpoint,
+    publicEndpoint: process.env.S3_PUBLIC_ENDPOINT ?? endpoint,
     region: getRequiredEnv('S3_REGION'),
     secretAccessKey: getRequiredEnv('S3_SECRET_ACCESS_KEY'),
   }
@@ -48,7 +52,7 @@ const getS3Client = () => {
   const config = getStorageConfig()
   s3Client = new S3Client({
     region: config.region,
-    endpoint: config.endpoint,
+    endpoint: config.publicEndpoint,
     credentials: {
       accessKeyId: config.accessKeyId,
       secretAccessKey: config.secretAccessKey,

@@ -37,7 +37,13 @@ const s3Config = JSON.stringify({
 
 interface SetupContext {
   provide: (
-    key: 's3AccessKeyId' | 's3Bucket' | 's3Endpoint' | 's3Region' | 's3SecretAccessKey',
+    key:
+      | 's3AccessKeyId'
+      | 's3Bucket'
+      | 's3Endpoint'
+      | 's3PublicEndpoint'
+      | 's3Region'
+      | 's3SecretAccessKey',
     value: string
   ) => void
 }
@@ -89,6 +95,7 @@ export default async function setup({ provide }: SetupContext) {
 
   try {
     const s3Endpoint = `http://${container.getHost()}:${container.getMappedPort(seaweedS3Port)}`
+    const s3PublicEndpoint = s3Endpoint
     const bootstrapClient = new S3Client({
       region: s3Region,
       endpoint: s3Endpoint,
@@ -104,6 +111,7 @@ export default async function setup({ provide }: SetupContext) {
     provide('s3AccessKeyId', s3AccessKeyId)
     provide('s3SecretAccessKey', s3SecretAccessKey)
     provide('s3Endpoint', s3Endpoint)
+    provide('s3PublicEndpoint', s3PublicEndpoint)
     provide('s3Region', s3Region)
     provide('s3Bucket', s3Bucket)
 
