@@ -8,7 +8,7 @@ import {
 const originalEnv = {
   S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID,
   S3_BUCKET: process.env.S3_BUCKET,
-  S3_ENDPOINT: process.env.S3_ENDPOINT,
+  S3_INTERNAL_ENDPOINT: process.env.S3_INTERNAL_ENDPOINT,
   S3_PUBLIC_ENDPOINT: process.env.S3_PUBLIC_ENDPOINT,
   S3_REGION: process.env.S3_REGION,
   S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
@@ -17,7 +17,7 @@ const originalEnv = {
 afterEach(() => {
   process.env.S3_ACCESS_KEY_ID = originalEnv.S3_ACCESS_KEY_ID
   process.env.S3_BUCKET = originalEnv.S3_BUCKET
-  process.env.S3_ENDPOINT = originalEnv.S3_ENDPOINT
+  process.env.S3_INTERNAL_ENDPOINT = originalEnv.S3_INTERNAL_ENDPOINT
   process.env.S3_PUBLIC_ENDPOINT = originalEnv.S3_PUBLIC_ENDPOINT
   process.env.S3_REGION = originalEnv.S3_REGION
   process.env.S3_SECRET_ACCESS_KEY = originalEnv.S3_SECRET_ACCESS_KEY
@@ -34,7 +34,7 @@ describe('storage presigned url service', () => {
   it('PUT 用の署名付き URL を生成できる', async () => {
     process.env.S3_ACCESS_KEY_ID = 'kaede-test'
     process.env.S3_SECRET_ACCESS_KEY = 'kaede-secret'
-    process.env.S3_ENDPOINT = 'http://seaweedfs:8333'
+    process.env.S3_INTERNAL_ENDPOINT = 'http://seaweedfs:8333'
     process.env.S3_PUBLIC_ENDPOINT = 'http://127.0.0.1:8333'
     process.env.S3_REGION = 'us-east-1'
     process.env.S3_BUCKET = 'okarin-local'

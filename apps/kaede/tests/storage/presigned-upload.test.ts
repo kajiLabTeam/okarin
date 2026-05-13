@@ -16,7 +16,7 @@ const getRequiredEnv = (name: string) => {
 
 const s3 = new S3Client({
   region: getRequiredEnv('S3_REGION'),
-  endpoint: process.env.S3_ENDPOINT,
+  endpoint: process.env.S3_INTERNAL_ENDPOINT,
   credentials: {
     accessKeyId: getRequiredEnv('S3_ACCESS_KEY_ID'),
     secretAccessKey: getRequiredEnv('S3_SECRET_ACCESS_KEY'),

@@ -32,7 +32,7 @@ const getRequiredEnv = (name: string) => {
 }
 
 const getStorageConfig = (): StorageConfig => {
-  const endpoint = getRequiredEnv('S3_ENDPOINT')
+  const endpoint = getRequiredEnv('S3_INTERNAL_ENDPOINT')
 
   return {
     accessKeyId: getRequiredEnv('S3_ACCESS_KEY_ID'),
