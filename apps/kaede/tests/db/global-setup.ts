@@ -51,9 +51,3 @@ export default async function setup({ provide }: SetupContext) {
     throw error
   }
 }
-
-declare module 'vitest' {
-  export interface ProvidedContext {
-    databaseUrl: string
-  }
-}
