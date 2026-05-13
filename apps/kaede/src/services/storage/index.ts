@@ -2,5 +2,5 @@ export {
   buildRecordingRawObjectKey,
   issueRecordingUploadUrls,
   resetS3ClientForTests,
-} from './s3.js'
-export type { RecordingUploadUrls } from './s3.js'
+} from './presigned-url.js'
+export type { RecordingUploadUrls } from './presigned-url.js'

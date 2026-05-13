@@ -22,7 +22,7 @@ afterEach(() => {
   resetS3ClientForTests()
 })
 
-describe('storage s3 service', () => {
+describe('storage presigned url service', () => {
   it('recording raw object key を保存規約どおりに組み立てる', () => {
     expect(buildRecordingRawObjectKey('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'gyro')).toBe(
       'recordings/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/raw/gyro.csv'
@@ -45,13 +45,8 @@ describe('storage s3 service', () => {
     expect(result.uploadUrls.pressure).toBeUndefined()
     expect(result.uploadUrls.acce).toBeDefined()
     expect(result.uploadUrls.gyro).toBeDefined()
-
-    if (!result.uploadUrls.acce) {
-      throw new Error('acce upload URL is missing')
-    }
-
-    if (!result.uploadUrls.gyro) {
-      throw new Error('gyro upload URL is missing')
+    if (!result.uploadUrls.acce || !result.uploadUrls.gyro) {
+      throw new Error('expected upload URLs for acce and gyro')
     }
 
     const acceUrl = new URL(result.uploadUrls.acce)
