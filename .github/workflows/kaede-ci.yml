@@ -6,12 +6,14 @@ on:
     paths:
       - "apps/kaede/**"
       - ".github/workflows/kaede-ci.yml"
+      - ".github/workflows/kaede-db-ci.yml"
       - ".github/workflows/kaede-s3-ci.yml"
   pull_request:
     branches: [main]
     paths:
       - "apps/kaede/**"
       - ".github/workflows/kaede-ci.yml"
+      - ".github/workflows/kaede-db-ci.yml"
       - ".github/workflows/kaede-s3-ci.yml"
 
 jobs:
