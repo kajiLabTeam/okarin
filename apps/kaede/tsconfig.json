@@ -11,5 +11,11 @@
     "rootDir": "./src",
     "outDir": "./dist"
   },
-  "exclude": ["node_modules", "tests", "vitest.config.ts", "vitest.db.config.ts"]
+  "exclude": [
+    "node_modules",
+    "tests",
+    "vitest.config.ts",
+    "vitest.db.config.ts",
+    "vitest.s3.config.ts"
+  ]
 }

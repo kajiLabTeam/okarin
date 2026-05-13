@@ -1,9 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { floorError, initRecordingMock, pedestrianError } = vi.hoisted(() => ({
+const { initRecordingMock } = vi.hoisted(() => ({
   initRecordingMock: vi.fn(),
-  pedestrianError: '11111111-1111-4111-8111-111111111111',
-  floorError: '22222222-2222-4222-8222-222222222222',
 }))
 
 vi.mock('../../usecases/init-recording.js', () => {
