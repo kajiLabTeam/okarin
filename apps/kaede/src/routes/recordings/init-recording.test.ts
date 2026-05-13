@@ -4,31 +4,9 @@ const { initRecordingMock } = vi.hoisted(() => ({
   initRecordingMock: vi.fn(),
 }))
 
-vi.mock('../../usecases/init-recording.js', () => {
-  class PedestrianNotFoundError extends Error {
-    pedestrianId: string
-
-    constructor(pedestrianId: string) {
-      super('pedestrian_id does not exist')
-      this.pedestrianId = pedestrianId
-    }
-  }
-
-  class FloorNotFoundError extends Error {
-    floorId: string
-
-    constructor(floorId: string) {
-      super('floor_id does not exist')
-      this.floorId = floorId
-    }
-  }
-
-  return {
-    initRecording: initRecordingMock,
-    PedestrianNotFoundError,
-    FloorNotFoundError,
-  }
-})
+vi.mock('../../usecases/init-recording.js', () => ({
+  initRecording: initRecordingMock,
+}))
 
 import { createApp } from '../../server.js'
 
@@ -43,13 +21,16 @@ describe('POST /api/recordings/init', () => {
     const recordingId = '33333333-3333-4333-8333-333333333333'
 
     initRecordingMock.mockResolvedValue({
-      recording_id: recordingId,
-      upload_status: 'accepted',
-      upload_urls: {
-        acce: 'https://example.test/acce',
-        gyro: 'https://example.test/gyro',
+      ok: true,
+      value: {
+        recording_id: recordingId,
+        upload_status: 'accepted',
+        upload_urls: {
+          acce: 'https://example.test/acce',
+          gyro: 'https://example.test/gyro',
+        },
+        expires_at: '2026-05-13T00:15:00.000Z',
       },
-      expires_at: '2026-05-13T00:15:00.000Z',
     })
 
     const app = createApp()
@@ -86,9 +67,14 @@ describe('POST /api/recordings/init', () => {
   it('存在しない floor_id は 404 を返す', async () => {
     const pedestrianId = '11111111-1111-4111-8111-111111111111'
     const floorId = '22222222-2222-4222-8222-222222222222'
-    const { FloorNotFoundError } = await import('../../usecases/init-recording.js')
 
-    initRecordingMock.mockRejectedValue(new FloorNotFoundError(floorId))
+    initRecordingMock.mockResolvedValue({
+      ok: false,
+      error: {
+        type: 'FLOOR_NOT_FOUND',
+        floorId,
+      },
+    })
 
     const app = createApp()
     const response = await app.request('/api/recordings/init', {
@@ -116,9 +102,14 @@ describe('POST /api/recordings/init', () => {
   it('存在しない pedestrian_id は 404 を返す', async () => {
     const pedestrianId = '11111111-1111-4111-8111-111111111111'
     const floorId = '22222222-2222-4222-8222-222222222222'
-    const { PedestrianNotFoundError } = await import('../../usecases/init-recording.js')
 
-    initRecordingMock.mockRejectedValue(new PedestrianNotFoundError(pedestrianId))
+    initRecordingMock.mockResolvedValue({
+      ok: false,
+      error: {
+        type: 'PEDESTRIAN_NOT_FOUND',
+        pedestrianId,
+      },
+    })
 
     const app = createApp()
     const response = await app.request('/api/recordings/init', {

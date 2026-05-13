@@ -5,11 +5,7 @@ import {
   initRecordingRequestSchema,
   initRecordingResponseSchema,
 } from '../../schemas/recordings.js'
-import {
-  FloorNotFoundError,
-  initRecording,
-  PedestrianNotFoundError,
-} from '../../usecases/init-recording.js'
+import { initRecording } from '../../usecases/init-recording.js'
 
 export const registerInitRecordingRoute = (app: OpenAPIHono) => {
   const route = createRoute({
@@ -48,38 +44,34 @@ export const registerInitRecordingRoute = (app: OpenAPIHono) => {
 
   app.openapi(route, async (c) => {
     const payload = c.req.valid('json')
+    const result = await initRecording(payload)
 
-    try {
-      const response = await initRecording(payload)
-      return c.json(response, 201)
-    } catch (error) {
-      if (error instanceof PedestrianNotFoundError) {
-        return c.json(
-          {
-            error_code: 'PEDESTRIAN_NOT_FOUND',
-            error_message: error.message,
-            details: {
-              pedestrian_id: error.pedestrianId,
-            },
+    if (!result.ok && result.error.type === 'PEDESTRIAN_NOT_FOUND') {
+      return c.json(
+        {
+          error_code: result.error.type,
+          error_message: 'pedestrian_id does not exist',
+          details: {
+            pedestrian_id: result.error.pedestrianId,
           },
-          404
-        )
-      }
-
-      if (error instanceof FloorNotFoundError) {
-        return c.json(
-          {
-            error_code: 'FLOOR_NOT_FOUND',
-            error_message: error.message,
-            details: {
-              floor_id: error.floorId,
-            },
-          },
-          404
-        )
-      }
-
-      throw error
+        },
+        404
+      )
     }
+
+    if (!result.ok && result.error.type === 'FLOOR_NOT_FOUND') {
+      return c.json(
+        {
+          error_code: result.error.type,
+          error_message: 'floor_id does not exist',
+          details: {
+            floor_id: result.error.floorId,
+          },
+        },
+        404
+      )
+    }
+
+    return c.json(result.value, 201)
   })
 }

@@ -4,17 +4,34 @@ import { db } from '../services/db/index.js'
 import { insertRecording } from '../services/recordings/index.js'
 import { issueRecordingUploadUrls } from '../services/storage/index.js'
 
-export class PedestrianNotFoundError extends Error {
-  constructor(public readonly pedestrianId: string) {
-    super('pedestrian_id does not exist')
-  }
-}
-
-export class FloorNotFoundError extends Error {
-  constructor(public readonly floorId: string) {
-    super('floor_id does not exist')
-  }
-}
+export type InitRecordingError =
+  | {
+      type: 'PEDESTRIAN_NOT_FOUND'
+      pedestrianId: string
+    }
+  | {
+      type: 'FLOOR_NOT_FOUND'
+      floorId: string
+    }
+export type InitRecordingResult =
+  | {
+      ok: true
+      value: {
+        recording_id: string
+        upload_status: 'accepted' | 'ready' | 'failed'
+        upload_urls: {
+          acce?: string
+          gyro?: string
+          pressure?: string
+          wifi?: string
+        }
+        expires_at: string
+      }
+    }
+  | {
+      ok: false
+      error: InitRecordingError
+    }
 
 export const initRecording = async (payload: InitRecordingRequest) => {
   const [pedestrian, floor] = await Promise.all([
@@ -27,11 +44,23 @@ export const initRecording = async (payload: InitRecordingRequest) => {
   ])
 
   if (!pedestrian) {
-    throw new PedestrianNotFoundError(payload.pedestrian_id)
+    return {
+      ok: false,
+      error: {
+        type: 'PEDESTRIAN_NOT_FOUND',
+        pedestrianId: payload.pedestrian_id,
+      },
+    } satisfies InitRecordingResult
   }
 
   if (!floor) {
-    throw new FloorNotFoundError(payload.floor_id)
+    return {
+      ok: false,
+      error: {
+        type: 'FLOOR_NOT_FOUND',
+        floorId: payload.floor_id,
+      },
+    } satisfies InitRecordingResult
   }
 
   const recording = await insertRecording({
@@ -45,9 +74,12 @@ export const initRecording = async (payload: InitRecordingRequest) => {
   )
 
   return {
-    recording_id: recording.id,
-    upload_status: recordingUploadStatusSchema.parse(recording.upload_status),
-    upload_urls: uploadUrls,
-    expires_at: expiresAt,
-  }
+    ok: true,
+    value: {
+      recording_id: recording.id,
+      upload_status: recordingUploadStatusSchema.parse(recording.upload_status),
+      upload_urls: uploadUrls,
+      expires_at: expiresAt,
+    },
+  } satisfies InitRecordingResult
 }
