@@ -10,6 +10,8 @@ services:
       - ${ENV_FILE:-./deploy/env/production.env}
       - ${KAEDE_ENV_FILE:-./deploy/apps/kaede.production.env}
       - ${DEPLOY_META_FILE:-/var/tmp/okarin/runtime/production.env}
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable
     ports:
       - "8080:8080"
 

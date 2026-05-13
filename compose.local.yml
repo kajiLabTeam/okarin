@@ -6,6 +6,8 @@ services:
     env_file:
       - ${ENV_FILE:-./deploy/env/local.env}
       - ${KAEDE_ENV_FILE:-./deploy/apps/kaede.local.env}
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable
     ports:
       - "8080:8080"
 
