@@ -1,34 +1,38 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { selectFromMock, insertRecordingMock, issueRecordingUploadUrlsMock } = vi.hoisted(() => ({
-  selectFromMock: vi.fn(),
-  insertRecordingMock: vi.fn(),
-  issueRecordingUploadUrlsMock: vi.fn(),
+const { floorError, initRecordingMock, pedestrianError } = vi.hoisted(() => ({
+  initRecordingMock: vi.fn(),
+  pedestrianError: '11111111-1111-4111-8111-111111111111',
+  floorError: '22222222-2222-4222-8222-222222222222',
 }))
 
-vi.mock('../../services/db/index.js', () => ({
-  db: {
-    selectFrom: selectFromMock,
-  },
-}))
+vi.mock('../../usecases/init-recording.js', () => {
+  class PedestrianNotFoundError extends Error {
+    pedestrianId: string
 
-vi.mock('../../services/recordings/index.js', () => ({
-  insertRecording: insertRecordingMock,
-}))
+    constructor(pedestrianId: string) {
+      super('pedestrian_id does not exist')
+      this.pedestrianId = pedestrianId
+    }
+  }
 
-vi.mock('../../services/storage/index.js', () => ({
-  issueRecordingUploadUrls: issueRecordingUploadUrlsMock,
-}))
+  class FloorNotFoundError extends Error {
+    floorId: string
+
+    constructor(floorId: string) {
+      super('floor_id does not exist')
+      this.floorId = floorId
+    }
+  }
+
+  return {
+    initRecording: initRecordingMock,
+    PedestrianNotFoundError,
+    FloorNotFoundError,
+  }
+})
 
 import { createApp } from '../../server.js'
-
-const makeLookupQuery = (result: { id: string } | undefined) => ({
-  select: vi.fn().mockReturnValue({
-    where: vi.fn().mockReturnValue({
-      executeTakeFirst: vi.fn().mockResolvedValue(result),
-    }),
-  }),
-})
 
 describe('POST /api/recordings/init', () => {
   beforeEach(() => {
@@ -40,28 +44,14 @@ describe('POST /api/recordings/init', () => {
     const floorId = '22222222-2222-4222-8222-222222222222'
     const recordingId = '33333333-3333-4333-8333-333333333333'
 
-    selectFromMock.mockImplementation((table: string) => {
-      if (table === 'pedestrians') {
-        return makeLookupQuery({ id: pedestrianId })
-      }
-
-      if (table === 'floors') {
-        return makeLookupQuery({ id: floorId })
-      }
-
-      throw new Error(`unexpected table: ${table}`)
-    })
-
-    insertRecordingMock.mockResolvedValue({
-      id: recordingId,
+    initRecordingMock.mockResolvedValue({
+      recording_id: recordingId,
       upload_status: 'accepted',
-    })
-    issueRecordingUploadUrlsMock.mockResolvedValue({
-      expiresAt: '2026-05-13T00:15:00.000Z',
-      uploadUrls: {
+      upload_urls: {
         acce: 'https://example.test/acce',
         gyro: 'https://example.test/gyro',
       },
+      expires_at: '2026-05-13T00:15:00.000Z',
     })
 
     const app = createApp()
@@ -88,29 +78,19 @@ describe('POST /api/recordings/init', () => {
       expires_at: '2026-05-13T00:15:00.000Z',
     })
 
-    expect(insertRecordingMock).toHaveBeenCalledWith({
+    expect(initRecordingMock).toHaveBeenCalledWith({
       pedestrian_id: pedestrianId,
       floor_id: floorId,
       upload_targets: ['acce', 'gyro'],
     })
-    expect(issueRecordingUploadUrlsMock).toHaveBeenCalledWith(recordingId, ['acce', 'gyro'])
   })
 
   it('存在しない floor_id は 404 を返す', async () => {
     const pedestrianId = '11111111-1111-4111-8111-111111111111'
     const floorId = '22222222-2222-4222-8222-222222222222'
+    const { FloorNotFoundError } = await import('../../usecases/init-recording.js')
 
-    selectFromMock.mockImplementation((table: string) => {
-      if (table === 'pedestrians') {
-        return makeLookupQuery({ id: pedestrianId })
-      }
-
-      if (table === 'floors') {
-        return makeLookupQuery(undefined)
-      }
-
-      throw new Error(`unexpected table: ${table}`)
-    })
+    initRecordingMock.mockRejectedValue(new FloorNotFoundError(floorId))
 
     const app = createApp()
     const response = await app.request('/api/recordings/init', {
@@ -131,6 +111,36 @@ describe('POST /api/recordings/init', () => {
       error_message: 'floor_id does not exist',
       details: {
         floor_id: floorId,
+      },
+    })
+  })
+
+  it('存在しない pedestrian_id は 404 を返す', async () => {
+    const pedestrianId = '11111111-1111-4111-8111-111111111111'
+    const floorId = '22222222-2222-4222-8222-222222222222'
+    const { PedestrianNotFoundError } = await import('../../usecases/init-recording.js')
+
+    initRecordingMock.mockRejectedValue(new PedestrianNotFoundError(pedestrianId))
+
+    const app = createApp()
+    const response = await app.request('/api/recordings/init', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        pedestrian_id: pedestrianId,
+        floor_id: floorId,
+        upload_targets: ['acce', 'gyro'],
+      }),
+    })
+
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'PEDESTRIAN_NOT_FOUND',
+      error_message: 'pedestrian_id does not exist',
+      details: {
+        pedestrian_id: pedestrianId,
       },
     })
   })

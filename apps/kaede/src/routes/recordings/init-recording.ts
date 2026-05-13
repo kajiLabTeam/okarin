@@ -1,13 +1,15 @@
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
-import { errorResponseSchema, recordingUploadStatusSchema } from '../../schemas/common.js'
+import { errorResponseSchema } from '../../schemas/common.js'
 import {
   initRecordingRequestSchema,
   initRecordingResponseSchema,
 } from '../../schemas/recordings.js'
-import { db } from '../../services/db/index.js'
-import { insertRecording } from '../../services/recordings/index.js'
-import { issueRecordingUploadUrls } from '../../services/storage/index.js'
+import {
+  FloorNotFoundError,
+  initRecording,
+  PedestrianNotFoundError,
+} from '../../usecases/init-recording.js'
 
 export const registerInitRecordingRoute = (app: OpenAPIHono) => {
   const route = createRoute({
@@ -47,59 +49,37 @@ export const registerInitRecordingRoute = (app: OpenAPIHono) => {
   app.openapi(route, async (c) => {
     const payload = c.req.valid('json')
 
-    const [pedestrian, floor] = await Promise.all([
-      db
-        .selectFrom('pedestrians')
-        .select('id')
-        .where('id', '=', payload.pedestrian_id)
-        .executeTakeFirst(),
-      db.selectFrom('floors').select('id').where('id', '=', payload.floor_id).executeTakeFirst(),
-    ])
-
-    if (!pedestrian) {
-      return c.json(
-        {
-          error_code: 'PEDESTRIAN_NOT_FOUND',
-          error_message: 'pedestrian_id does not exist',
-          details: {
-            pedestrian_id: payload.pedestrian_id,
+    try {
+      const response = await initRecording(payload)
+      return c.json(response, 201)
+    } catch (error) {
+      if (error instanceof PedestrianNotFoundError) {
+        return c.json(
+          {
+            error_code: 'PEDESTRIAN_NOT_FOUND',
+            error_message: error.message,
+            details: {
+              pedestrian_id: error.pedestrianId,
+            },
           },
-        },
-        404
-      )
-    }
+          404
+        )
+      }
 
-    if (!floor) {
-      return c.json(
-        {
-          error_code: 'FLOOR_NOT_FOUND',
-          error_message: 'floor_id does not exist',
-          details: {
-            floor_id: payload.floor_id,
+      if (error instanceof FloorNotFoundError) {
+        return c.json(
+          {
+            error_code: 'FLOOR_NOT_FOUND',
+            error_message: error.message,
+            details: {
+              floor_id: error.floorId,
+            },
           },
-        },
-        404
-      )
+          404
+        )
+      }
+
+      throw error
     }
-
-    const recording = await insertRecording({
-      pedestrian_id: payload.pedestrian_id,
-      floor_id: payload.floor_id,
-      upload_targets: payload.upload_targets,
-    })
-    const { expiresAt, uploadUrls } = await issueRecordingUploadUrls(
-      recording.id,
-      payload.upload_targets
-    )
-
-    return c.json(
-      {
-        recording_id: recording.id,
-        upload_status: recordingUploadStatusSchema.parse(recording.upload_status),
-        upload_urls: uploadUrls,
-        expires_at: expiresAt,
-      },
-      201
-    )
   })
 }
