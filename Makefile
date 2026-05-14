@@ -75,7 +75,8 @@ endif
 
 db-seed-local:
 	$(COMPOSE) $(COMPOSE_FILES) exec -T postgres \
-		psql -U $$POSTGRES_USER -d $$POSTGRES_DB < ./db/seeds/local_dev.sql
+		sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' < ./db/seeds/local_dev.sql
+	@echo "  local dev seed data inserted successfully; see building_id, floor_id, pedestrian_id above"
 
 storage-init:
 	$(COMPOSE) $(COMPOSE_FILES) --profile tools run --rm storage-bootstrap
