@@ -1,3 +1,4 @@
+import type { UploadTarget } from '../schemas/common.js'
 import { recordingUploadStatusSchema } from '../schemas/common.js'
 import type { RefreshUploadUrlsRequest, RecordingIdParams } from '../schemas/recordings.js'
 import { findRecordingById } from '../services/recordings/index.js'
@@ -16,7 +17,7 @@ export type RefreshUploadUrlsError =
   | {
       type: 'RECORDING_UPLOAD_TARGETS_INVALID'
       recordingId: string
-      invalidTargets: string[]
+      invalidTargets: UploadTarget[]
     }
 
 export type RefreshUploadUrlsResult =
