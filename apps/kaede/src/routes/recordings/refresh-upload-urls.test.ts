@@ -166,4 +166,20 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
       },
     })
   })
+
+  it('不正な path/body はバリデーションエラーを返し usecase を呼ばない', async () => {
+    const app = createApp()
+    const response = await app.request('/api/recordings/not-a-uuid/refresh-upload-urls', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        targets: [],
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(refreshUploadUrlsMock).not.toHaveBeenCalled()
+  })
 })
