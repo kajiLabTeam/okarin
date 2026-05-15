@@ -8,6 +8,10 @@ vi.mock('../../usecases/init-recording.js', () => ({
   initRecording: initRecordingMock,
 }))
 
+vi.mock('../../usecases/refresh-upload-urls.js', () => ({
+  refreshUploadUrls: vi.fn(),
+}))
+
 import { createApp } from '../../server.js'
 
 describe('POST /api/recordings/init', () => {

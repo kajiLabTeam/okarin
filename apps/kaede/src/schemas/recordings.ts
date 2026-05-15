@@ -159,3 +159,4 @@ export const recordingGroundTruthCompleteResponseSchema = z.object({
 
 export type InitRecordingRequest = z.infer<typeof initRecordingRequestSchema>
 export type RecordingIdParams = z.infer<typeof recordingIdParamsSchema>
+export type RefreshUploadUrlsRequest = z.infer<typeof refreshUploadUrlsRequestSchema>

@@ -1,12 +1,12 @@
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
-import { errorResponseSchema, notImplementedResponseSchema } from '../../schemas/common.js'
+import { errorResponseSchema } from '../../schemas/common.js'
 import {
   recordingIdParamsSchema,
   refreshUploadUrlsRequestSchema,
   refreshUploadUrlsResponseSchema,
 } from '../../schemas/recordings.js'
-import { notImplemented } from '../../utils/not-implemented.js'
+import { refreshUploadUrls } from '../../usecases/refresh-upload-urls.js'
 
 export const registerRefreshUploadUrlsRoute = (app: OpenAPIHono) => {
   const route = createRoute({
@@ -49,25 +49,55 @@ export const registerRefreshUploadUrlsRoute = (app: OpenAPIHono) => {
           },
         },
       },
-      501: {
-        description: 'not implemented',
-        content: {
-          'application/json': {
-            schema: notImplementedResponseSchema,
-          },
-        },
-      },
     },
   })
 
-  app.openapi(route, (c) => {
-    c.req.valid('param')
-    c.req.valid('json')
+  app.openapi(route, async (c) => {
+    const params = c.req.valid('param')
+    const payload = c.req.valid('json')
+    const result = await refreshUploadUrls(params, payload)
 
-    return notImplemented(
-      c,
-      'POST /api/recordings/:recordingId/refresh-upload-urls',
-      'recording の upload URL を再発行する'
-    )
+    if (!result.ok && result.error.type === 'RECORDING_NOT_FOUND') {
+      return c.json(
+        {
+          error_code: result.error.type,
+          error_message: 'recording not found',
+          details: {
+            recording_id: result.error.recordingId,
+          },
+        },
+        404
+      )
+    }
+
+    if (!result.ok && result.error.type === 'RECORDING_UPLOAD_URL_REFRESH_FORBIDDEN') {
+      return c.json(
+        {
+          error_code: result.error.type,
+          error_message: 'upload url refresh is not allowed in the current upload state',
+          details: {
+            recording_id: result.error.recordingId,
+            upload_status: result.error.uploadStatus,
+          },
+        },
+        409
+      )
+    }
+
+    if (!result.ok && result.error.type === 'RECORDING_UPLOAD_TARGETS_INVALID') {
+      return c.json(
+        {
+          error_code: result.error.type,
+          error_message: 'requested targets are not allowed for this recording',
+          details: {
+            recording_id: result.error.recordingId,
+            invalid_targets: result.error.invalidTargets,
+          },
+        },
+        409
+      )
+    }
+
+    return c.json(result.value, 200)
   })
 }
