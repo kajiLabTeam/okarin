@@ -68,8 +68,7 @@ export const refreshUploadUrls = async (
     } satisfies RefreshUploadUrlsResult
   }
 
-  const uniqueTargets = Array.from(new Set(payload.targets))
-  const invalidTargets = uniqueTargets.filter(
+  const invalidTargets = payload.targets.filter(
     (target) => !recording.upload_targets.includes(target)
   )
   if (invalidTargets.length > 0) {
@@ -83,7 +82,7 @@ export const refreshUploadUrls = async (
     } satisfies RefreshUploadUrlsResult
   }
 
-  const { expiresAt, uploadUrls } = await issueRecordingUploadUrls(recording.id, uniqueTargets)
+  const { expiresAt, uploadUrls } = await issueRecordingUploadUrls(recording.id, payload.targets)
 
   return {
     ok: true,
