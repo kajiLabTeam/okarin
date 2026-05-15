@@ -55,6 +55,10 @@ ps:
 config:
 	$(COMPOSE) $(COMPOSE_FILES) config
 
+db-in:
+	$(COMPOSE) $(COMPOSE_FILES) exec postgres \
+		sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
+
 db-status:
 	$(COMPOSE) $(COMPOSE_FILES) --profile tools run --rm dbmate status
 
