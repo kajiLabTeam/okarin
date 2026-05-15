@@ -58,6 +58,7 @@ const getS3Client = () => {
       secretAccessKey: config.secretAccessKey,
     },
     forcePathStyle: true,
+    requestChecksumCalculation: 'WHEN_REQUIRED',
   })
 
   return s3Client
