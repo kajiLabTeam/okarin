@@ -8,6 +8,7 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:db": "vitest run --config vitest.db.config.ts",
+    "test:s3": "vitest run --config vitest.s3.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
     "db:codegen": "kysely-codegen --dialect postgres --default-schema public --exclude-pattern public.schema_migrations --out-file ./src/services/db/generated.ts",
     "lint": "eslint .",
@@ -15,6 +16,8 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1045.0",
+    "@aws-sdk/s3-request-presigner": "^3.1045.0",
     "@hono/node-server": "^1.19.11",
     "@hono/zod-openapi": "^0.19.10",
     "@scalar/hono-api-reference": "^0.10.9",
@@ -34,6 +37,7 @@
     "eslint-config-prettier": "^10.1.8",
     "kysely-codegen": "^0.20.0",
     "prettier": "^3.8.1",
+    "testcontainers": "^11.14.0",
     "tsx": "^4.7.1",
     "typescript": "^5.8.3",
     "vitest": "^4.1.4"

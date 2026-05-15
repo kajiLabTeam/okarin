@@ -6,6 +6,8 @@
 
 - `migrations/`
   - `dbmate` で管理する migration SQL を置く
+- `seeds/`
+  - ローカル動作確認用の投入 SQL を置く
 - `schema.sql`
   - `dbmate dump` で更新する最新スキーマのスナップショット
 
@@ -39,6 +41,13 @@ make db-new ENV=local NAME=add_something
 ```
 
 初回セットアップでは、`make up ENV=local` で `postgres` を起動してから `make db-up ENV=local` を実行する。
+
+ローカルで API 動作確認用データを入れる場合は、例えば次を使う。
+
+```sh
+docker exec -i okarin-local-postgres-1 \
+  psql -U okarin -d okarin < db/seeds/local_dev.sql
+```
 
 ## 参照
 

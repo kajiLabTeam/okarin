@@ -21,7 +21,7 @@ else
 $(error Unsupported ENV='$(ENV)'. Use local|staging|production)
 endif
 
-.PHONY: help pull up down logs ps config db-status db-up db-down db-dump db-new storage-init storage-test
+.PHONY: help pull up down logs ps config db-status db-up db-down db-dump db-new db-seed-local storage-init storage-test
 
 help:
 	@echo "Usage examples:"
@@ -33,6 +33,7 @@ help:
 	@echo "  make db-status ENV=local"
 	@echo "  make db-up ENV=local"
 	@echo "  make db-new ENV=local NAME=init"
+	@echo "  make db-seed-local ENV=local"
 	@echo "  make storage-init ENV=local"
 	@echo "  make storage-test"
 
@@ -54,6 +55,10 @@ ps:
 config:
 	$(COMPOSE) $(COMPOSE_FILES) config
 
+db-in:
+	$(COMPOSE) $(COMPOSE_FILES) exec postgres \
+		sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
+
 db-status:
 	$(COMPOSE) $(COMPOSE_FILES) --profile tools run --rm dbmate status
 
@@ -71,6 +76,11 @@ ifndef NAME
 	$(error NAME is required. Use NAME=create_something)
 endif
 	$(COMPOSE) $(COMPOSE_FILES) --profile tools run --rm dbmate new $(NAME)
+
+db-seed-local:
+	$(COMPOSE) $(COMPOSE_FILES) exec -T postgres \
+		sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' < ./db/seeds/local_dev.sql
+	@echo "  local dev seed data inserted successfully; see building_id, floor_id, pedestrian_id above"
 
 storage-init:
 	$(COMPOSE) $(COMPOSE_FILES) --profile tools run --rm storage-bootstrap

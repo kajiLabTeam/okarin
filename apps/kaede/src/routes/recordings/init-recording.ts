@@ -1,11 +1,11 @@
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
-import { notImplementedResponseSchema } from '../../schemas/common.js'
+import { errorResponseSchema } from '../../schemas/common.js'
 import {
   initRecordingRequestSchema,
   initRecordingResponseSchema,
 } from '../../schemas/recordings.js'
-import { notImplemented } from '../../utils/not-implemented.js'
+import { initRecording } from '../../usecases/init-recording.js'
 
 export const registerInitRecordingRoute = (app: OpenAPIHono) => {
   const route = createRoute({
@@ -31,20 +31,47 @@ export const registerInitRecordingRoute = (app: OpenAPIHono) => {
           },
         },
       },
-      501: {
-        description: 'not implemented',
+      404: {
+        description: 'pedestrian or floor not found',
         content: {
           'application/json': {
-            schema: notImplementedResponseSchema,
+            schema: errorResponseSchema,
           },
         },
       },
     },
   })
 
-  app.openapi(route, (c) => {
-    c.req.valid('json')
+  app.openapi(route, async (c) => {
+    const payload = c.req.valid('json')
+    const result = await initRecording(payload)
 
-    return notImplemented(c, 'POST /api/recordings/init', 'recording を作成する')
+    if (!result.ok && result.error.type === 'PEDESTRIAN_NOT_FOUND') {
+      return c.json(
+        {
+          error_code: result.error.type,
+          error_message: 'pedestrian_id does not exist',
+          details: {
+            pedestrian_id: result.error.pedestrianId,
+          },
+        },
+        404
+      )
+    }
+
+    if (!result.ok && result.error.type === 'FLOOR_NOT_FOUND') {
+      return c.json(
+        {
+          error_code: result.error.type,
+          error_message: 'floor_id does not exist',
+          details: {
+            floor_id: result.error.floorId,
+          },
+        },
+        404
+      )
+    }
+
+    return c.json(result.value, 201)
   })
 }
