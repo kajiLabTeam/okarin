@@ -8,6 +8,10 @@ vi.mock('../../usecases/init-recording.js', () => ({
   initRecording: initRecordingMock,
 }))
 
+vi.mock('../../usecases/refresh-upload-urls.js', () => ({
+  refreshUploadUrls: vi.fn(),
+}))
+
 import { createApp } from '../../server.js'
 
 describe('POST /api/recordings/init', () => {
@@ -132,5 +136,26 @@ describe('POST /api/recordings/init', () => {
         pedestrian_id: pedestrianId,
       },
     })
+  })
+
+  it('不正な upload_targets はバリデーションエラーを返し usecase を呼ばない', async () => {
+    const pedestrianId = '11111111-1111-4111-8111-111111111111'
+    const floorId = '22222222-2222-4222-8222-222222222222'
+
+    const app = createApp()
+    const response = await app.request('/api/recordings/init', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        pedestrian_id: pedestrianId,
+        floor_id: floorId,
+        upload_targets: ['acce'],
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(initRecordingMock).not.toHaveBeenCalled()
   })
 })

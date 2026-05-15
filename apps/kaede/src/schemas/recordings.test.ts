@@ -53,6 +53,14 @@ describe('recording schemas', () => {
     expect(result.success).toBe(false)
   })
 
+  it('refreshUploadUrlsRequestSchema は重複した targets を拒否する', () => {
+    const result = refreshUploadUrlsRequestSchema.safeParse({
+      targets: ['acce', 'acce'],
+    })
+
+    expect(result.success).toBe(false)
+  })
+
   it('recordingGroundTruthRequestSchema は truth_type=uwb を受け入れる', () => {
     const result = recordingGroundTruthRequestSchema.safeParse({
       truth_type: 'uwb',

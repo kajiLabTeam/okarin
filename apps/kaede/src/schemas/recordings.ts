@@ -62,9 +62,20 @@ export const completeUploadResponseSchema = z.object({
 })
 
 export const refreshUploadUrlsRequestSchema = z.object({
-  targets: z.array(uploadTargetSchema).min(1).openapi({
-    description: '再発行したいアップロード URL の対象一覧',
-  }),
+  targets: z
+    .array(uploadTargetSchema)
+    .min(1)
+    .openapi({
+      description: '再発行したいアップロード URL の対象一覧',
+    })
+    .superRefine((targets, ctx) => {
+      if (new Set(targets).size !== targets.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'targets must not contain duplicates',
+        })
+      }
+    }),
 })
 
 export const refreshUploadUrlsResponseSchema = z.object({
@@ -159,3 +170,4 @@ export const recordingGroundTruthCompleteResponseSchema = z.object({
 
 export type InitRecordingRequest = z.infer<typeof initRecordingRequestSchema>
 export type RecordingIdParams = z.infer<typeof recordingIdParamsSchema>
+export type RefreshUploadUrlsRequest = z.infer<typeof refreshUploadUrlsRequestSchema>
