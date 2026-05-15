@@ -42,7 +42,8 @@ export const registerRefreshUploadUrlsRoute = (app: OpenAPIHono) => {
         },
       },
       409: {
-        description: '現在状態では upload URL を再発行できない',
+        description:
+          '現在状態では upload URL を再発行できない、または対象 target が recording に対して不正',
         content: {
           'application/json': {
             schema: errorResponseSchema,
