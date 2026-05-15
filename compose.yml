@@ -1,6 +1,6 @@
 services:
   kaede:
-    restart: on-failure:3
+    restart: unless-stopped
     depends_on:
       nozomi:
         condition: service_healthy
@@ -21,7 +21,7 @@ services:
       start_period: 5s
 
   nozomi:
-    restart: on-failure:3
+    restart: unless-stopped
     environment:
       HOST: 0.0.0.0
       PORT: 8000
