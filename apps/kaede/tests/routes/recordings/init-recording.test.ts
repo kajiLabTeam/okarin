@@ -112,4 +112,29 @@ describe('POST /api/recordings/init', () => {
       },
     })
   })
+
+  it('存在しない floor_id は 404 を返す', async () => {
+    const { pedestrianId } = await createRecordingFixture()
+
+    const response = await app.request('/api/recordings/init', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        pedestrian_id: pedestrianId,
+        floor_id: '22222222-2222-4222-8222-222222222222',
+        upload_targets: ['acce', 'gyro'],
+      }),
+    })
+
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'FLOOR_NOT_FOUND',
+      error_message: 'floor_id does not exist',
+      details: {
+        floor_id: '22222222-2222-4222-8222-222222222222',
+      },
+    })
+  })
 })

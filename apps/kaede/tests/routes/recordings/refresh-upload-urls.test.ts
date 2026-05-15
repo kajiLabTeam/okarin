@@ -132,6 +132,30 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
     })
   })
 
+  it('failed 状態の recording は 409 を返す', async () => {
+    const { recordingId } = await createRecordingFixture('failed')
+
+    const response = await app.request(`/api/recordings/${recordingId}/refresh-upload-urls`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        targets: ['acce', 'gyro'],
+      }),
+    })
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'RECORDING_UPLOAD_URL_REFRESH_FORBIDDEN',
+      error_message: 'upload url refresh is not allowed in the current upload state',
+      details: {
+        recording_id: recordingId,
+        upload_status: 'failed',
+      },
+    })
+  })
+
   it('recording に含まれない target の再発行は 409 を返す', async () => {
     const { recordingId } = await createRecordingFixture('accepted')
 
@@ -142,6 +166,30 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
       },
       body: JSON.stringify({
         targets: ['pressure'],
+      }),
+    })
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'RECORDING_UPLOAD_TARGETS_INVALID',
+      error_message: 'requested targets are not allowed for this recording',
+      details: {
+        recording_id: recordingId,
+        invalid_targets: ['pressure'],
+      },
+    })
+  })
+
+  it('一部に不正 target が含まれる場合は 409 を返す', async () => {
+    const { recordingId } = await createRecordingFixture('accepted')
+
+    const response = await app.request(`/api/recordings/${recordingId}/refresh-upload-urls`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        targets: ['acce', 'pressure'],
       }),
     })
 
