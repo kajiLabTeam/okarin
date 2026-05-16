@@ -19,3 +19,6 @@ process.env.S3_INTERNAL_ENDPOINT = inject('s3InternalEndpoint')
 process.env.S3_PUBLIC_ENDPOINT = inject('s3PublicEndpoint')
 process.env.S3_REGION = inject('s3Region')
 process.env.S3_BUCKET = inject('s3Bucket')
+process.env.NOZOMI_INTERNAL_ENDPOINT ??= 'http://127.0.0.1:8000'
+process.env.KAEDE_INTERNAL_BASE_URL ??= 'http://kaede:8080'
+process.env.CALLBACK_TOKEN_SECRET ??= 'change_me_test_callback_secret'
