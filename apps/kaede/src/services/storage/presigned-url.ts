@@ -1,4 +1,4 @@
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import type { UploadTarget } from '../../schemas/common.js'
 
@@ -21,11 +21,13 @@ interface StorageConfig {
 }
 
 interface S3Context {
-  client: S3Client
   config: StorageConfig
+  internalClient: S3Client
+  presignClient: S3Client
 }
 
-let s3Client: S3Client | undefined
+let internalS3Client: S3Client | undefined
+let presignS3Client: S3Client | undefined
 let storageConfig: StorageConfig | undefined
 
 const getRequiredEnv = (name: string) => {
@@ -59,14 +61,26 @@ const getStorageConfig = (): StorageConfig => {
 const getS3Context = (): S3Context => {
   const config = getStorageConfig()
 
-  if (s3Client) {
+  if (internalS3Client && presignS3Client) {
     return {
-      client: s3Client,
       config,
+      internalClient: internalS3Client,
+      presignClient: presignS3Client,
     }
   }
 
-  s3Client = new S3Client({
+  internalS3Client = new S3Client({
+    region: config.region,
+    endpoint: config.endpoint,
+    credentials: {
+      accessKeyId: config.accessKeyId,
+      secretAccessKey: config.secretAccessKey,
+    },
+    forcePathStyle: true,
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+  })
+
+  presignS3Client = new S3Client({
     region: config.region,
     endpoint: config.publicEndpoint,
     credentials: {
@@ -78,8 +92,9 @@ const getS3Context = (): S3Context => {
   })
 
   return {
-    client: s3Client,
     config,
+    internalClient: internalS3Client,
+    presignClient: presignS3Client,
   }
 }
 
@@ -87,18 +102,22 @@ export const buildRecordingRawObjectKey = (recordingId: string, target: UploadTa
   return `recordings/${recordingId}/raw/${target}.csv`
 }
 
+export const buildRecordingRawObjectPrefix = (recordingId: string) => {
+  return `recordings/${recordingId}/raw/`
+}
+
 export const issueRecordingUploadUrls = async (
   recordingId: string,
   targets: UploadTarget[],
   now: Date = new Date()
 ) => {
-  const { client, config } = getS3Context()
+  const { config, presignClient } = getS3Context()
   const uploadUrls: RecordingUploadUrls = {}
 
   await Promise.all(
     targets.map(async (target) => {
       uploadUrls[target] = await getSignedUrl(
-        client,
+        presignClient,
         new PutObjectCommand({
           Bucket: config.bucket,
           Key: buildRecordingRawObjectKey(recordingId, target),
@@ -114,7 +133,35 @@ export const issueRecordingUploadUrls = async (
   }
 }
 
+export const listRecordingRawObjectKeys = async (recordingId: string) => {
+  const { config, internalClient } = getS3Context()
+  const prefix = buildRecordingRawObjectPrefix(recordingId)
+  const keys: string[] = []
+  let continuationToken: string | undefined
+
+  do {
+    const response = await internalClient.send(
+      new ListObjectsV2Command({
+        Bucket: config.bucket,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      })
+    )
+
+    for (const object of response.Contents ?? []) {
+      if (object.Key) {
+        keys.push(object.Key)
+      }
+    }
+
+    continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined
+  } while (continuationToken)
+
+  return keys
+}
+
 export const resetS3ClientForTests = () => {
-  s3Client = undefined
+  internalS3Client = undefined
+  presignS3Client = undefined
   storageConfig = undefined
 }

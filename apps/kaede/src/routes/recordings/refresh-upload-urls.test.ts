@@ -12,6 +12,10 @@ vi.mock('../../usecases/refresh-upload-urls.js', () => ({
   refreshUploadUrls: refreshUploadUrlsMock,
 }))
 
+vi.mock('../../usecases/complete-upload.js', () => ({
+  completeUpload: vi.fn(),
+}))
+
 import { createApp } from '../../server.js'
 
 describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {

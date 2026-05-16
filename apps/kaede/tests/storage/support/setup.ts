@@ -2,6 +2,7 @@ import { inject } from 'vitest'
 
 declare module 'vitest' {
   export interface ProvidedContext {
+    databaseUrl: string
     s3AccessKeyId: string
     s3Bucket: string
     s3InternalEndpoint: string
@@ -11,6 +12,7 @@ declare module 'vitest' {
   }
 }
 
+process.env.DATABASE_URL = inject('databaseUrl')
 process.env.S3_ACCESS_KEY_ID = inject('s3AccessKeyId')
 process.env.S3_SECRET_ACCESS_KEY = inject('s3SecretAccessKey')
 process.env.S3_INTERNAL_ENDPOINT = inject('s3InternalEndpoint')

@@ -1,4 +1,4 @@
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 
 const getRequiredEnv = (name: string) => {
   const value = process.env[name]
@@ -44,4 +44,15 @@ export const readObjectText = async (client: S3Client, key: string) => {
   }
 
   return readBody(body as AsyncIterable<Uint8Array>)
+}
+
+export const putObjectText = async (client: S3Client, key: string, body: string) => {
+  await client.send(
+    new PutObjectCommand({
+      Bucket: getRequiredEnv('S3_BUCKET'),
+      Key: key,
+      Body: body,
+      ContentType: 'text/csv',
+    })
+  )
 }
