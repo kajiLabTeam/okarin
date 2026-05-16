@@ -1,22 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createRouteTestApp } from '../create-route-test-app.js'
+import { registerRefreshUploadUrlsRoute } from './refresh-upload-urls.js'
 
 const { refreshUploadUrlsMock } = vi.hoisted(() => ({
   refreshUploadUrlsMock: vi.fn(),
 }))
 
-vi.mock('../../usecases/init-recording.js', () => ({
-  initRecording: vi.fn(),
-}))
-
 vi.mock('../../usecases/refresh-upload-urls.js', () => ({
   refreshUploadUrls: refreshUploadUrlsMock,
 }))
-
-vi.mock('../../usecases/complete-upload.js', () => ({
-  completeUpload: vi.fn(),
-}))
-
-import { createApp } from '../../server.js'
 
 describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
   beforeEach(() => {
@@ -39,7 +31,7 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
       },
     })
 
-    const app = createApp()
+    const app = createRouteTestApp('/recordings', registerRefreshUploadUrlsRoute)
     const response = await app.request(`/api/recordings/${recordingId}/refresh-upload-urls`, {
       method: 'POST',
       headers: {
@@ -82,7 +74,7 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
       },
     })
 
-    const app = createApp()
+    const app = createRouteTestApp('/recordings', registerRefreshUploadUrlsRoute)
     const response = await app.request(`/api/recordings/${recordingId}/refresh-upload-urls`, {
       method: 'POST',
       headers: {
@@ -115,7 +107,7 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
       },
     })
 
-    const app = createApp()
+    const app = createRouteTestApp('/recordings', registerRefreshUploadUrlsRoute)
     const response = await app.request(`/api/recordings/${recordingId}/refresh-upload-urls`, {
       method: 'POST',
       headers: {
@@ -149,7 +141,7 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
       },
     })
 
-    const app = createApp()
+    const app = createRouteTestApp('/recordings', registerRefreshUploadUrlsRoute)
     const response = await app.request(`/api/recordings/${recordingId}/refresh-upload-urls`, {
       method: 'POST',
       headers: {
@@ -172,7 +164,7 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
   })
 
   it('不正な path/body はバリデーションエラーを返し usecase を呼ばない', async () => {
-    const app = createApp()
+    const app = createRouteTestApp('/recordings', registerRefreshUploadUrlsRoute)
     const response = await app.request('/api/recordings/not-a-uuid/refresh-upload-urls', {
       method: 'POST',
       headers: {
