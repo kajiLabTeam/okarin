@@ -1,5 +1,6 @@
 export {
   buildRecordingRawObjectKey,
+  doesRecordingRawObjectExist,
   issueRecordingUploadUrls,
   resetS3ClientForTests,
 } from './presigned-url.js'

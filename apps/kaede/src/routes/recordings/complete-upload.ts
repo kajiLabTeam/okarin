@@ -1,8 +1,8 @@
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
-import { errorResponseSchema, notImplementedResponseSchema } from '../../schemas/common.js'
+import { errorResponseSchema } from '../../schemas/common.js'
 import { completeUploadResponseSchema, recordingIdParamsSchema } from '../../schemas/recordings.js'
-import { notImplemented } from '../../utils/not-implemented.js'
+import { completeUpload } from '../../usecases/complete-upload.js'
 
 export const registerCompleteUploadRoute = (app: OpenAPIHono) => {
   const route = createRoute({
@@ -31,31 +31,65 @@ export const registerCompleteUploadRoute = (app: OpenAPIHono) => {
         },
       },
       409: {
-        description: '現在状態では upload 完了を確定できない',
+        description: '現在状態では upload 完了を確定できない、または必要 target が未アップロード',
         content: {
           'application/json': {
             schema: errorResponseSchema,
           },
         },
       },
-      501: {
-        description: 'not implemented',
-        content: {
-          'application/json': {
-            schema: notImplementedResponseSchema,
-          },
-        },
-      },
     },
   })
 
-  app.openapi(route, (c) => {
-    c.req.valid('param')
+  app.openapi(route, async (c) => {
+    const params = c.req.valid('param')
+    const result = await completeUpload(params)
 
-    return notImplemented(
-      c,
-      'POST /api/recordings/:recordingId/complete-upload',
-      'recording の raw upload 完了を反映する'
-    )
+    if (!result.ok && result.error.type === 'RECORDING_NOT_FOUND') {
+      return c.json(
+        {
+          error_code: result.error.type,
+          error_message: 'recording not found',
+          details: {
+            recording_id: result.error.recordingId,
+          },
+        },
+        404
+      )
+    }
+
+    if (!result.ok && result.error.type === 'UPLOAD_TARGETS_MISSING') {
+      return c.json(
+        {
+          error_code: result.error.type,
+          error_message: 'some upload targets are missing',
+          details: {
+            recording_id: result.error.recordingId,
+            missing_targets: result.error.missingTargets,
+          },
+        },
+        409
+      )
+    }
+
+    if (!result.ok && result.error.type === 'RECORDING_UPLOAD_FINALIZED') {
+      return c.json(
+        {
+          error_code: result.error.type,
+          error_message: 'recording is already in a terminal upload state',
+          details: {
+            recording_id: result.error.recordingId,
+            upload_status: result.error.uploadStatus,
+          },
+        },
+        409
+      )
+    }
+
+    if (!result.ok) {
+      throw new Error('unreachable complete-upload result')
+    }
+
+    return c.json(result.value, 200)
   })
 }
