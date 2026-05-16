@@ -131,6 +131,34 @@ describe('POST /api/recordings/:recordingId/complete-upload', () => {
     })
   })
 
+  it('壊れた upload_targets は 500 を返す', async () => {
+    const recordingId = '11111111-1111-4111-8111-111111111111'
+
+    completeUploadMock.mockResolvedValue({
+      ok: false,
+      error: {
+        type: 'RECORDING_UPLOAD_TARGETS_INVALID',
+        recordingId,
+        invalidTargets: ['broken-target'],
+      },
+    })
+
+    const app = createApp()
+    const response = await app.request(`/api/recordings/${recordingId}/complete-upload`, {
+      method: 'POST',
+    })
+
+    expect(response.status).toBe(500)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'RECORDING_UPLOAD_TARGETS_INVALID',
+      error_message: 'recording upload_targets contains invalid values',
+      details: {
+        recording_id: recordingId,
+        invalid_targets: ['broken-target'],
+      },
+    })
+  })
+
   it('不正な path は 400 を返し usecase を呼ばない', async () => {
     const app = createApp()
     const response = await app.request('/api/recordings/not-a-uuid/complete-upload', {

@@ -50,7 +50,14 @@ export const markRecordingUploadReady = async (
   recordingId: string,
   executor: DbExecutor = db
 ): Promise<Recording | undefined> => {
-  return updateRecording(recordingId, { upload_status: 'ready' }, executor)
+  return executor
+    .updateTable('recordings')
+    .set({ upload_status: 'ready' })
+    .where('id', '=', recordingId)
+    .where('deleted_at', 'is', null)
+    .where('upload_status', '=', 'accepted')
+    .returningAll()
+    .executeTakeFirst()
 }
 
 export const markRecordingUploadFailed = async (

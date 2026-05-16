@@ -1,10 +1,7 @@
 import { CreateBucketCommand, S3Client } from '@aws-sdk/client-s3'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
-import { Client } from 'pg'
 import { GenericContainer, Wait } from 'testcontainers'
-import { readFile } from 'node:fs/promises'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { applySchema } from '../../support/db-schema.js'
 
 const s3AccessKeyId = 'kaede-test'
 const s3SecretAccessKey = 'change_me_test_kaede_secret_key'
@@ -52,33 +49,6 @@ interface SetupContext {
       | 's3SecretAccessKey',
     value: string
   ) => void
-}
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-const loadSchemaSql = async () => {
-  const schemaPath = path.resolve(__dirname, '../../../../../db/schema.sql')
-  const raw = await readFile(schemaPath, 'utf8')
-
-  const sanitized = raw
-    .split('\n')
-    .filter((line) => !line.startsWith('\\'))
-    .join('\n')
-
-  return `CREATE EXTENSION IF NOT EXISTS pgcrypto;\n${sanitized}`
-}
-
-const applySchema = async (connectionString: string) => {
-  const schemaSql = await loadSchemaSql()
-  const client = new Client({ connectionString })
-
-  await client.connect()
-  try {
-    await client.query(schemaSql)
-  } finally {
-    await client.end()
-  }
 }
 
 const sleep = async (ms: number) => {

@@ -38,6 +38,14 @@ export const registerCompleteUploadRoute = (app: OpenAPIHono) => {
           },
         },
       },
+      500: {
+        description: 'recording の内部データ不整合により upload 完了を確定できない',
+        content: {
+          'application/json': {
+            schema: errorResponseSchema,
+          },
+        },
+      },
     },
   })
 
@@ -83,6 +91,20 @@ export const registerCompleteUploadRoute = (app: OpenAPIHono) => {
           },
         },
         409
+      )
+    }
+
+    if (!result.ok && result.error.type === 'RECORDING_UPLOAD_TARGETS_INVALID') {
+      return c.json(
+        {
+          error_code: result.error.type,
+          error_message: 'recording upload_targets contains invalid values',
+          details: {
+            recording_id: result.error.recordingId,
+            invalid_targets: result.error.invalidTargets,
+          },
+        },
+        500
       )
     }
 

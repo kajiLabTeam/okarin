@@ -25,6 +25,25 @@ describe('completeUpload', () => {
     vi.clearAllMocks()
   })
 
+  it('recording が存在しない場合は RECORDING_NOT_FOUND を返す', async () => {
+    findRecordingByIdMock.mockResolvedValue(undefined)
+
+    await expect(
+      completeUpload({
+        recordingId: '11111111-1111-4111-8111-111111111111',
+      })
+    ).resolves.toEqual({
+      ok: false,
+      error: {
+        type: 'RECORDING_NOT_FOUND',
+        recordingId: '11111111-1111-4111-8111-111111111111',
+      },
+    })
+
+    expect(listRecordingRawObjectKeysMock).not.toHaveBeenCalled()
+    expect(markRecordingUploadReadyMock).not.toHaveBeenCalled()
+  })
+
   it('全 target が存在する場合 ready に更新する', async () => {
     findRecordingByIdMock.mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',
@@ -103,6 +122,30 @@ describe('completeUpload', () => {
         type: 'RECORDING_UPLOAD_FINALIZED',
         recordingId: '11111111-1111-4111-8111-111111111111',
         uploadStatus: 'failed',
+      },
+    })
+
+    expect(listRecordingRawObjectKeysMock).not.toHaveBeenCalled()
+    expect(markRecordingUploadReadyMock).not.toHaveBeenCalled()
+  })
+
+  it('recording.upload_targets に不正値がある場合は制御されたエラーを返す', async () => {
+    findRecordingByIdMock.mockResolvedValue({
+      id: '11111111-1111-4111-8111-111111111111',
+      upload_status: 'accepted',
+      upload_targets: ['acce', 'broken-target'],
+    })
+
+    await expect(
+      completeUpload({
+        recordingId: '11111111-1111-4111-8111-111111111111',
+      })
+    ).resolves.toEqual({
+      ok: false,
+      error: {
+        type: 'RECORDING_UPLOAD_TARGETS_INVALID',
+        recordingId: '11111111-1111-4111-8111-111111111111',
+        invalidTargets: ['broken-target'],
       },
     })
 

@@ -1,4 +1,4 @@
-import { uploadTargetSchema } from '../schemas/common.js'
+import { uploadTargetSchema, recordingUploadStatusSchema } from '../schemas/common.js'
 import type { UploadTarget } from '../schemas/common.js'
 import type { RecordingIdParams } from '../schemas/recordings.js'
 import { findRecordingById, markRecordingUploadReady } from '../services/recordings/index.js'
@@ -21,6 +21,11 @@ export type CompleteUploadError =
       type: 'UPLOAD_TARGETS_MISSING'
       recordingId: string
       missingTargets: UploadTarget[]
+    }
+  | {
+      type: 'RECORDING_UPLOAD_TARGETS_INVALID'
+      recordingId: string
+      invalidTargets: string[]
     }
 
 export type CompleteUploadResult =
@@ -60,7 +65,27 @@ export const completeUpload = async (params: RecordingIdParams): Promise<Complet
     }
   }
 
-  const uploadTargets = recording.upload_targets.map((target) => uploadTargetSchema.parse(target))
+  const uploadTargetResults = recording.upload_targets.map((target) =>
+    uploadTargetSchema.safeParse(target)
+  )
+  const invalidTargets = recording.upload_targets.filter(
+    (_target, index) => !uploadTargetResults[index]?.success
+  )
+
+  if (invalidTargets.length > 0) {
+    return {
+      ok: false,
+      error: {
+        type: 'RECORDING_UPLOAD_TARGETS_INVALID',
+        recordingId: recording.id,
+        invalidTargets,
+      },
+    }
+  }
+
+  const uploadTargets: UploadTarget[] = uploadTargetResults.flatMap((result) =>
+    result.success ? [result.data] : []
+  )
   const uploadedKeysList: string[] = await listRecordingRawObjectKeys(recording.id)
   const uploadedKeys = new Set<string>(uploadedKeysList)
   const missingTargets = uploadTargets.filter(
@@ -80,11 +105,35 @@ export const completeUpload = async (params: RecordingIdParams): Promise<Complet
 
   const updated = await markRecordingUploadReady(recording.id)
   if (!updated) {
+    const latest = await findRecordingById(recording.id)
+    if (!latest) {
+      return {
+        ok: false,
+        error: {
+          type: 'RECORDING_NOT_FOUND',
+          recordingId: recording.id,
+        },
+      }
+    }
+
+    const latestUploadStatus = recordingUploadStatusSchema.safeParse(latest.upload_status)
+    if (!latestUploadStatus.success || latestUploadStatus.data === 'accepted') {
+      return {
+        ok: false,
+        error: {
+          type: 'RECORDING_UPLOAD_TARGETS_INVALID',
+          recordingId: latest.id,
+          invalidTargets: latest.upload_targets,
+        },
+      }
+    }
+
     return {
       ok: false,
       error: {
-        type: 'RECORDING_NOT_FOUND',
+        type: 'RECORDING_UPLOAD_FINALIZED',
         recordingId: recording.id,
+        uploadStatus: latestUploadStatus.data,
       },
     }
   }
