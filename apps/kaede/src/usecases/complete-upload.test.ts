@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { doesRecordingRawObjectExistMock, findRecordingByIdMock, markRecordingUploadReadyMock } =
+const { findRecordingByIdMock, listRecordingRawObjectKeysMock, markRecordingUploadReadyMock } =
   vi.hoisted(() => ({
-    doesRecordingRawObjectExistMock: vi.fn(),
     findRecordingByIdMock: vi.fn(),
+    listRecordingRawObjectKeysMock: vi.fn(),
     markRecordingUploadReadyMock: vi.fn(),
   }))
 
@@ -13,7 +13,9 @@ vi.mock('../services/recordings/index.js', () => ({
 }))
 
 vi.mock('../services/storage/index.js', () => ({
-  doesRecordingRawObjectExist: doesRecordingRawObjectExistMock,
+  buildRecordingRawObjectKey: (recordingId: string, target: string) =>
+    `recordings/${recordingId}/raw/${target}.csv`,
+  listRecordingRawObjectKeys: listRecordingRawObjectKeysMock,
 }))
 
 import { completeUpload } from './complete-upload.js'
@@ -29,7 +31,10 @@ describe('completeUpload', () => {
       upload_status: 'accepted',
       upload_targets: ['acce', 'gyro'],
     })
-    doesRecordingRawObjectExistMock.mockResolvedValue(true)
+    listRecordingRawObjectKeysMock.mockResolvedValue([
+      'recordings/11111111-1111-4111-8111-111111111111/raw/acce.csv',
+      'recordings/11111111-1111-4111-8111-111111111111/raw/gyro.csv',
+    ])
     markRecordingUploadReadyMock.mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',
       upload_status: 'ready',
@@ -47,7 +52,9 @@ describe('completeUpload', () => {
       },
     })
 
-    expect(doesRecordingRawObjectExistMock).toHaveBeenCalledTimes(2)
+    expect(listRecordingRawObjectKeysMock).toHaveBeenCalledWith(
+      '11111111-1111-4111-8111-111111111111'
+    )
     expect(markRecordingUploadReadyMock).toHaveBeenCalledWith(
       '11111111-1111-4111-8111-111111111111'
     )
@@ -59,10 +66,9 @@ describe('completeUpload', () => {
       upload_status: 'accepted',
       upload_targets: ['acce', 'gyro', 'wifi'],
     })
-    doesRecordingRawObjectExistMock
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false)
-      .mockResolvedValueOnce(false)
+    listRecordingRawObjectKeysMock.mockResolvedValue([
+      'recordings/11111111-1111-4111-8111-111111111111/raw/acce.csv',
+    ])
 
     await expect(
       completeUpload({
@@ -100,7 +106,7 @@ describe('completeUpload', () => {
       },
     })
 
-    expect(doesRecordingRawObjectExistMock).not.toHaveBeenCalled()
+    expect(listRecordingRawObjectKeysMock).not.toHaveBeenCalled()
     expect(markRecordingUploadReadyMock).not.toHaveBeenCalled()
   })
 })

@@ -1,4 +1,4 @@
-import { HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import type { UploadTarget } from '../../schemas/common.js'
 
@@ -102,6 +102,10 @@ export const buildRecordingRawObjectKey = (recordingId: string, target: UploadTa
   return `recordings/${recordingId}/raw/${target}.csv`
 }
 
+export const buildRecordingRawObjectPrefix = (recordingId: string) => {
+  return `recordings/${recordingId}/raw/`
+}
+
 export const issueRecordingUploadUrls = async (
   recordingId: string,
   targets: UploadTarget[],
@@ -129,32 +133,31 @@ export const issueRecordingUploadUrls = async (
   }
 }
 
-export const doesRecordingRawObjectExist = async (recordingId: string, target: UploadTarget) => {
+export const listRecordingRawObjectKeys = async (recordingId: string) => {
   const { config, internalClient } = getS3Context()
+  const prefix = buildRecordingRawObjectPrefix(recordingId)
+  const keys: string[] = []
+  let continuationToken: string | undefined
 
-  try {
-    await internalClient.send(
-      new HeadObjectCommand({
+  do {
+    const response = await internalClient.send(
+      new ListObjectsV2Command({
         Bucket: config.bucket,
-        Key: buildRecordingRawObjectKey(recordingId, target),
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
       })
     )
-    return true
-  } catch (error) {
-    if (
-      error &&
-      typeof error === 'object' &&
-      '$metadata' in error &&
-      error.$metadata &&
-      typeof error.$metadata === 'object' &&
-      'httpStatusCode' in error.$metadata &&
-      error.$metadata.httpStatusCode === 404
-    ) {
-      return false
+
+    for (const object of response.Contents ?? []) {
+      if (object.Key) {
+        keys.push(object.Key)
+      }
     }
 
-    throw error
-  }
+    continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined
+  } while (continuationToken)
+
+  return keys
 }
 
 export const resetS3ClientForTests = () => {

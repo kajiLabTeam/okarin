@@ -2,7 +2,10 @@ import { uploadTargetSchema } from '../schemas/common.js'
 import type { UploadTarget } from '../schemas/common.js'
 import type { RecordingIdParams } from '../schemas/recordings.js'
 import { findRecordingById, markRecordingUploadReady } from '../services/recordings/index.js'
-import { doesRecordingRawObjectExist } from '../services/storage/index.js'
+import {
+  buildRecordingRawObjectKey,
+  listRecordingRawObjectKeys,
+} from '../services/storage/index.js'
 
 export type CompleteUploadError =
   | {
@@ -58,16 +61,11 @@ export const completeUpload = async (params: RecordingIdParams): Promise<Complet
   }
 
   const uploadTargets = recording.upload_targets.map((target) => uploadTargetSchema.parse(target))
-  const existenceResults = await Promise.all(
-    uploadTargets.map(async (target) => ({
-      target,
-      exists: await doesRecordingRawObjectExist(recording.id, target),
-    }))
+  const uploadedKeysList: string[] = await listRecordingRawObjectKeys(recording.id)
+  const uploadedKeys = new Set<string>(uploadedKeysList)
+  const missingTargets = uploadTargets.filter(
+    (target) => !uploadedKeys.has(buildRecordingRawObjectKey(recording.id, target))
   )
-
-  const missingTargets = existenceResults
-    .filter((result) => !result.exists)
-    .map((result) => result.target)
 
   if (missingTargets.length > 0) {
     return {

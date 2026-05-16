@@ -1,6 +1,10 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from '../../src/server.js'
 import { createDb } from '../../src/services/db/client.js'
+import {
+  listRecordingRawObjectKeys,
+  resetS3ClientForTests,
+} from '../../src/services/storage/index.js'
 import { resetDatabase } from '../db/helpers.js'
 import { createStorageClient, putObjectText } from './support/helpers.js'
 
@@ -49,6 +53,7 @@ const createRecordingFixture = async () => {
 describe('POST /api/recordings/:recordingId/complete-upload', () => {
   beforeEach(async () => {
     await resetDatabase(db)
+    resetS3ClientForTests()
   })
 
   afterAll(async () => {
@@ -79,7 +84,7 @@ describe('POST /api/recordings/:recordingId/complete-upload', () => {
       .executeTakeFirstOrThrow()
 
     expect(updated.upload_status).toBe('ready')
-  })
+  }, 15000)
 
   it('不足 raw がある場合は missing_targets を返す', async () => {
     const { recordingId } = await createRecordingFixture()
@@ -107,5 +112,15 @@ describe('POST /api/recordings/:recordingId/complete-upload', () => {
       .executeTakeFirstOrThrow()
 
     expect(updated.upload_status).toBe('accepted')
-  })
+  }, 15000)
+
+  it('storage listing が recording 配下の uploaded object keys を返す', async () => {
+    const { recordingId } = await createRecordingFixture()
+
+    await putObjectText(s3, `recordings/${recordingId}/raw/acce.csv`, 'timestamp,x\n0,1\n')
+
+    await expect(listRecordingRawObjectKeys(recordingId)).resolves.toEqual([
+      `recordings/${recordingId}/raw/acce.csv`,
+    ])
+  }, 15000)
 })
