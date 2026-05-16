@@ -1,0 +1,252 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const {
+  findRecordingByIdMock,
+  insertTrajectoryMock,
+  insertTrajectoryConstraintsMock,
+  markTrajectoryFailedMock,
+  markTrajectoryProcessingMock,
+  issueInternalRecordingRawDownloadUrlsMock,
+  issueInternalTrajectoryResultUploadUrlMock,
+  submitAnalyzeRequestMock,
+  generateCallbackTokenMock,
+} = vi.hoisted(() => ({
+  findRecordingByIdMock: vi.fn(),
+  insertTrajectoryMock: vi.fn(),
+  insertTrajectoryConstraintsMock: vi.fn(),
+  markTrajectoryFailedMock: vi.fn(),
+  markTrajectoryProcessingMock: vi.fn(),
+  issueInternalRecordingRawDownloadUrlsMock: vi.fn(),
+  issueInternalTrajectoryResultUploadUrlMock: vi.fn(),
+  submitAnalyzeRequestMock: vi.fn(),
+  generateCallbackTokenMock: vi.fn(),
+}))
+
+vi.mock('../services/recordings/index.js', () => ({
+  findRecordingById: findRecordingByIdMock,
+}))
+
+vi.mock('../services/trajectories/index.js', () => ({
+  insertTrajectory: insertTrajectoryMock,
+  insertTrajectoryConstraints: insertTrajectoryConstraintsMock,
+  markTrajectoryFailed: markTrajectoryFailedMock,
+  markTrajectoryProcessing: markTrajectoryProcessingMock,
+}))
+
+vi.mock('../services/storage/index.js', () => ({
+  issueInternalRecordingRawDownloadUrls: issueInternalRecordingRawDownloadUrlsMock,
+  issueInternalTrajectoryResultUploadUrl: issueInternalTrajectoryResultUploadUrlMock,
+}))
+
+vi.mock('../services/nozomi/index.js', () => ({
+  submitAnalyzeRequest: submitAnalyzeRequestMock,
+}))
+
+vi.mock('../services/trajectories/callback-token.js', () => ({
+  generateCallbackToken: generateCallbackTokenMock,
+}))
+
+vi.mock('../services/db/index.js', () => ({
+  db: {
+    transaction: () => ({
+      execute: async (callback: (trx: object) => Promise<unknown>) => callback({}),
+    }),
+  },
+}))
+
+import { createTrajectory } from './create-trajectory.js'
+
+describe('createTrajectory', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    process.env.KAEDE_INTERNAL_BASE_URL = 'http://kaede:8080'
+  })
+
+  it('ready な recording から processing trajectory を作成する', async () => {
+    const recordingId = '11111111-1111-4111-8111-111111111111'
+    const trajectoryId = '22222222-2222-4222-8222-222222222222'
+
+    findRecordingByIdMock.mockResolvedValue({
+      id: recordingId,
+      floor_id: '33333333-3333-4333-8333-333333333333',
+      upload_status: 'ready',
+      upload_targets: ['acce', 'gyro'],
+    })
+    insertTrajectoryMock.mockResolvedValue({
+      id: trajectoryId,
+      recording_id: recordingId,
+      floor_id: '33333333-3333-4333-8333-333333333333',
+      status: 'accepted',
+    })
+    insertTrajectoryConstraintsMock.mockResolvedValue(undefined)
+    issueInternalRecordingRawDownloadUrlsMock.mockResolvedValue({
+      expiresAt: '2026-05-17T00:15:00.000Z',
+      rawDataUrls: {
+        acce: 'http://seaweedfs:8333/acce',
+        gyro: 'http://seaweedfs:8333/gyro',
+      },
+    })
+    issueInternalTrajectoryResultUploadUrlMock.mockResolvedValue({
+      expiresAt: '2026-05-17T00:15:00.000Z',
+      uploadUrl: 'http://seaweedfs:8333/result',
+      objectKey: `trajectories/${trajectoryId}/analyzed/result.csv`,
+    })
+    generateCallbackTokenMock.mockReturnValue('signed-callback-token')
+    submitAnalyzeRequestMock.mockResolvedValue({
+      trajectory_id: trajectoryId,
+      status: 'accepted',
+    })
+    markTrajectoryProcessingMock.mockResolvedValue({
+      id: trajectoryId,
+      recording_id: recordingId,
+      status: 'processing',
+    })
+
+    const result = await createTrajectory(
+      { recordingId },
+      {
+        constraints: [],
+      }
+    )
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        trajectory_id: trajectoryId,
+        recording_id: recordingId,
+        status: 'processing',
+      },
+    })
+    expect(insertTrajectoryConstraintsMock).toHaveBeenCalledWith([], {})
+    expect(submitAnalyzeRequestMock).toHaveBeenCalledWith({
+      trajectory_id: trajectoryId,
+      recording_id: recordingId,
+      floor_id: '33333333-3333-4333-8333-333333333333',
+      constraints: [],
+      raw_data_urls: {
+        acce: 'http://seaweedfs:8333/acce',
+        gyro: 'http://seaweedfs:8333/gyro',
+      },
+      result_upload_url: 'http://seaweedfs:8333/result',
+      callback_url: 'http://kaede:8080/api/trajectories/callback',
+      callback_token: 'signed-callback-token',
+    })
+  })
+
+  it('存在しない recording は 404 相当エラーを返す', async () => {
+    findRecordingByIdMock.mockResolvedValue(undefined)
+
+    const result = await createTrajectory(
+      { recordingId: '11111111-1111-4111-8111-111111111111' },
+      { constraints: [] }
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'RECORDING_NOT_FOUND',
+        recordingId: '11111111-1111-4111-8111-111111111111',
+      },
+    })
+  })
+
+  it('ready でない recording は 409 相当エラーを返す', async () => {
+    findRecordingByIdMock.mockResolvedValue({
+      id: '11111111-1111-4111-8111-111111111111',
+      floor_id: '33333333-3333-4333-8333-333333333333',
+      upload_status: 'accepted',
+      upload_targets: ['acce', 'gyro'],
+    })
+
+    const result = await createTrajectory(
+      { recordingId: '11111111-1111-4111-8111-111111111111' },
+      { constraints: [] }
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'RECORDING_NOT_READY',
+        recordingId: '11111111-1111-4111-8111-111111111111',
+        uploadStatus: 'accepted',
+      },
+    })
+  })
+
+  it('壊れた upload_targets は 500 相当エラーを返す', async () => {
+    findRecordingByIdMock.mockResolvedValue({
+      id: '11111111-1111-4111-8111-111111111111',
+      floor_id: '33333333-3333-4333-8333-333333333333',
+      upload_status: 'ready',
+      upload_targets: ['acce'],
+    })
+
+    const result = await createTrajectory(
+      { recordingId: '11111111-1111-4111-8111-111111111111' },
+      { constraints: [] }
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'RECORDING_UPLOAD_TARGETS_INVALID',
+        recordingId: '11111111-1111-4111-8111-111111111111',
+        invalidTargets: ['acce'],
+      },
+    })
+  })
+
+  it('nozomi 依頼失敗時は failed にして 502 相当エラーを返す', async () => {
+    const recordingId = '11111111-1111-4111-8111-111111111111'
+    const trajectoryId = '22222222-2222-4222-8222-222222222222'
+
+    findRecordingByIdMock.mockResolvedValue({
+      id: recordingId,
+      floor_id: '33333333-3333-4333-8333-333333333333',
+      upload_status: 'ready',
+      upload_targets: ['acce', 'gyro'],
+    })
+    insertTrajectoryMock.mockResolvedValue({
+      id: trajectoryId,
+      recording_id: recordingId,
+      floor_id: '33333333-3333-4333-8333-333333333333',
+      status: 'accepted',
+    })
+    insertTrajectoryConstraintsMock.mockResolvedValue(undefined)
+    issueInternalRecordingRawDownloadUrlsMock.mockResolvedValue({
+      expiresAt: '2026-05-17T00:15:00.000Z',
+      rawDataUrls: {
+        acce: 'http://seaweedfs:8333/acce',
+        gyro: 'http://seaweedfs:8333/gyro',
+      },
+    })
+    issueInternalTrajectoryResultUploadUrlMock.mockResolvedValue({
+      expiresAt: '2026-05-17T00:15:00.000Z',
+      uploadUrl: 'http://seaweedfs:8333/result',
+      objectKey: `trajectories/${trajectoryId}/analyzed/result.csv`,
+    })
+    generateCallbackTokenMock.mockReturnValue('signed-callback-token')
+    submitAnalyzeRequestMock.mockRejectedValue(new Error('boom'))
+    markTrajectoryFailedMock.mockResolvedValue({
+      id: trajectoryId,
+      recording_id: recordingId,
+      status: 'failed',
+    })
+
+    const result = await createTrajectory({ recordingId }, { constraints: [] })
+
+    expect(markTrajectoryFailedMock).toHaveBeenCalledWith(
+      trajectoryId,
+      'NOZOMI_REQUEST_FAILED',
+      'failed to submit analyze request to nozomi'
+    )
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'NOZOMI_REQUEST_FAILED',
+        recordingId,
+        trajectoryId,
+      },
+    })
+  })
+})

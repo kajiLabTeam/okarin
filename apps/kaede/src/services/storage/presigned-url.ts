@@ -1,4 +1,9 @@
-import { ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import {
+  GetObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import type { UploadTarget } from '../../schemas/common.js'
 
@@ -7,6 +12,13 @@ const uploadUrlTtlSeconds = 15 * 60
 export interface RecordingUploadUrls {
   acce?: string
   gyro?: string
+  pressure?: string
+  wifi?: string
+}
+
+export interface RecordingRawDownloadUrls {
+  acce: string
+  gyro: string
   pressure?: string
   wifi?: string
 }
@@ -106,6 +118,10 @@ export const buildRecordingRawObjectPrefix = (recordingId: string) => {
   return `recordings/${recordingId}/raw/`
 }
 
+export const buildTrajectoryAnalyzedResultObjectKey = (trajectoryId: string) => {
+  return `trajectories/${trajectoryId}/analyzed/result.csv`
+}
+
 export const issueRecordingUploadUrls = async (
   recordingId: string,
   targets: UploadTarget[],
@@ -158,6 +174,56 @@ export const listRecordingRawObjectKeys = async (recordingId: string) => {
   } while (continuationToken)
 
   return keys
+}
+
+export const issueInternalRecordingRawDownloadUrls = async (
+  recordingId: string,
+  targets: UploadTarget[],
+  now: Date = new Date()
+) => {
+  const { config, internalClient } = getS3Context()
+  const rawDataUrls = {} as RecordingRawDownloadUrls
+
+  await Promise.all(
+    targets.map(async (target) => {
+      rawDataUrls[target] = await getSignedUrl(
+        internalClient,
+        new GetObjectCommand({
+          Bucket: config.bucket,
+          Key: buildRecordingRawObjectKey(recordingId, target),
+        }),
+        { expiresIn: uploadUrlTtlSeconds }
+      )
+    })
+  )
+
+  return {
+    expiresAt: new Date(now.getTime() + uploadUrlTtlSeconds * 1000).toISOString(),
+    rawDataUrls,
+  }
+}
+
+export const issueInternalTrajectoryResultUploadUrl = async (
+  trajectoryId: string,
+  now: Date = new Date()
+) => {
+  const { config, internalClient } = getS3Context()
+  const objectKey = buildTrajectoryAnalyzedResultObjectKey(trajectoryId)
+
+  const uploadUrl = await getSignedUrl(
+    internalClient,
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: objectKey,
+    }),
+    { expiresIn: uploadUrlTtlSeconds }
+  )
+
+  return {
+    expiresAt: new Date(now.getTime() + uploadUrlTtlSeconds * 1000).toISOString(),
+    uploadUrl,
+    objectKey,
+  }
 }
 
 export const resetS3ClientForTests = () => {
