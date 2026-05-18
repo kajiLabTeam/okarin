@@ -21,6 +21,7 @@ export interface DatabaseRuntimeConfig {
 
 export interface NozomiRuntimeConfig {
   internalEndpoint: string
+  requestTimeoutMs: number
 }
 
 export interface StorageRuntimeConfig {
@@ -42,6 +43,7 @@ export interface RuntimeConfig {
 
 const defaultPort = 8080
 const defaultCallbackTokenTtlSeconds = 24 * 60 * 60
+const defaultNozomiRequestTimeoutMs = 10 * 1000
 
 let appRuntimeConfig: AppRuntimeConfig | undefined
 let callbackRuntimeConfig: CallbackRuntimeConfig | undefined
@@ -86,6 +88,10 @@ export const getDatabaseRuntimeConfig = (): DatabaseRuntimeConfig => {
 export const getNozomiRuntimeConfig = (): NozomiRuntimeConfig => {
   nozomiRuntimeConfig ??= {
     internalEndpoint: normalizeBaseUrl(getRequiredEnv('NOZOMI_INTERNAL_ENDPOINT')),
+    requestTimeoutMs: parsePositiveIntegerEnv(
+      'NOZOMI_REQUEST_TIMEOUT_MS',
+      defaultNozomiRequestTimeoutMs
+    ),
   }
 
   return nozomiRuntimeConfig

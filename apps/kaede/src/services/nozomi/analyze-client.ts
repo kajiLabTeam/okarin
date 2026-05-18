@@ -31,15 +31,25 @@ export interface AnalyzeRequestPayload {
   callback_token: string
 }
 
-const getNozomiAnalyzeUrl = () => `${getNozomiRuntimeConfig().internalEndpoint}/analyze`
+const getNozomiAnalyzeConfig = () => {
+  const config = getNozomiRuntimeConfig()
+
+  return {
+    requestTimeoutMs: config.requestTimeoutMs,
+    url: `${config.internalEndpoint}/analyze`,
+  }
+}
 
 export const submitAnalyzeRequest = async (payload: AnalyzeRequestPayload) => {
-  const response = await fetch(getNozomiAnalyzeUrl(), {
+  const { requestTimeoutMs, url } = getNozomiAnalyzeConfig()
+
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
     },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(requestTimeoutMs),
   })
 
   if (!response.ok) {
