@@ -5,6 +5,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { getStorageRuntimeConfig, resetRuntimeConfigForTests } from '../../config/runtime.js'
 import type { UploadTarget } from '../../schemas/common.js'
 
 const uploadUrlTtlSeconds = 15 * 60
@@ -42,29 +43,20 @@ let internalS3Client: S3Client | undefined
 let presignS3Client: S3Client | undefined
 let storageConfig: StorageConfig | undefined
 
-const getRequiredEnv = (name: string) => {
-  const value = process.env[name]
-  if (!value) {
-    throw new Error(`${name} is not set`)
-  }
-
-  return value
-}
-
 const getStorageConfig = (): StorageConfig => {
   if (storageConfig) {
     return storageConfig
   }
 
-  const endpoint = getRequiredEnv('S3_INTERNAL_ENDPOINT')
+  const storage = getStorageRuntimeConfig()
 
   storageConfig = {
-    accessKeyId: getRequiredEnv('S3_ACCESS_KEY_ID'),
-    bucket: getRequiredEnv('S3_BUCKET'),
-    endpoint,
-    publicEndpoint: process.env.S3_PUBLIC_ENDPOINT ?? endpoint,
-    region: getRequiredEnv('S3_REGION'),
-    secretAccessKey: getRequiredEnv('S3_SECRET_ACCESS_KEY'),
+    accessKeyId: storage.accessKeyId,
+    bucket: storage.bucket,
+    endpoint: storage.internalEndpoint,
+    publicEndpoint: storage.publicEndpoint,
+    region: storage.region,
+    secretAccessKey: storage.secretAccessKey,
   }
 
   return storageConfig
@@ -230,4 +222,5 @@ export const resetS3ClientForTests = () => {
   internalS3Client = undefined
   presignS3Client = undefined
   storageConfig = undefined
+  resetRuntimeConfigForTests()
 }

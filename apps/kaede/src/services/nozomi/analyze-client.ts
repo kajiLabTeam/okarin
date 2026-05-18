@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { getNozomiRuntimeConfig } from '../../config/runtime.js'
 
 const analyzeAcceptedResponseSchema = z.object({
   trajectory_id: z.string().uuid(),
@@ -30,20 +31,7 @@ export interface AnalyzeRequestPayload {
   callback_token: string
 }
 
-const getRequiredEnv = (name: string) => {
-  const value = process.env[name]
-  if (!value) {
-    throw new Error(`${name} is not set`)
-  }
-
-  return value
-}
-
-// nozomi analyze API の URL を取得する。環境変数 NOZOMI_INTERNAL_ENDPOINT を基に構築。
-const getNozomiAnalyzeUrl = () => {
-  const endpoint = getRequiredEnv('NOZOMI_INTERNAL_ENDPOINT').replace(/\/+$/, '')
-  return `${endpoint}/analyze`
-}
+const getNozomiAnalyzeUrl = () => `${getNozomiRuntimeConfig().internalEndpoint}/analyze`
 
 export const submitAnalyzeRequest = async (payload: AnalyzeRequestPayload) => {
   const response = await fetch(getNozomiAnalyzeUrl(), {

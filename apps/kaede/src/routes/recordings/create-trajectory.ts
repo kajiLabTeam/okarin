@@ -58,7 +58,8 @@ export const registerCreateTrajectoryRoute = (app: OpenAPIHono) => {
         },
       },
       500: {
-        description: 'recording の内部データ不整合により trajectory を作成できない',
+        description:
+          'recording の内部データ不整合または解析依頼準備失敗により trajectory を作成できない',
         content: {
           'application/json': {
             schema: errorResponseSchema,
@@ -116,6 +117,20 @@ export const registerCreateTrajectoryRoute = (app: OpenAPIHono) => {
           details: {
             recording_id: result.error.recordingId,
             invalid_targets: result.error.invalidTargets,
+          },
+        },
+        500
+      )
+    }
+
+    if (!result.ok && result.error.type === 'TRAJECTORY_ANALYZE_PREPARATION_FAILED') {
+      return c.json(
+        {
+          error_code: result.error.type,
+          error_message: 'failed to prepare analyze request',
+          details: {
+            recording_id: result.error.recordingId,
+            trajectory_id: result.error.trajectoryId,
           },
         },
         500

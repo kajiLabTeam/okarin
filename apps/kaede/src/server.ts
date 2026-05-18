@@ -2,13 +2,15 @@ import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 import { Scalar } from '@scalar/hono-api-reference'
 import * as Sentry from '@sentry/node'
 import { HTTPException } from 'hono/http-exception'
+import { getRuntimeConfig } from './config/runtime.js'
 import { registerApiRoutes } from './routes/index.js'
 
 export const createApp = () => {
   const app = new OpenAPIHono()
-  const deployRef = process.env.APP_DEPLOY_REF ?? 'unknown'
-  const revision = process.env.APP_REVISION ?? 'unknown'
-  const deployedAt = process.env.APP_DEPLOYED_AT ?? 'unknown'
+  const runtimeConfig = getRuntimeConfig()
+  const deployRef = runtimeConfig.app.deployRef
+  const revision = runtimeConfig.app.revision
+  const deployedAt = runtimeConfig.app.deployedAt
 
   app.use(async (_c, next) => {
     Sentry.setTag('service', 'kaede')
@@ -80,7 +82,7 @@ export const createApp = () => {
       })
     )
 
-  const appEnv = process.env.APP_ENV ?? 'local'
+  const appEnv = runtimeConfig.app.env
   if (appEnv === 'local' || appEnv === 'staging') {
     app.get('/debug-sentry', () => {
       throw new Error(`test error for sentry from ${appEnv}`)

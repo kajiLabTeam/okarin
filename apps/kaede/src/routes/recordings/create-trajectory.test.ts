@@ -156,6 +156,41 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
     })
   })
 
+  it('解析依頼準備失敗は 500 を返す', async () => {
+    const recordingId = '11111111-1111-4111-8111-111111111111'
+    const trajectoryId = '22222222-2222-4222-8222-222222222222'
+
+    createTrajectoryMock.mockResolvedValue({
+      ok: false,
+      error: {
+        type: 'TRAJECTORY_ANALYZE_PREPARATION_FAILED',
+        recordingId,
+        trajectoryId,
+      },
+    })
+
+    const app = createRouteTestApp('/recordings', registerCreateTrajectoryRoute)
+    const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        constraints: [],
+      }),
+    })
+
+    expect(response.status).toBe(500)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'TRAJECTORY_ANALYZE_PREPARATION_FAILED',
+      error_message: 'failed to prepare analyze request',
+      details: {
+        recording_id: recordingId,
+        trajectory_id: trajectoryId,
+      },
+    })
+  })
+
   it('不正な constraints は 400 を返し usecase を呼ばない', async () => {
     const recordingId = '11111111-1111-4111-8111-111111111111'
 

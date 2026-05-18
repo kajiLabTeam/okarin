@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { CallbackRuntimeConfig } from '../config/runtime.js'
 
 const {
   findRecordingByIdMock,
@@ -10,6 +11,7 @@ const {
   issueInternalTrajectoryResultUploadUrlMock,
   submitAnalyzeRequestMock,
   generateCallbackTokenMock,
+  getCallbackRuntimeConfigMock,
 } = vi.hoisted(() => ({
   findRecordingByIdMock: vi.fn(),
   insertTrajectoryMock: vi.fn(),
@@ -20,6 +22,11 @@ const {
   issueInternalTrajectoryResultUploadUrlMock: vi.fn(),
   submitAnalyzeRequestMock: vi.fn(),
   generateCallbackTokenMock: vi.fn(),
+  getCallbackRuntimeConfigMock: vi.fn<() => CallbackRuntimeConfig>(),
+}))
+
+vi.mock('@sentry/node', () => ({
+  captureException: vi.fn(),
 }))
 
 vi.mock('../services/recordings/index.js', () => ({
@@ -54,12 +61,20 @@ vi.mock('../services/db/index.js', () => ({
   },
 }))
 
+vi.mock('../config/runtime.js', () => ({
+  getCallbackRuntimeConfig: getCallbackRuntimeConfigMock,
+}))
+
 import { createTrajectory } from './create-trajectory.js'
 
 describe('createTrajectory', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    process.env.KAEDE_INTERNAL_BASE_URL = 'http://kaede:8080'
+    getCallbackRuntimeConfigMock.mockReturnValue({
+      baseUrl: 'http://kaede:8080',
+      tokenSecret: 'test-callback-secret',
+      tokenTtlSeconds: 3600,
+    })
   })
 
   it('ready な recording から processing trajectory を作成する', async () => {
@@ -86,6 +101,11 @@ describe('createTrajectory', () => {
         gyro: 'http://seaweedfs:8333/gyro',
       },
     })
+    markTrajectoryProcessingMock.mockResolvedValue({
+      id: trajectoryId,
+      recording_id: recordingId,
+      status: 'processing',
+    })
     issueInternalTrajectoryResultUploadUrlMock.mockResolvedValue({
       expiresAt: '2026-05-17T00:15:00.000Z',
       uploadUrl: 'http://seaweedfs:8333/result',
@@ -95,11 +115,6 @@ describe('createTrajectory', () => {
     submitAnalyzeRequestMock.mockResolvedValue({
       trajectory_id: trajectoryId,
       status: 'accepted',
-    })
-    markTrajectoryProcessingMock.mockResolvedValue({
-      id: trajectoryId,
-      recording_id: recordingId,
-      status: 'processing',
     })
 
     const result = await createTrajectory(
@@ -118,6 +133,7 @@ describe('createTrajectory', () => {
       },
     })
     expect(insertTrajectoryConstraintsMock).toHaveBeenCalledWith([], {})
+    expect(markTrajectoryProcessingMock).toHaveBeenCalledWith(trajectoryId)
     expect(submitAnalyzeRequestMock).toHaveBeenCalledWith({
       trajectory_id: trajectoryId,
       recording_id: recordingId,
@@ -213,6 +229,11 @@ describe('createTrajectory', () => {
       status: 'accepted',
     })
     insertTrajectoryConstraintsMock.mockResolvedValue(undefined)
+    markTrajectoryProcessingMock.mockResolvedValue({
+      id: trajectoryId,
+      recording_id: recordingId,
+      status: 'processing',
+    })
     issueInternalRecordingRawDownloadUrlsMock.mockResolvedValue({
       expiresAt: '2026-05-17T00:15:00.000Z',
       rawDataUrls: {
@@ -248,5 +269,52 @@ describe('createTrajectory', () => {
         trajectoryId,
       },
     })
+  })
+
+  it('解析依頼準備失敗時は failed にして 500 相当エラーを返す', async () => {
+    const recordingId = '11111111-1111-4111-8111-111111111111'
+    const trajectoryId = '22222222-2222-4222-8222-222222222222'
+
+    findRecordingByIdMock.mockResolvedValue({
+      id: recordingId,
+      floor_id: '33333333-3333-4333-8333-333333333333',
+      upload_status: 'ready',
+      upload_targets: ['acce', 'gyro'],
+    })
+    insertTrajectoryMock.mockResolvedValue({
+      id: trajectoryId,
+      recording_id: recordingId,
+      floor_id: '33333333-3333-4333-8333-333333333333',
+      status: 'accepted',
+    })
+    insertTrajectoryConstraintsMock.mockResolvedValue(undefined)
+    markTrajectoryProcessingMock.mockResolvedValue({
+      id: trajectoryId,
+      recording_id: recordingId,
+      status: 'processing',
+    })
+    issueInternalRecordingRawDownloadUrlsMock.mockRejectedValue(new Error('presign failed'))
+    markTrajectoryFailedMock.mockResolvedValue({
+      id: trajectoryId,
+      recording_id: recordingId,
+      status: 'failed',
+    })
+
+    const result = await createTrajectory({ recordingId }, { constraints: [] })
+
+    expect(markTrajectoryFailedMock).toHaveBeenCalledWith(
+      trajectoryId,
+      'TRAJECTORY_ANALYZE_PREPARATION_FAILED',
+      'failed to prepare analyze request'
+    )
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'TRAJECTORY_ANALYZE_PREPARATION_FAILED',
+        recordingId,
+        trajectoryId,
+      },
+    })
+    expect(submitAnalyzeRequestMock).not.toHaveBeenCalled()
   })
 })

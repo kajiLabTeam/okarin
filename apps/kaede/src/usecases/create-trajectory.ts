@@ -1,3 +1,5 @@
+import * as Sentry from '@sentry/node'
+import { getCallbackRuntimeConfig } from '../config/runtime.js'
 import { uploadTargetsSchema } from '../schemas/common.js'
 import type { RecordingIdParams } from '../schemas/recordings.js'
 import type { CreateTrajectoryRequest } from '../schemas/trajectories.js'
@@ -36,6 +38,11 @@ export type CreateTrajectoryError =
       recordingId: string
       trajectoryId: string
     }
+  | {
+      type: 'TRAJECTORY_ANALYZE_PREPARATION_FAILED'
+      recordingId: string
+      trajectoryId: string
+    }
 
 export type CreateTrajectoryResult =
   | {
@@ -51,19 +58,7 @@ export type CreateTrajectoryResult =
       error: CreateTrajectoryError
     }
 
-const getRequiredEnv = (name: string) => {
-  const value = process.env[name]
-  if (!value) {
-    throw new Error(`${name} is not set`)
-  }
-
-  return value
-}
-
-const getCallbackUrl = () => {
-  const baseUrl = getRequiredEnv('KAEDE_INTERNAL_BASE_URL').replace(/\/+$/, '')
-  return `${baseUrl}/api/trajectories/callback`
-}
+const getCallbackUrl = () => `${getCallbackRuntimeConfig().baseUrl}/api/trajectories/callback`
 
 export const createTrajectory = async (
   params: RecordingIdParams,
@@ -131,15 +126,45 @@ export const createTrajectory = async (
     return insertedTrajectory
   })
 
-  try {
-    const [{ rawDataUrls }, { uploadUrl: resultUploadUrl }, callbackToken] = await Promise.all([
-      issueInternalRecordingRawDownloadUrls(recording.id, uploadTargets.data),
-      issueInternalTrajectoryResultUploadUrl(trajectory.id),
-      Promise.resolve(generateCallbackToken(trajectory.id)),
-    ])
+  const processing = await markTrajectoryProcessing(trajectory.id)
+  if (!processing) {
+    throw new Error('failed to update trajectory status to processing')
+  }
 
+  let rawDataUrls: Awaited<ReturnType<typeof issueInternalRecordingRawDownloadUrls>>['rawDataUrls']
+  let resultUploadUrl: string
+  let callbackToken: string
+
+  try {
+    const [rawDataUrlResult, resultUploadUrlResult, callbackTokenResult] = await Promise.all([
+      issueInternalRecordingRawDownloadUrls(recording.id, uploadTargets.data),
+      issueInternalTrajectoryResultUploadUrl(processing.id),
+      Promise.resolve(generateCallbackToken(processing.id)),
+    ])
+    rawDataUrls = rawDataUrlResult.rawDataUrls
+    resultUploadUrl = resultUploadUrlResult.uploadUrl
+    callbackToken = callbackTokenResult
+  } catch (error) {
+    Sentry.captureException(error)
+    await markTrajectoryFailed(
+      processing.id,
+      'TRAJECTORY_ANALYZE_PREPARATION_FAILED',
+      'failed to prepare analyze request'
+    )
+
+    return {
+      ok: false,
+      error: {
+        type: 'TRAJECTORY_ANALYZE_PREPARATION_FAILED',
+        recordingId: recording.id,
+        trajectoryId: processing.id,
+      },
+    }
+  }
+
+  try {
     const accepted = await submitAnalyzeRequest({
-      trajectory_id: trajectory.id,
+      trajectory_id: processing.id,
       recording_id: recording.id,
       floor_id: recording.floor_id,
       constraints: payload.constraints,
@@ -149,12 +174,13 @@ export const createTrajectory = async (
       callback_token: callbackToken,
     })
 
-    if (accepted.trajectory_id !== trajectory.id) {
+    if (accepted.trajectory_id !== processing.id) {
       throw new Error('unexpected nozomi analyze response')
     }
-  } catch {
+  } catch (error) {
+    Sentry.captureException(error)
     await markTrajectoryFailed(
-      trajectory.id,
+      processing.id,
       'NOZOMI_REQUEST_FAILED',
       'failed to submit analyze request to nozomi'
     )
@@ -164,14 +190,9 @@ export const createTrajectory = async (
       error: {
         type: 'NOZOMI_REQUEST_FAILED',
         recordingId: recording.id,
-        trajectoryId: trajectory.id,
+        trajectoryId: processing.id,
       },
     }
-  }
-
-  const processing = await markTrajectoryProcessing(trajectory.id)
-  if (!processing) {
-    throw new Error('failed to update trajectory status to processing')
   }
 
   return {
