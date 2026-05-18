@@ -84,14 +84,17 @@ export const markTrajectoryFailed = async (
   failedAt: Date = new Date(),
   executor: DbExecutor = db
 ): Promise<Trajectory | undefined> => {
-  return updateTrajectory(
-    trajectoryId,
-    {
+  return executor
+    .updateTable('trajectories')
+    .set({
       status: 'failed',
       error_code: errorCode,
       error_message: errorMessage,
       failed_at: failedAt,
-    },
-    executor
-  )
+    })
+    .where('id', '=', trajectoryId)
+    .where('deleted_at', 'is', null)
+    .where('status', 'in', ['accepted', 'processing'])
+    .returningAll()
+    .executeTakeFirst()
 }
