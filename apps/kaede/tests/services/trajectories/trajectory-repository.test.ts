@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { createDb } from '../../../src/services/db/client.js'
+import { insertRecording } from '../../../src/services/recordings/index.js'
 import {
   insertTrajectory,
   markTrajectoryFailed,
@@ -9,7 +10,7 @@ import { resetDatabase } from '../../db/helpers.js'
 
 const db = createDb()
 
-const createFloorFixture = async () => {
+const createRecordingFixture = async () => {
   const building = await db
     .insertInto('buildings')
     .values({ name: 'Trajectory Building' })
@@ -27,7 +28,22 @@ const createFloorFixture = async () => {
     .returning(['id'])
     .executeTakeFirstOrThrow()
 
-  return floor
+  const pedestrian = await db
+    .insertInto('pedestrians')
+    .defaultValues()
+    .returning(['id'])
+    .executeTakeFirstOrThrow()
+
+  const recording = await insertRecording(
+    {
+      pedestrian_id: pedestrian.id,
+      floor_id: floor.id,
+      upload_targets: ['acce', 'gyro'],
+    },
+    db
+  )
+
+  return { floor, recording }
 }
 
 describe('trajectory repository', () => {
@@ -40,11 +56,11 @@ describe('trajectory repository', () => {
   })
 
   it('accepted を processing に更新できる', async () => {
-    const floor = await createFloorFixture()
+    const { floor, recording } = await createRecordingFixture()
 
     const created = await insertTrajectory(
       {
-        recording_id: '11111111-1111-4111-8111-111111111111',
+        recording_id: recording.id,
         floor_id: floor.id,
         status: 'accepted',
       },
@@ -57,11 +73,11 @@ describe('trajectory repository', () => {
   })
 
   it('completed は failed に更新しない', async () => {
-    const floor = await createFloorFixture()
+    const { floor, recording } = await createRecordingFixture()
 
     const created = await insertTrajectory(
       {
-        recording_id: '11111111-1111-4111-8111-111111111111',
+        recording_id: recording.id,
         floor_id: floor.id,
         status: 'completed',
       },
