@@ -35,6 +35,9 @@ describe('storage presigned url service', () => {
       publicEndpoint: 'http://127.0.0.1:8333',
       region: 'us-east-1',
       bucket: 'okarin-local',
+      recordingUploadUrlTtlSeconds: 900,
+      trajectoryRawDownloadUrlTtlSeconds: 86400,
+      trajectoryResultUploadUrlTtlSeconds: 86400,
     })
 
     const recordingId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
