@@ -1,12 +1,23 @@
-import { ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import {
+  GetObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { getStorageRuntimeConfig, resetRuntimeConfigForTests } from '../../config/runtime.js'
 import type { UploadTarget } from '../../schemas/common.js'
-
-const uploadUrlTtlSeconds = 15 * 60
 
 export interface RecordingUploadUrls {
   acce?: string
   gyro?: string
+  pressure?: string
+  wifi?: string
+}
+
+export interface RecordingRawDownloadUrls {
+  acce: string
+  gyro: string
   pressure?: string
   wifi?: string
 }
@@ -17,7 +28,10 @@ interface StorageConfig {
   endpoint: string
   publicEndpoint: string
   region: string
+  recordingUploadUrlTtlSeconds: number
   secretAccessKey: string
+  trajectoryRawDownloadUrlTtlSeconds: number
+  trajectoryResultUploadUrlTtlSeconds: number
 }
 
 interface S3Context {
@@ -30,29 +44,23 @@ let internalS3Client: S3Client | undefined
 let presignS3Client: S3Client | undefined
 let storageConfig: StorageConfig | undefined
 
-const getRequiredEnv = (name: string) => {
-  const value = process.env[name]
-  if (!value) {
-    throw new Error(`${name} is not set`)
-  }
-
-  return value
-}
-
 const getStorageConfig = (): StorageConfig => {
   if (storageConfig) {
     return storageConfig
   }
 
-  const endpoint = getRequiredEnv('S3_INTERNAL_ENDPOINT')
+  const storage = getStorageRuntimeConfig()
 
   storageConfig = {
-    accessKeyId: getRequiredEnv('S3_ACCESS_KEY_ID'),
-    bucket: getRequiredEnv('S3_BUCKET'),
-    endpoint,
-    publicEndpoint: process.env.S3_PUBLIC_ENDPOINT ?? endpoint,
-    region: getRequiredEnv('S3_REGION'),
-    secretAccessKey: getRequiredEnv('S3_SECRET_ACCESS_KEY'),
+    accessKeyId: storage.accessKeyId,
+    bucket: storage.bucket,
+    endpoint: storage.internalEndpoint,
+    publicEndpoint: storage.publicEndpoint,
+    region: storage.region,
+    recordingUploadUrlTtlSeconds: storage.recordingUploadUrlTtlSeconds,
+    secretAccessKey: storage.secretAccessKey,
+    trajectoryRawDownloadUrlTtlSeconds: storage.trajectoryRawDownloadUrlTtlSeconds,
+    trajectoryResultUploadUrlTtlSeconds: storage.trajectoryResultUploadUrlTtlSeconds,
   }
 
   return storageConfig
@@ -106,6 +114,10 @@ export const buildRecordingRawObjectPrefix = (recordingId: string) => {
   return `recordings/${recordingId}/raw/`
 }
 
+export const buildTrajectoryAnalyzedResultObjectKey = (trajectoryId: string) => {
+  return `trajectories/${trajectoryId}/analyzed/result.csv`
+}
+
 export const issueRecordingUploadUrls = async (
   recordingId: string,
   targets: UploadTarget[],
@@ -122,13 +134,13 @@ export const issueRecordingUploadUrls = async (
           Bucket: config.bucket,
           Key: buildRecordingRawObjectKey(recordingId, target),
         }),
-        { expiresIn: uploadUrlTtlSeconds }
+        { expiresIn: config.recordingUploadUrlTtlSeconds }
       )
     })
   )
 
   return {
-    expiresAt: new Date(now.getTime() + uploadUrlTtlSeconds * 1000).toISOString(),
+    expiresAt: new Date(now.getTime() + config.recordingUploadUrlTtlSeconds * 1000).toISOString(),
     uploadUrls,
   }
 }
@@ -160,8 +172,99 @@ export const listRecordingRawObjectKeys = async (recordingId: string) => {
   return keys
 }
 
+export const issueInternalRecordingRawDownloadUrls = async (
+  recordingId: string,
+  targets: UploadTarget[],
+  now: Date = new Date()
+) => {
+  const { config, internalClient } = getS3Context()
+
+  if (!targets.includes('acce') || !targets.includes('gyro')) {
+    throw new Error('recording raw download URLs require acce and gyro targets')
+  }
+
+  const [acceUrl, gyroUrl] = await Promise.all([
+    getSignedUrl(
+      internalClient,
+      new GetObjectCommand({
+        Bucket: config.bucket,
+        Key: buildRecordingRawObjectKey(recordingId, 'acce'),
+      }),
+      { expiresIn: config.trajectoryRawDownloadUrlTtlSeconds }
+    ),
+    getSignedUrl(
+      internalClient,
+      new GetObjectCommand({
+        Bucket: config.bucket,
+        Key: buildRecordingRawObjectKey(recordingId, 'gyro'),
+      }),
+      { expiresIn: config.trajectoryRawDownloadUrlTtlSeconds }
+    ),
+  ])
+
+  const rawDataUrls: RecordingRawDownloadUrls = {
+    acce: acceUrl,
+    gyro: gyroUrl,
+  }
+
+  if (targets.includes('pressure')) {
+    rawDataUrls.pressure = await getSignedUrl(
+      internalClient,
+      new GetObjectCommand({
+        Bucket: config.bucket,
+        Key: buildRecordingRawObjectKey(recordingId, 'pressure'),
+      }),
+      { expiresIn: config.trajectoryRawDownloadUrlTtlSeconds }
+    )
+  }
+
+  if (targets.includes('wifi')) {
+    rawDataUrls.wifi = await getSignedUrl(
+      internalClient,
+      new GetObjectCommand({
+        Bucket: config.bucket,
+        Key: buildRecordingRawObjectKey(recordingId, 'wifi'),
+      }),
+      { expiresIn: config.trajectoryRawDownloadUrlTtlSeconds }
+    )
+  }
+
+  return {
+    expiresAt: new Date(
+      now.getTime() + config.trajectoryRawDownloadUrlTtlSeconds * 1000
+    ).toISOString(),
+    rawDataUrls,
+  }
+}
+
+export const issueInternalTrajectoryResultUploadUrl = async (
+  trajectoryId: string,
+  now: Date = new Date()
+) => {
+  const { config, internalClient } = getS3Context()
+  const objectKey = buildTrajectoryAnalyzedResultObjectKey(trajectoryId)
+
+  const uploadUrl = await getSignedUrl(
+    internalClient,
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: objectKey,
+    }),
+    { expiresIn: config.trajectoryResultUploadUrlTtlSeconds }
+  )
+
+  return {
+    expiresAt: new Date(
+      now.getTime() + config.trajectoryResultUploadUrlTtlSeconds * 1000
+    ).toISOString(),
+    uploadUrl,
+    objectKey,
+  }
+}
+
 export const resetS3ClientForTests = () => {
   internalS3Client = undefined
   presignS3Client = undefined
   storageConfig = undefined
+  resetRuntimeConfigForTests()
 }

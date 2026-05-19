@@ -58,45 +58,51 @@ export const registerRefreshUploadUrlsRoute = (app: OpenAPIHono) => {
     const payload = c.req.valid('json')
     const result = await refreshUploadUrls(params, payload)
 
-    if (!result.ok && result.error.type === 'RECORDING_NOT_FOUND') {
-      return c.json(
-        {
-          error_code: result.error.type,
-          error_message: 'recording not found',
-          details: {
-            recording_id: result.error.recordingId,
-          },
-        },
-        404
-      )
-    }
+    if (!result.ok) {
+      switch (result.error.type) {
+        case 'RECORDING_NOT_FOUND':
+          return c.json(
+            {
+              error_code: result.error.type,
+              error_message: 'recording not found',
+              details: {
+                recording_id: result.error.recordingId,
+              },
+            },
+            404
+          )
 
-    if (!result.ok && result.error.type === 'RECORDING_UPLOAD_URL_REFRESH_FORBIDDEN') {
-      return c.json(
-        {
-          error_code: result.error.type,
-          error_message: 'upload url refresh is not allowed in the current upload state',
-          details: {
-            recording_id: result.error.recordingId,
-            upload_status: result.error.uploadStatus,
-          },
-        },
-        409
-      )
-    }
+        case 'RECORDING_UPLOAD_URL_REFRESH_FORBIDDEN':
+          return c.json(
+            {
+              error_code: result.error.type,
+              error_message: 'upload url refresh is not allowed in the current upload state',
+              details: {
+                recording_id: result.error.recordingId,
+                upload_status: result.error.uploadStatus,
+              },
+            },
+            409
+          )
 
-    if (!result.ok && result.error.type === 'RECORDING_UPLOAD_TARGETS_INVALID') {
-      return c.json(
-        {
-          error_code: result.error.type,
-          error_message: 'requested targets are not allowed for this recording',
-          details: {
-            recording_id: result.error.recordingId,
-            invalid_targets: result.error.invalidTargets,
-          },
-        },
-        409
-      )
+        case 'RECORDING_UPLOAD_TARGETS_INVALID':
+          return c.json(
+            {
+              error_code: result.error.type,
+              error_message: 'requested targets are not allowed for this recording',
+              details: {
+                recording_id: result.error.recordingId,
+                invalid_targets: result.error.invalidTargets,
+              },
+            },
+            409
+          )
+
+        default: {
+          const exhaustiveCheck: never = result.error
+          throw new Error(`unhandled refresh-upload-urls error: ${JSON.stringify(exhaustiveCheck)}`)
+        }
+      }
     }
 
     return c.json(result.value, 200)

@@ -53,63 +53,64 @@ export const registerCompleteUploadRoute = (app: OpenAPIHono) => {
     const params = c.req.valid('param')
     const result = await completeUpload(params)
 
-    if (!result.ok && result.error.type === 'RECORDING_NOT_FOUND') {
-      return c.json(
-        {
-          error_code: result.error.type,
-          error_message: 'recording not found',
-          details: {
-            recording_id: result.error.recordingId,
-          },
-        },
-        404
-      )
-    }
-
-    if (!result.ok && result.error.type === 'UPLOAD_TARGETS_MISSING') {
-      return c.json(
-        {
-          error_code: result.error.type,
-          error_message: 'some upload targets are missing',
-          details: {
-            recording_id: result.error.recordingId,
-            missing_targets: result.error.missingTargets,
-          },
-        },
-        409
-      )
-    }
-
-    if (!result.ok && result.error.type === 'RECORDING_UPLOAD_FINALIZED') {
-      return c.json(
-        {
-          error_code: result.error.type,
-          error_message: 'recording is already in a terminal upload state',
-          details: {
-            recording_id: result.error.recordingId,
-            upload_status: result.error.uploadStatus,
-          },
-        },
-        409
-      )
-    }
-
-    if (!result.ok && result.error.type === 'RECORDING_UPLOAD_TARGETS_INVALID') {
-      return c.json(
-        {
-          error_code: result.error.type,
-          error_message: 'recording upload_targets contains invalid values',
-          details: {
-            recording_id: result.error.recordingId,
-            invalid_targets: result.error.invalidTargets,
-          },
-        },
-        500
-      )
-    }
-
     if (!result.ok) {
-      throw new Error('unreachable complete-upload result')
+      switch (result.error.type) {
+        case 'RECORDING_NOT_FOUND':
+          return c.json(
+            {
+              error_code: result.error.type,
+              error_message: 'recording not found',
+              details: {
+                recording_id: result.error.recordingId,
+              },
+            },
+            404
+          )
+
+        case 'UPLOAD_TARGETS_MISSING':
+          return c.json(
+            {
+              error_code: result.error.type,
+              error_message: 'some upload targets are missing',
+              details: {
+                recording_id: result.error.recordingId,
+                missing_targets: result.error.missingTargets,
+              },
+            },
+            409
+          )
+
+        case 'RECORDING_UPLOAD_FINALIZED':
+          return c.json(
+            {
+              error_code: result.error.type,
+              error_message: 'recording is already in a terminal upload state',
+              details: {
+                recording_id: result.error.recordingId,
+                upload_status: result.error.uploadStatus,
+              },
+            },
+            409
+          )
+
+        case 'RECORDING_UPLOAD_TARGETS_INVALID':
+          return c.json(
+            {
+              error_code: result.error.type,
+              error_message: 'recording upload_targets contains invalid values',
+              details: {
+                recording_id: result.error.recordingId,
+                invalid_targets: result.error.invalidTargets,
+              },
+            },
+            500
+          )
+
+        default: {
+          const exhaustiveCheck: never = result.error
+          throw new Error(`unhandled complete-upload error: ${JSON.stringify(exhaustiveCheck)}`)
+        }
+      }
     }
 
     return c.json(result.value, 200)

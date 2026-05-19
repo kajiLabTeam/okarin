@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createRouteTestApp } from '../create-route-test-app.js'
+import { registerInitRecordingRoute } from './init-recording.js'
 
 const { initRecordingMock } = vi.hoisted(() => ({
   initRecordingMock: vi.fn(),
@@ -7,16 +9,6 @@ const { initRecordingMock } = vi.hoisted(() => ({
 vi.mock('../../usecases/init-recording.js', () => ({
   initRecording: initRecordingMock,
 }))
-
-vi.mock('../../usecases/refresh-upload-urls.js', () => ({
-  refreshUploadUrls: vi.fn(),
-}))
-
-vi.mock('../../usecases/complete-upload.js', () => ({
-  completeUpload: vi.fn(),
-}))
-
-import { createApp } from '../../server.js'
 
 describe('POST /api/recordings/init', () => {
   beforeEach(() => {
@@ -41,7 +33,7 @@ describe('POST /api/recordings/init', () => {
       },
     })
 
-    const app = createApp()
+    const app = createRouteTestApp('/recordings', registerInitRecordingRoute)
     const response = await app.request('/api/recordings/init', {
       method: 'POST',
       headers: {
@@ -84,7 +76,7 @@ describe('POST /api/recordings/init', () => {
       },
     })
 
-    const app = createApp()
+    const app = createRouteTestApp('/recordings', registerInitRecordingRoute)
     const response = await app.request('/api/recordings/init', {
       method: 'POST',
       headers: {
@@ -119,7 +111,7 @@ describe('POST /api/recordings/init', () => {
       },
     })
 
-    const app = createApp()
+    const app = createRouteTestApp('/recordings', registerInitRecordingRoute)
     const response = await app.request('/api/recordings/init', {
       method: 'POST',
       headers: {
@@ -146,7 +138,7 @@ describe('POST /api/recordings/init', () => {
     const pedestrianId = '11111111-1111-4111-8111-111111111111'
     const floorId = '22222222-2222-4222-8222-222222222222'
 
-    const app = createApp()
+    const app = createRouteTestApp('/recordings', registerInitRecordingRoute)
     const response = await app.request('/api/recordings/init', {
       method: 'POST',
       headers: {

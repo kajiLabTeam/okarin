@@ -1,22 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createRouteTestApp } from '../create-route-test-app.js'
+import { registerCompleteUploadRoute } from './complete-upload.js'
 
 const { completeUploadMock } = vi.hoisted(() => ({
   completeUploadMock: vi.fn(),
 }))
 
-vi.mock('../../usecases/init-recording.js', () => ({
-  initRecording: vi.fn(),
-}))
-
-vi.mock('../../usecases/refresh-upload-urls.js', () => ({
-  refreshUploadUrls: vi.fn(),
-}))
-
 vi.mock('../../usecases/complete-upload.js', () => ({
   completeUpload: completeUploadMock,
 }))
-
-import { createApp } from '../../server.js'
 
 describe('POST /api/recordings/:recordingId/complete-upload', () => {
   beforeEach(() => {
@@ -34,7 +26,7 @@ describe('POST /api/recordings/:recordingId/complete-upload', () => {
       },
     })
 
-    const app = createApp()
+    const app = createRouteTestApp('/recordings', registerCompleteUploadRoute)
     const response = await app.request(`/api/recordings/${recordingId}/complete-upload`, {
       method: 'POST',
     })
@@ -61,7 +53,7 @@ describe('POST /api/recordings/:recordingId/complete-upload', () => {
       },
     })
 
-    const app = createApp()
+    const app = createRouteTestApp('/recordings', registerCompleteUploadRoute)
     const response = await app.request(`/api/recordings/${recordingId}/complete-upload`, {
       method: 'POST',
     })
@@ -89,7 +81,7 @@ describe('POST /api/recordings/:recordingId/complete-upload', () => {
       },
     })
 
-    const app = createApp()
+    const app = createRouteTestApp('/recordings', registerCompleteUploadRoute)
     const response = await app.request(`/api/recordings/${recordingId}/complete-upload`, {
       method: 'POST',
     })
@@ -116,7 +108,7 @@ describe('POST /api/recordings/:recordingId/complete-upload', () => {
       },
     })
 
-    const app = createApp()
+    const app = createRouteTestApp('/recordings', registerCompleteUploadRoute)
     const response = await app.request(`/api/recordings/${recordingId}/complete-upload`, {
       method: 'POST',
     })
@@ -143,7 +135,7 @@ describe('POST /api/recordings/:recordingId/complete-upload', () => {
       },
     })
 
-    const app = createApp()
+    const app = createRouteTestApp('/recordings', registerCompleteUploadRoute)
     const response = await app.request(`/api/recordings/${recordingId}/complete-upload`, {
       method: 'POST',
     })
@@ -160,7 +152,7 @@ describe('POST /api/recordings/:recordingId/complete-upload', () => {
   })
 
   it('不正な path は 400 を返し usecase を呼ばない', async () => {
-    const app = createApp()
+    const app = createRouteTestApp('/recordings', registerCompleteUploadRoute)
     const response = await app.request('/api/recordings/not-a-uuid/complete-upload', {
       method: 'POST',
     })

@@ -1,26 +1,22 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { StorageRuntimeConfig } from '../../config/runtime.js'
 import {
   buildRecordingRawObjectKey,
   issueRecordingUploadUrls,
   resetS3ClientForTests,
 } from './index.js'
 
-const originalEnv = {
-  S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID,
-  S3_BUCKET: process.env.S3_BUCKET,
-  S3_INTERNAL_ENDPOINT: process.env.S3_INTERNAL_ENDPOINT,
-  S3_PUBLIC_ENDPOINT: process.env.S3_PUBLIC_ENDPOINT,
-  S3_REGION: process.env.S3_REGION,
-  S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
-}
+const { getStorageRuntimeConfigMock } = vi.hoisted(() => ({
+  getStorageRuntimeConfigMock: vi.fn<() => StorageRuntimeConfig>(),
+}))
+
+vi.mock('../../config/runtime.js', () => ({
+  getStorageRuntimeConfig: getStorageRuntimeConfigMock,
+  resetRuntimeConfigForTests: vi.fn(),
+}))
 
 afterEach(() => {
-  process.env.S3_ACCESS_KEY_ID = originalEnv.S3_ACCESS_KEY_ID
-  process.env.S3_BUCKET = originalEnv.S3_BUCKET
-  process.env.S3_INTERNAL_ENDPOINT = originalEnv.S3_INTERNAL_ENDPOINT
-  process.env.S3_PUBLIC_ENDPOINT = originalEnv.S3_PUBLIC_ENDPOINT
-  process.env.S3_REGION = originalEnv.S3_REGION
-  process.env.S3_SECRET_ACCESS_KEY = originalEnv.S3_SECRET_ACCESS_KEY
+  vi.clearAllMocks()
   resetS3ClientForTests()
 })
 
@@ -32,12 +28,17 @@ describe('storage presigned url service', () => {
   })
 
   it('PUT 用の署名付き URL を生成できる', async () => {
-    process.env.S3_ACCESS_KEY_ID = 'kaede-test'
-    process.env.S3_SECRET_ACCESS_KEY = 'kaede-secret'
-    process.env.S3_INTERNAL_ENDPOINT = 'http://seaweedfs:8333'
-    process.env.S3_PUBLIC_ENDPOINT = 'http://127.0.0.1:8333'
-    process.env.S3_REGION = 'us-east-1'
-    process.env.S3_BUCKET = 'okarin-local'
+    getStorageRuntimeConfigMock.mockReturnValue({
+      accessKeyId: 'kaede-test',
+      secretAccessKey: 'kaede-secret',
+      internalEndpoint: 'http://seaweedfs:8333',
+      publicEndpoint: 'http://127.0.0.1:8333',
+      region: 'us-east-1',
+      bucket: 'okarin-local',
+      recordingUploadUrlTtlSeconds: 900,
+      trajectoryRawDownloadUrlTtlSeconds: 86400,
+      trajectoryResultUploadUrlTtlSeconds: 86400,
+    })
 
     const recordingId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
     const now = new Date('2026-05-13T00:00:00.000Z')

@@ -1,11 +1,12 @@
 import '../instrument.mjs'
 import { serve } from '@hono/node-server'
+import { validateRuntimeConfig } from './config/runtime.js'
 import { createApp } from './server.js'
 
+const runtimeConfig = validateRuntimeConfig()
 const app = createApp()
-const parsedPort = Number.parseInt(process.env.PORT ?? '8080', 10)
-const port = Number.isNaN(parsedPort) ? 8080 : parsedPort
-const host = process.env.HOST ?? '0.0.0.0'
+const port = runtimeConfig.app.port
+const host = runtimeConfig.app.host
 
 serve(
   {

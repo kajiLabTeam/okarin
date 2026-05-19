@@ -1,12 +1,12 @@
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
-import { errorResponseSchema, notImplementedResponseSchema } from '../../schemas/common.js'
+import { errorResponseSchema } from '../../schemas/common.js'
 import { recordingIdParamsSchema } from '../../schemas/recordings.js'
 import {
   createTrajectoryRequestSchema,
   createTrajectoryResponseSchema,
 } from '../../schemas/trajectories.js'
-import { notImplemented } from '../../utils/not-implemented.js'
+import { createTrajectory } from '../../usecases/create-trajectory.js'
 
 export const registerCreateTrajectoryRoute = (app: OpenAPIHono) => {
   const route = createRoute({
@@ -33,6 +33,14 @@ export const registerCreateTrajectoryRoute = (app: OpenAPIHono) => {
           },
         },
       },
+      400: {
+        description: 'constraints などの request 内容が不正',
+        content: {
+          'application/json': {
+            schema: errorResponseSchema,
+          },
+        },
+      },
       404: {
         description: 'recording が存在しない',
         content: {
@@ -49,8 +57,9 @@ export const registerCreateTrajectoryRoute = (app: OpenAPIHono) => {
           },
         },
       },
-      422: {
-        description: 'constraints などの request 内容が不正',
+      500: {
+        description:
+          'recording の内部データ不整合または解析依頼準備失敗により trajectory を作成できない',
         content: {
           'application/json': {
             schema: errorResponseSchema,
@@ -65,25 +74,87 @@ export const registerCreateTrajectoryRoute = (app: OpenAPIHono) => {
           },
         },
       },
-      501: {
-        description: 'not implemented',
-        content: {
-          'application/json': {
-            schema: notImplementedResponseSchema,
-          },
-        },
-      },
     },
   })
 
-  app.openapi(route, (c) => {
-    c.req.valid('param')
-    c.req.valid('json')
+  app.openapi(route, async (c) => {
+    const params = c.req.valid('param')
+    const body = c.req.valid('json')
+    const result = await createTrajectory(params, body)
 
-    return notImplemented(
-      c,
-      'POST /api/recordings/:recordingId/trajectories',
-      'trajectory を作成して解析を開始する'
-    )
+    if (!result.ok) {
+      switch (result.error.type) {
+        case 'RECORDING_NOT_FOUND':
+          return c.json(
+            {
+              error_code: result.error.type,
+              error_message: 'recording not found',
+              details: {
+                recording_id: result.error.recordingId,
+              },
+            },
+            404
+          )
+
+        case 'RECORDING_NOT_READY':
+          return c.json(
+            {
+              error_code: result.error.type,
+              error_message: 'recording is not ready for trajectory creation',
+              details: {
+                recording_id: result.error.recordingId,
+                upload_status: result.error.uploadStatus,
+              },
+            },
+            409
+          )
+
+        case 'RECORDING_UPLOAD_TARGETS_INVALID':
+          return c.json(
+            {
+              error_code: result.error.type,
+              error_message: 'recording upload_targets contains invalid values',
+              details: {
+                recording_id: result.error.recordingId,
+                invalid_targets: result.error.invalidTargets,
+              },
+            },
+            500
+          )
+
+        case 'TRAJECTORY_ANALYZE_PREPARATION_FAILED':
+          return c.json(
+            {
+              error_code: result.error.type,
+              error_message: 'failed to prepare analyze request',
+              details: {
+                recording_id: result.error.recordingId,
+                trajectory_id: result.error.trajectoryId,
+              },
+            },
+            500
+          )
+
+        case 'NOZOMI_REQUEST_FAILED':
+          return c.json(
+            {
+              error_code: result.error.type,
+              error_message: 'failed to submit analyze request to nozomi',
+              details: {
+                recording_id: result.error.recordingId,
+                trajectory_id: result.error.trajectoryId,
+              },
+            },
+            502
+          )
+
+        default: {
+          const exhaustiveCheck: never = result.error
+          throw new Error(`unhandled create-trajectory error: ${JSON.stringify(exhaustiveCheck)}`)
+        }
+      }
+    }
+
+    return c.json(result.value, 201)
   })
 }
