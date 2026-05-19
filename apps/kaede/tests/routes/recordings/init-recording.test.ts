@@ -3,36 +3,10 @@ import { initRecordingResponseSchema } from '../../../src/schemas/recordings.js'
 import { createApp } from '../../../src/server.js'
 import { createDb } from '../../../src/services/db/client.js'
 import { resetDatabase } from '../../db/helpers.js'
+import { createRecordingFixture } from '../../fixtures/recordings.js'
 
 const db = createDb()
 const app = createApp()
-
-const createRecordingFixture = async () => {
-  const building = await db
-    .insertInto('buildings')
-    .values({ name: 'Fixture Building' })
-    .returning(['id'])
-    .executeTakeFirstOrThrow()
-
-  const floor = await db
-    .insertInto('floors')
-    .values({
-      building_id: building.id,
-      level: 3,
-      name: '3F',
-      image_object_path: `maps/${building.id}/33333333-3333-4333-8333-333333333333.png`,
-    })
-    .returning(['id'])
-    .executeTakeFirstOrThrow()
-
-  const pedestrian = await db
-    .insertInto('pedestrians')
-    .defaultValues()
-    .returning(['id'])
-    .executeTakeFirstOrThrow()
-
-  return { floorId: floor.id, pedestrianId: pedestrian.id }
-}
 
 describe('POST /api/recordings/init', () => {
   beforeEach(async () => {
@@ -44,7 +18,7 @@ describe('POST /api/recordings/init', () => {
   })
 
   it('recording を作成しアップロード URL を返す', async () => {
-    const { floorId, pedestrianId } = await createRecordingFixture()
+    const { floorId, pedestrianId } = await createRecordingFixture(db)
 
     const response = await app.request('/api/recordings/init', {
       method: 'POST',
@@ -89,7 +63,7 @@ describe('POST /api/recordings/init', () => {
   })
 
   it('存在しない pedestrian_id は 404 を返す', async () => {
-    const { floorId } = await createRecordingFixture()
+    const { floorId } = await createRecordingFixture(db)
 
     const response = await app.request('/api/recordings/init', {
       method: 'POST',
@@ -114,7 +88,7 @@ describe('POST /api/recordings/init', () => {
   })
 
   it('存在しない floor_id は 404 を返す', async () => {
-    const { pedestrianId } = await createRecordingFixture()
+    const { pedestrianId } = await createRecordingFixture(db)
 
     const response = await app.request('/api/recordings/init', {
       method: 'POST',

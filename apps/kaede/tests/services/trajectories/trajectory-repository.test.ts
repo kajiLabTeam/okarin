@@ -1,50 +1,14 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { createDb } from '../../../src/services/db/client.js'
-import { insertRecording } from '../../../src/services/recordings/index.js'
 import {
   insertTrajectory,
   markTrajectoryFailed,
   markTrajectoryProcessing,
 } from '../../../src/services/trajectories/index.js'
 import { resetDatabase } from '../../db/helpers.js'
+import { createRecordingFixture } from '../../fixtures/recordings.js'
 
 const db = createDb()
-
-const createRecordingFixture = async () => {
-  const building = await db
-    .insertInto('buildings')
-    .values({ name: 'Trajectory Building' })
-    .returning(['id'])
-    .executeTakeFirstOrThrow()
-
-  const floor = await db
-    .insertInto('floors')
-    .values({
-      building_id: building.id,
-      level: 1,
-      name: '1F',
-      image_object_path: `maps/${building.id}/11111111-1111-4111-8111-111111111111.png`,
-    })
-    .returning(['id'])
-    .executeTakeFirstOrThrow()
-
-  const pedestrian = await db
-    .insertInto('pedestrians')
-    .defaultValues()
-    .returning(['id'])
-    .executeTakeFirstOrThrow()
-
-  const recording = await insertRecording(
-    {
-      pedestrian_id: pedestrian.id,
-      floor_id: floor.id,
-      upload_targets: ['acce', 'gyro'],
-    },
-    db
-  )
-
-  return { floor, recording }
-}
 
 describe('trajectory repository', () => {
   beforeEach(async () => {
@@ -56,7 +20,12 @@ describe('trajectory repository', () => {
   })
 
   it('accepted を processing に更新できる', async () => {
-    const { floor, recording } = await createRecordingFixture()
+    const { floor, recording } = await createRecordingFixture(db, {
+      uploadTargets: ['acce', 'gyro'],
+      floorLevel: 1,
+      floorName: '1F',
+      buildingName: 'Trajectory Building',
+    })
 
     const created = await insertTrajectory(
       {
@@ -73,7 +42,12 @@ describe('trajectory repository', () => {
   })
 
   it('completed は failed に更新しない', async () => {
-    const { floor, recording } = await createRecordingFixture()
+    const { floor, recording } = await createRecordingFixture(db, {
+      uploadTargets: ['acce', 'gyro'],
+      floorLevel: 1,
+      floorName: '1F',
+      buildingName: 'Trajectory Building',
+    })
 
     const created = await insertTrajectory(
       {

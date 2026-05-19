@@ -3,49 +3,10 @@ import { refreshUploadUrlsResponseSchema } from '../../../src/schemas/recordings
 import { createApp } from '../../../src/server.js'
 import { createDb } from '../../../src/services/db/client.js'
 import { resetDatabase } from '../../db/helpers.js'
+import { createRecordingFixture } from '../../fixtures/recordings.js'
 
 const db = createDb()
 const app = createApp()
-
-const createRecordingFixture = async (
-  uploadStatus: 'accepted' | 'ready' | 'failed' = 'accepted'
-) => {
-  const building = await db
-    .insertInto('buildings')
-    .values({ name: 'Fixture Building' })
-    .returning(['id'])
-    .executeTakeFirstOrThrow()
-
-  const floor = await db
-    .insertInto('floors')
-    .values({
-      building_id: building.id,
-      level: 3,
-      name: '3F',
-      image_object_path: `maps/${building.id}/33333333-3333-4333-8333-333333333333.png`,
-    })
-    .returning(['id'])
-    .executeTakeFirstOrThrow()
-
-  const pedestrian = await db
-    .insertInto('pedestrians')
-    .defaultValues()
-    .returning(['id'])
-    .executeTakeFirstOrThrow()
-
-  const recording = await db
-    .insertInto('recordings')
-    .values({
-      pedestrian_id: pedestrian.id,
-      floor_id: floor.id,
-      upload_status: uploadStatus,
-      upload_targets: ['acce', 'gyro', 'wifi'],
-    })
-    .returning(['id'])
-    .executeTakeFirstOrThrow()
-
-  return { recordingId: recording.id }
-}
 
 describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
   beforeEach(async () => {
@@ -57,7 +18,10 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
   })
 
   it('accepted な recording に対して upload URL を再発行する', async () => {
-    const { recordingId } = await createRecordingFixture('accepted')
+    const { recordingId } = await createRecordingFixture(db, {
+      uploadStatus: 'accepted',
+      uploadTargets: ['acce', 'gyro', 'wifi'],
+    })
 
     const response = await app.request(`/api/recordings/${recordingId}/refresh-upload-urls`, {
       method: 'POST',
@@ -109,7 +73,10 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
   })
 
   it('accepted 以外の recording は 409 を返す', async () => {
-    const { recordingId } = await createRecordingFixture('ready')
+    const { recordingId } = await createRecordingFixture(db, {
+      uploadStatus: 'ready',
+      uploadTargets: ['acce', 'gyro', 'wifi'],
+    })
 
     const response = await app.request(`/api/recordings/${recordingId}/refresh-upload-urls`, {
       method: 'POST',
@@ -133,7 +100,10 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
   })
 
   it('failed 状態の recording は 409 を返す', async () => {
-    const { recordingId } = await createRecordingFixture('failed')
+    const { recordingId } = await createRecordingFixture(db, {
+      uploadStatus: 'failed',
+      uploadTargets: ['acce', 'gyro', 'wifi'],
+    })
 
     const response = await app.request(`/api/recordings/${recordingId}/refresh-upload-urls`, {
       method: 'POST',
@@ -157,7 +127,10 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
   })
 
   it('recording に含まれない target の再発行は 409 を返す', async () => {
-    const { recordingId } = await createRecordingFixture('accepted')
+    const { recordingId } = await createRecordingFixture(db, {
+      uploadStatus: 'accepted',
+      uploadTargets: ['acce', 'gyro', 'wifi'],
+    })
 
     const response = await app.request(`/api/recordings/${recordingId}/refresh-upload-urls`, {
       method: 'POST',
@@ -181,7 +154,10 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
   })
 
   it('一部に不正 target が含まれる場合は 409 を返す', async () => {
-    const { recordingId } = await createRecordingFixture('accepted')
+    const { recordingId } = await createRecordingFixture(db, {
+      uploadStatus: 'accepted',
+      uploadTargets: ['acce', 'gyro', 'wifi'],
+    })
 
     const response = await app.request(`/api/recordings/${recordingId}/refresh-upload-urls`, {
       method: 'POST',

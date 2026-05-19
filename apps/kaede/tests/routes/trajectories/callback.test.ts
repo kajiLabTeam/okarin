@@ -1,13 +1,10 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from '../../../src/server.js'
 import { createDb } from '../../../src/services/db/client.js'
-import { insertRecording } from '../../../src/services/recordings/index.js'
 import type * as StorageService from '../../../src/services/storage/index.js'
-import {
-  generateCallbackToken,
-  insertTrajectory,
-} from '../../../src/services/trajectories/index.js'
+import { generateCallbackToken } from '../../../src/services/trajectories/index.js'
 import { resetDatabase } from '../../db/helpers.js'
+import { createTrajectoryFixture } from '../../fixtures/trajectories.js'
 
 const { doesTrajectoryAnalyzedResultObjectExistMock } = vi.hoisted(() => ({
   doesTrajectoryAnalyzedResultObjectExistMock: vi.fn(),
@@ -27,52 +24,6 @@ vi.mock('../../../src/services/storage/index.js', async () => {
 const db = createDb()
 const app = createApp()
 
-const createTrajectoryFixture = async (
-  status: 'processing' | 'completed' | 'failed' = 'processing'
-) => {
-  const building = await db
-    .insertInto('buildings')
-    .values({ name: 'Callback Fixture Building' })
-    .returning(['id'])
-    .executeTakeFirstOrThrow()
-
-  const floor = await db
-    .insertInto('floors')
-    .values({
-      building_id: building.id,
-      level: 1,
-      name: '1F',
-      image_object_path: `maps/${building.id}/11111111-1111-4111-8111-111111111111.png`,
-    })
-    .returning(['id'])
-    .executeTakeFirstOrThrow()
-
-  const pedestrian = await db
-    .insertInto('pedestrians')
-    .defaultValues()
-    .returning(['id'])
-    .executeTakeFirstOrThrow()
-
-  const recording = await insertRecording(
-    {
-      pedestrian_id: pedestrian.id,
-      floor_id: floor.id,
-      upload_targets: ['acce', 'gyro'],
-      upload_status: 'ready',
-    },
-    db
-  )
-
-  return insertTrajectory(
-    {
-      recording_id: recording.id,
-      floor_id: floor.id,
-      status,
-    },
-    db
-  )
-}
-
 describe('POST /api/trajectories/callback', () => {
   beforeEach(async () => {
     await resetDatabase(db)
@@ -84,7 +35,9 @@ describe('POST /api/trajectories/callback', () => {
   })
 
   it('completed callback を受理して completed に更新する', async () => {
-    const trajectory = await createTrajectoryFixture('processing')
+    const { trajectory } = await createTrajectoryFixture(db, {
+      trajectoryStatus: 'processing',
+    })
     doesTrajectoryAnalyzedResultObjectExistMock.mockResolvedValue(true)
     const callbackToken = generateCallbackToken(trajectory.id)
 
@@ -119,7 +72,9 @@ describe('POST /api/trajectories/callback', () => {
   })
 
   it('failed callback を受理して failed に更新する', async () => {
-    const trajectory = await createTrajectoryFixture('processing')
+    const { trajectory } = await createTrajectoryFixture(db, {
+      trajectoryStatus: 'processing',
+    })
     const callbackToken = generateCallbackToken(trajectory.id)
 
     const response = await app.request('/api/trajectories/callback', {
