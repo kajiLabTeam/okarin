@@ -5,7 +5,7 @@ set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
 PROJECT_NAME=okarin-production
-COMPOSE_FILE=compose.production.yml
+COMPOSE_FILE=docker/compose.production.yml
 REVISION_DIR=/var/tmp/okarin/revisions
 REVISION_FILE="$REVISION_DIR/production.last_successful"
 RUNTIME_DIR=/var/tmp/okarin/runtime
@@ -34,7 +34,7 @@ compose_cmd() {
   sh -c 'exec "$@"' _ $DOCKER_COMPOSE_BIN \
     --env-file "$ENV_FILE" \
     -p "$PROJECT_NAME" \
-    -f compose.yml \
+    -f docker/compose.yml \
     -f "$COMPOSE_FILE" \
     "$@"
 }

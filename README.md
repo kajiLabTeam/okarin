@@ -81,11 +81,11 @@ uv run pytest
 
 ## Docker Compose 構成
 
-- `compose.yml`: 共通定義（`kaede` / `nozomi`）
-- `compose.local.yml`: ローカル用オーバーレイ（`postgres` / `seaweedfs` 追加、ローカルビルド）
-- `compose.test.yml`: test 用オーバーレイ（ローカルに近い構成で test 用 env を使用）
-- `compose.staging.yml`: staging 用オーバーレイ（環境変数ファイルを staging に切替）
-- `compose.production.yml`: production 用オーバーレイ（環境変数ファイルを production に切替）
+- `docker/compose.yml`: 共通定義（`kaede` / `nozomi`）
+- `docker/compose.local.yml`: ローカル用オーバーレイ（`postgres` / `seaweedfs` 追加、ローカルビルド）
+- `docker/compose.test.yml`: test 用オーバーレイ（ローカルに近い構成で test 用 env を使用）
+- `docker/compose.staging.yml`: staging 用オーバーレイ（環境変数ファイルを staging に切替）
+- `docker/compose.production.yml`: production 用オーバーレイ（環境変数ファイルを production に切替）
 
 ### ローカル起動（app + postgresql + object storage）
 
@@ -99,13 +99,13 @@ cp deploy/seaweedfs/s3.local.conf.example deploy/seaweedfs/s3.local.conf
 ```
 
 ```sh
-docker compose -p okarin-local -f compose.yml -f compose.local.yml up -d --build --remove-orphans
+docker compose -p okarin-local -f docker/compose.yml -f docker/compose.local.yml up -d --build --remove-orphans
 ```
 
 停止:
 
 ```sh
-docker compose -p okarin-local -f compose.yml -f compose.local.yml down
+docker compose -p okarin-local -f docker/compose.yml -f docker/compose.local.yml down
 ```
 
 ローカルの共通環境変数は `deploy/env/local.env` を使います。
@@ -139,7 +139,7 @@ touch /var/tmp/okarin/runtime/test.env
 ```sh
 ENV_FILE=./deploy/env/test.env \
 DEPLOY_META_FILE=/var/tmp/okarin/runtime/test.env \
-docker compose -p okarin-test -f compose.yml -f compose.test.yml up -d --build --remove-orphans
+docker compose -p okarin-test -f docker/compose.yml -f docker/compose.test.yml up -d --build --remove-orphans
 ```
 
 停止:
@@ -147,7 +147,7 @@ docker compose -p okarin-test -f compose.yml -f compose.test.yml up -d --build -
 ```sh
 ENV_FILE=./deploy/env/test.env \
 DEPLOY_META_FILE=/var/tmp/okarin/runtime/test.env \
-docker compose -p okarin-test -f compose.yml -f compose.test.yml down
+docker compose -p okarin-test -f docker/compose.yml -f docker/compose.test.yml down
 ```
 
 ### staging 手動デプロイ
@@ -160,7 +160,7 @@ touch /var/tmp/okarin/runtime/staging.env
 ```sh
 ENV_FILE=./deploy/env/staging.env \
 DEPLOY_META_FILE=/var/tmp/okarin/runtime/staging.env \
-docker compose -p okarin-staging -f compose.yml -f compose.staging.yml up -d --build --remove-orphans
+docker compose -p okarin-staging -f docker/compose.yml -f docker/compose.staging.yml up -d --build --remove-orphans
 ```
 
 ### production 手動デプロイ
@@ -173,7 +173,7 @@ touch /var/tmp/okarin/runtime/production.env
 ```sh
 ENV_FILE=./deploy/env/production.env \
 DEPLOY_META_FILE=/var/tmp/okarin/runtime/production.env \
-docker compose -p okarin-production -f compose.yml -f compose.production.yml up -d --build --remove-orphans
+docker compose -p okarin-production -f docker/compose.yml -f docker/compose.production.yml up -d --build --remove-orphans
 ```
 
 停止:
@@ -181,7 +181,7 @@ docker compose -p okarin-production -f compose.yml -f compose.production.yml up 
 ```sh
 ENV_FILE=./deploy/env/production.env \
 DEPLOY_META_FILE=/var/tmp/okarin/runtime/production.env \
-docker compose -p okarin-production -f compose.yml -f compose.production.yml down
+docker compose -p okarin-production -f docker/compose.yml -f docker/compose.production.yml down
 ```
 
 ## SSH デプロイスクリプト

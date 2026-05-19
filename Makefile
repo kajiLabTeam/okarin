@@ -6,16 +6,16 @@ KAEDE_ENV_FILE ?= ./deploy/apps/kaede.$(ENV).env
 STORAGE_BOOTSTRAP_ENV_FILE ?= ./deploy/apps/storage-bootstrap.$(ENV).env
 COMPOSE = docker compose --env-file $(ENV_FILE) -p $(PROJECT_NAME)
 
-BASE_FILES := -f compose.yml
+BASE_FILES := -f docker/compose.yml
 
 ifeq ($(ENV),local)
-COMPOSE_FILES := $(BASE_FILES) -f compose.local.yml
+COMPOSE_FILES := $(BASE_FILES) -f docker/compose.local.yml
 UP_ARGS := -d --build --remove-orphans
 else ifeq ($(ENV),staging)
-COMPOSE_FILES := $(BASE_FILES) -f compose.staging.yml
+COMPOSE_FILES := $(BASE_FILES) -f docker/compose.staging.yml
 UP_ARGS := -d --build --remove-orphans
 else ifeq ($(ENV),production)
-COMPOSE_FILES := $(BASE_FILES) -f compose.production.yml
+COMPOSE_FILES := $(BASE_FILES) -f docker/compose.production.yml
 UP_ARGS := -d --build --remove-orphans
 else
 $(error Unsupported ENV='$(ENV)'. Use local|staging|production)

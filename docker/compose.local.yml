@@ -1,11 +1,11 @@
 services:
   kaede:
     build:
-      context: ./apps/kaede
+      context: ../apps/kaede
     image: okarin/kaede:local
     env_file:
-      - ${ENV_FILE:-./deploy/env/local.env}
-      - ${KAEDE_ENV_FILE:-./deploy/apps/kaede.local.env}
+      - ${ENV_FILE:-../deploy/env/local.env}
+      - ${KAEDE_ENV_FILE:-../deploy/apps/kaede.local.env}
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable
     ports:
@@ -13,10 +13,10 @@ services:
 
   nozomi:
     build:
-      context: ./apps/nozomi
+      context: ../apps/nozomi
     image: okarin/nozomi:local
     env_file:
-      - ${ENV_FILE:-./deploy/env/local.env}
+      - ${ENV_FILE:-../deploy/env/local.env}
     depends_on:
       postgres:
         condition: service_healthy
@@ -29,7 +29,7 @@ services:
     image: ${POSTGRES_IMAGE:-postgres:17-alpine}
     restart: unless-stopped
     env_file:
-      - ${ENV_FILE:-./deploy/env/local.env}
+      - ${ENV_FILE:-../deploy/env/local.env}
     ports:
       - "5432:5432"
     volumes:
@@ -44,7 +44,7 @@ services:
     image: ghcr.io/amacneil/dbmate:2
     profiles: ["tools"]
     env_file:
-      - ${ENV_FILE:-./deploy/env/local.env}
+      - ${ENV_FILE:-../deploy/env/local.env}
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable
       DBMATE_MIGRATIONS_DIR: /db/migrations
@@ -54,14 +54,14 @@ services:
         condition: service_healthy
     working_dir: /db
     volumes:
-      - ./db:/db
+      - ../db:/db
 
   storage-bootstrap:
     image: amazon/aws-cli:2.34.38
     profiles: ["tools"]
     env_file:
-      - ${ENV_FILE:-./deploy/env/local.env}
-      - ${STORAGE_BOOTSTRAP_ENV_FILE:-./deploy/apps/storage-bootstrap.local.env}
+      - ${ENV_FILE:-../deploy/env/local.env}
+      - ${STORAGE_BOOTSTRAP_ENV_FILE:-../deploy/apps/storage-bootstrap.local.env}
     depends_on:
       seaweedfs:
         condition: service_healthy
@@ -69,7 +69,7 @@ services:
     entrypoint: []
     command: ["sh", "./init_bucket.sh"]
     volumes:
-      - ./storage/bootstrap:/work:ro
+      - ../storage/bootstrap:/work:ro
 
   seaweedfs:
     image: ${SEAWEEDFS_IMAGE:-chrislusf/seaweedfs:4.17}
@@ -87,7 +87,7 @@ services:
       - "9333:9333"
     volumes:
       - seaweedfs_data:/data
-      - ./deploy/seaweedfs/s3.local.conf:/etc/seaweedfs/s3.conf:ro
+      - ../deploy/seaweedfs/s3.local.conf:/etc/seaweedfs/s3.conf:ro
 
 volumes:
   postgres_data:
