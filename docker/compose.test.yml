@@ -59,6 +59,8 @@ services:
     env_file:
       - ${ENV_FILE:-../deploy/env/test.env}
       - ${STORAGE_BOOTSTRAP_ENV_FILE:-../deploy/apps/storage-bootstrap.test.env}
+    environment:
+      S3_ENDPOINT: ${S3_INTERNAL_ENDPOINT}
     depends_on:
       seaweedfs:
         condition: service_healthy
