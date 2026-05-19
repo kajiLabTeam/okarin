@@ -6,49 +6,12 @@ import {
   resetS3ClientForTests,
 } from '../../src/services/storage/index.js'
 import { resetDatabase } from '../db/helpers.js'
+import { createRecordingFixture } from '../fixtures/recordings.js'
 import { createStorageClient, putObjectText } from './support/helpers.js'
 
 const db = createDb()
 const app = createApp()
 const s3 = createStorageClient()
-
-const createRecordingFixture = async () => {
-  const building = await db
-    .insertInto('buildings')
-    .values({ name: 'Fixture Building' })
-    .returning(['id'])
-    .executeTakeFirstOrThrow()
-
-  const floor = await db
-    .insertInto('floors')
-    .values({
-      building_id: building.id,
-      level: 3,
-      name: '3F',
-      image_object_path: `maps/${building.id}/33333333-3333-4333-8333-333333333333.png`,
-    })
-    .returning(['id'])
-    .executeTakeFirstOrThrow()
-
-  const pedestrian = await db
-    .insertInto('pedestrians')
-    .defaultValues()
-    .returning(['id'])
-    .executeTakeFirstOrThrow()
-
-  const recording = await db
-    .insertInto('recordings')
-    .values({
-      pedestrian_id: pedestrian.id,
-      floor_id: floor.id,
-      upload_status: 'accepted',
-      upload_targets: ['acce', 'gyro'],
-    })
-    .returning(['id'])
-    .executeTakeFirstOrThrow()
-
-  return { recordingId: recording.id }
-}
 
 describe('POST /api/recordings/:recordingId/complete-upload', () => {
   beforeEach(async () => {
@@ -62,7 +25,10 @@ describe('POST /api/recordings/:recordingId/complete-upload', () => {
   })
 
   it('必要な raw が揃っていれば ready に更新する', async () => {
-    const { recordingId } = await createRecordingFixture()
+    const { recordingId } = await createRecordingFixture(db, {
+      uploadStatus: 'accepted',
+      uploadTargets: ['acce', 'gyro'],
+    })
 
     await putObjectText(s3, `recordings/${recordingId}/raw/acce.csv`, 'timestamp,x\n0,1\n')
     await putObjectText(s3, `recordings/${recordingId}/raw/gyro.csv`, 'timestamp,z\n0,2\n')
@@ -87,7 +53,10 @@ describe('POST /api/recordings/:recordingId/complete-upload', () => {
   }, 15000)
 
   it('不足 raw がある場合は missing_targets を返す', async () => {
-    const { recordingId } = await createRecordingFixture()
+    const { recordingId } = await createRecordingFixture(db, {
+      uploadStatus: 'accepted',
+      uploadTargets: ['acce', 'gyro'],
+    })
 
     await putObjectText(s3, `recordings/${recordingId}/raw/acce.csv`, 'timestamp,x\n0,1\n')
 
@@ -115,7 +84,10 @@ describe('POST /api/recordings/:recordingId/complete-upload', () => {
   }, 15000)
 
   it('storage listing が recording 配下の uploaded object keys を返す', async () => {
-    const { recordingId } = await createRecordingFixture()
+    const { recordingId } = await createRecordingFixture(db, {
+      uploadStatus: 'accepted',
+      uploadTargets: ['acce', 'gyro'],
+    })
 
     await putObjectText(s3, `recordings/${recordingId}/raw/acce.csv`, 'timestamp,x\n0,1\n')
 

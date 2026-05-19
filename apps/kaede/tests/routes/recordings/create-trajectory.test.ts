@@ -4,6 +4,7 @@ import { createApp } from '../../../src/server.js'
 import { createDb } from '../../../src/services/db/client.js'
 import type * as StorageService from '../../../src/services/storage/index.js'
 import { resetDatabase } from '../../db/helpers.js'
+import { createRecordingFixture } from '../../fixtures/recordings.js'
 
 const {
   issueInternalRecordingRawDownloadUrlsMock,
@@ -34,44 +35,6 @@ vi.mock('../../../src/services/nozomi/index.js', () => ({
 const db = createDb()
 const app = createApp()
 
-const createRecordingFixture = async (uploadStatus: 'accepted' | 'ready' = 'ready') => {
-  const building = await db
-    .insertInto('buildings')
-    .values({ name: 'Fixture Building' })
-    .returning(['id'])
-    .executeTakeFirstOrThrow()
-
-  const floor = await db
-    .insertInto('floors')
-    .values({
-      building_id: building.id,
-      level: 3,
-      name: '3F',
-      image_object_path: `maps/${building.id}/33333333-3333-4333-8333-333333333333.png`,
-    })
-    .returning(['id'])
-    .executeTakeFirstOrThrow()
-
-  const pedestrian = await db
-    .insertInto('pedestrians')
-    .defaultValues()
-    .returning(['id'])
-    .executeTakeFirstOrThrow()
-
-  const recording = await db
-    .insertInto('recordings')
-    .values({
-      pedestrian_id: pedestrian.id,
-      floor_id: floor.id,
-      upload_status: uploadStatus,
-      upload_targets: ['acce', 'gyro'],
-    })
-    .returning(['id'])
-    .executeTakeFirstOrThrow()
-
-  return { recordingId: recording.id }
-}
-
 describe('POST /api/recordings/:recordingId/trajectories', () => {
   beforeEach(async () => {
     await resetDatabase(db)
@@ -95,7 +58,10 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
   })
 
   it('trajectory と constraints を作成し processing を返す', async () => {
-    const { recordingId } = await createRecordingFixture('ready')
+    const { recordingId } = await createRecordingFixture(db, {
+      uploadStatus: 'ready',
+      uploadTargets: ['acce', 'gyro'],
+    })
 
     submitAnalyzeRequestMock.mockImplementation((payload: { trajectory_id: string }) => ({
       trajectory_id: payload.trajectory_id,
@@ -172,7 +138,10 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
   })
 
   it('ready でない recording は 409 を返す', async () => {
-    const { recordingId } = await createRecordingFixture('accepted')
+    const { recordingId } = await createRecordingFixture(db, {
+      uploadStatus: 'accepted',
+      uploadTargets: ['acce', 'gyro'],
+    })
 
     const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
       method: 'POST',
@@ -197,7 +166,10 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
   })
 
   it('nozomi 依頼失敗時は 502 を返し trajectory を failed にする', async () => {
-    const { recordingId } = await createRecordingFixture('ready')
+    const { recordingId } = await createRecordingFixture(db, {
+      uploadStatus: 'ready',
+      uploadTargets: ['acce', 'gyro'],
+    })
 
     submitAnalyzeRequestMock.mockRejectedValue(new Error('upstream failure'))
 

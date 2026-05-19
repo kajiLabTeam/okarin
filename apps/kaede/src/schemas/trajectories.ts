@@ -261,7 +261,9 @@ export const callbackResponseSchema = z.object({
   trajectory_id: uuidSchema.openapi({
     description: 'callback を受理した trajectory の ID',
   }),
-  status: trajectoryStatusSchema,
+  status: z.enum(['completed', 'failed']).openapi({
+    description: 'callback 受理後の終端状態',
+  }),
 })
 
 export const trajectoryStatusResponseSchema = z.object({

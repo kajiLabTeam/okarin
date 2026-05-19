@@ -77,6 +77,25 @@ export const markTrajectoryProcessing = async (
     .executeTakeFirst()
 }
 
+export const markTrajectoryCompleted = async (
+  trajectoryId: string,
+  executor: DbExecutor = db
+): Promise<Trajectory | undefined> => {
+  return executor
+    .updateTable('trajectories')
+    .set({
+      status: 'completed',
+      error_code: null,
+      error_message: null,
+      failed_at: null,
+    })
+    .where('id', '=', trajectoryId)
+    .where('deleted_at', 'is', null)
+    .where('status', 'in', ['accepted', 'processing'])
+    .returningAll()
+    .executeTakeFirst()
+}
+
 export const markTrajectoryFailed = async (
   trajectoryId: string,
   errorCode: string,
