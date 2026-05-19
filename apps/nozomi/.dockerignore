@@ -6,3 +6,6 @@ __pycache__
 .nozomi.egg-info
 .git
 .gitignore
+.vscode
+tests
+.python-version
