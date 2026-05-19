@@ -161,6 +161,10 @@ describe('POST /api/trajectories/callback', () => {
     })
 
     expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      error_code: 'CALLBACK_PAYLOAD_INVALID',
+      error_message: 'callback payload is invalid',
+    })
     expect(receiveCallbackMock).not.toHaveBeenCalled()
   })
 })

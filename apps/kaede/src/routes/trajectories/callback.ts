@@ -74,100 +74,118 @@ export const registerCallbackRoute = (app: OpenAPIHono) => {
     },
   })
 
-  app.openapi(route, async (c) => {
-    const payload = c.req.valid('json')
-    const result = await receiveCallback(payload)
+  app.openapi(
+    route,
+    async (c) => {
+      const payload = c.req.valid('json')
+      const result = await receiveCallback(payload)
 
-    if (!result.ok) {
-      switch (result.error.type) {
-        case 'CALLBACK_TOKEN_INVALID':
-          return c.json(
-            {
-              error_code: result.error.type,
-              error_message: 'callback token is invalid',
-            },
-            401
-          )
-
-        case 'CALLBACK_TOKEN_EXPIRED':
-          return c.json(
-            {
-              error_code: result.error.type,
-              error_message: 'callback token has expired',
-            },
-            401
-          )
-
-        case 'TRAJECTORY_NOT_FOUND':
-          return c.json(
-            {
-              error_code: result.error.type,
-              error_message: 'trajectory not found',
-              details: {
-                trajectory_id: result.error.trajectoryId,
+      if (!result.ok) {
+        switch (result.error.type) {
+          case 'CALLBACK_TOKEN_INVALID':
+            return c.json(
+              {
+                error_code: result.error.type,
+                error_message: 'callback token is invalid',
               },
-            },
-            404
-          )
+              401
+            )
 
-        case 'CALLBACK_TRAJECTORY_MISMATCH':
-          return c.json(
-            {
-              error_code: result.error.type,
-              error_message: 'trajectory_id in token and body do not match',
-              details: {
-                trajectory_id: result.error.trajectoryId,
-                token_trajectory_id: result.error.tokenTrajectoryId,
+          case 'CALLBACK_TOKEN_EXPIRED':
+            return c.json(
+              {
+                error_code: result.error.type,
+                error_message: 'callback token has expired',
               },
-            },
-            409
-          )
+              401
+            )
 
-        case 'CALLBACK_RESULT_OBJECT_KEY_MISMATCH':
-          return c.json(
-            {
-              error_code: result.error.type,
-              error_message: 'result_object_key does not match the expected object key',
-              details: {
-                trajectory_id: result.error.trajectoryId,
-                result_object_key: result.error.resultObjectKey,
+          case 'TRAJECTORY_NOT_FOUND':
+            return c.json(
+              {
+                error_code: result.error.type,
+                error_message: 'trajectory not found',
+                details: {
+                  trajectory_id: result.error.trajectoryId,
+                },
               },
-            },
-            409
-          )
+              404
+            )
 
-        case 'CALLBACK_ALREADY_FINALIZED':
-          return c.json(
-            {
-              error_code: result.error.type,
-              error_message: 'trajectory is already finalized with a conflicting callback payload',
-              details: {
-                trajectory_id: result.error.trajectoryId,
-                status: result.error.status,
+          case 'CALLBACK_TRAJECTORY_MISMATCH':
+            return c.json(
+              {
+                error_code: result.error.type,
+                error_message: 'trajectory_id in token and body do not match',
+                details: {
+                  trajectory_id: result.error.trajectoryId,
+                  token_trajectory_id: result.error.tokenTrajectoryId,
+                },
               },
-            },
-            409
-          )
+              409
+            )
 
-        case 'CALLBACK_DEPENDENCY_FAILURE':
-          return c.json(
-            {
-              error_code: result.error.type,
-              error_message: 'failed to verify object or update trajectory state',
-              details: {
-                trajectory_id: result.error.trajectoryId,
+          case 'CALLBACK_RESULT_OBJECT_KEY_MISMATCH':
+            return c.json(
+              {
+                error_code: result.error.type,
+                error_message: 'result_object_key does not match the expected object key',
+                details: {
+                  trajectory_id: result.error.trajectoryId,
+                  result_object_key: result.error.resultObjectKey,
+                },
               },
-            },
-            503
-          )
+              409
+            )
 
-        default: {
-          const exhaustiveCheck: never = result.error
-          throw new Error(`unhandled callback error: ${JSON.stringify(exhaustiveCheck)}`)
+          case 'CALLBACK_ALREADY_FINALIZED':
+            return c.json(
+              {
+                error_code: result.error.type,
+                error_message:
+                  'trajectory is already finalized with a conflicting callback payload',
+                details: {
+                  trajectory_id: result.error.trajectoryId,
+                  status: result.error.status,
+                },
+              },
+              409
+            )
+
+          case 'CALLBACK_DEPENDENCY_FAILURE':
+            return c.json(
+              {
+                error_code: result.error.type,
+                error_message: 'failed to verify object or update trajectory state',
+                details: {
+                  trajectory_id: result.error.trajectoryId,
+                },
+              },
+              503
+            )
+
+          default: {
+            const exhaustiveCheck: never = result.error
+            throw new Error(`unhandled callback error: ${JSON.stringify(exhaustiveCheck)}`)
+          }
         }
       }
-    }
 
-    return c.json(result.value, 200)
-  })
+      return c.json(result.value, 200)
+    },
+    (result, c) => {
+      if (!result.success) {
+        return c.json(
+          {
+            error_code: 'CALLBACK_PAYLOAD_INVALID' as const,
+            error_message: 'callback payload is invalid',
+            details: {
+              issues: result.error.issues,
+            },
+          },
+          400
+        )
+      }
+    }
+  )
 }

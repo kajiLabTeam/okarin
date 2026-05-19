@@ -1,4 +1,4 @@
-import { ListObjectsV2Command } from '@aws-sdk/client-s3'
+import { HeadObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3'
 import {
   buildRecordingRawObjectPrefix,
   buildTrajectoryAnalyzedResultObjectKey,
@@ -36,12 +36,25 @@ export const doesTrajectoryAnalyzedResultObjectExist = async (trajectoryId: stri
   const expectedKey = buildTrajectoryAnalyzedResultObjectKey(trajectoryId)
   const { config, internalClient } = getS3Context()
 
-  const response = await internalClient.send(
-    new ListObjectsV2Command({
-      Bucket: config.bucket,
-      Prefix: expectedKey,
-    })
-  )
+  try {
+    await internalClient.send(
+      new HeadObjectCommand({
+        Bucket: config.bucket,
+        Key: expectedKey,
+      })
+    )
 
-  return (response.Contents ?? []).some((object) => object.Key === expectedKey)
+    return true
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      (error.name === 'NotFound' || error.name === 'NoSuchKey')
+    ) {
+      return false
+    }
+
+    throw error
+  }
 }
