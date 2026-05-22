@@ -8,6 +8,7 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
 
 from src.routes.analysis import analysis_router
+from src.routes.debug import debug_router
 from src.routes.health import health_router
 
 
@@ -139,3 +140,4 @@ async def scalar_reference() -> HTMLResponse:
 
 app.include_router(health_router)
 app.include_router(analysis_router)
+app.include_router(debug_router)
