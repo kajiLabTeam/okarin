@@ -1,6 +1,7 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, BackgroundTasks, status
 
 from src.schemas.analysis import AnalyzeAcceptedResponse, AnalyzeRequest
+from src.usecases.submit_analysis import submit_analysis
 
 analysis_router = APIRouter()
 
@@ -16,8 +17,7 @@ analysis_router = APIRouter()
     ),
     tags=["analysis"],
 )
-def analyze(payload: AnalyzeRequest) -> AnalyzeAcceptedResponse:
-    return AnalyzeAcceptedResponse(
-        trajectory_id=payload.trajectory_id,
-        status="accepted",
-    )
+def analyze(
+    payload: AnalyzeRequest, background_tasks: BackgroundTasks
+) -> AnalyzeAcceptedResponse:
+    return submit_analysis(payload, background_tasks)
