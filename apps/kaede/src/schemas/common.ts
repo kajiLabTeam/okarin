@@ -1,16 +1,4 @@
 import { z } from '@hono/zod-openapi'
-import type { JsonValue } from '../services/db/generated.js'
-
-const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
-  z.union([
-    z.string(),
-    z.number(),
-    z.boolean(),
-    z.null(),
-    z.array(jsonValueSchema),
-    z.record(jsonValueSchema),
-  ])
-)
 
 export const uuidSchema = z.string().uuid().openapi({
   description: 'UUID 形式の識別子',
@@ -116,8 +104,9 @@ export const nozomiPingResponseSchema = z.object({
   checked_modules: z.array(z.string()).openapi({
     description: 'ping() 探索時に確認したモジュール一覧',
   }),
-  result: jsonValueSchema.openapi({
+  result: z.any().openapi({
     description: 'nozomi 側 ping() の戻り値',
+    example: 'pong',
   }),
 })
 
