@@ -4,6 +4,8 @@ import { pingNozomi } from './ping-client.js'
 
 describe('pingNozomi', () => {
   const originalFetch = globalThis.fetch
+  const originalNozomiInternalEndpoint = process.env.NOZOMI_INTERNAL_ENDPOINT
+  const originalNozomiRequestTimeoutMs = process.env.NOZOMI_REQUEST_TIMEOUT_MS
 
   beforeEach(() => {
     process.env.NOZOMI_INTERNAL_ENDPOINT = 'http://nozomi:8000'
@@ -14,6 +16,16 @@ describe('pingNozomi', () => {
   afterEach(() => {
     globalThis.fetch = originalFetch
     vi.restoreAllMocks()
+    if (originalNozomiInternalEndpoint === undefined) {
+      delete process.env.NOZOMI_INTERNAL_ENDPOINT
+    } else {
+      process.env.NOZOMI_INTERNAL_ENDPOINT = originalNozomiInternalEndpoint
+    }
+    if (originalNozomiRequestTimeoutMs === undefined) {
+      delete process.env.NOZOMI_REQUEST_TIMEOUT_MS
+    } else {
+      process.env.NOZOMI_REQUEST_TIMEOUT_MS = originalNozomiRequestTimeoutMs
+    }
     resetRuntimeConfigForTests()
   })
 
