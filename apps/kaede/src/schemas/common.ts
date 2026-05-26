@@ -89,6 +89,27 @@ export const errorResponseSchema = z.object({
   }),
 })
 
+export const nozomiPingResponseSchema = z.object({
+  ok: z.literal(true).openapi({
+    description: 'nozomi 側の ping が正常に完了したことを表す',
+  }),
+  rikka_version: z.string().min(1).openapi({
+    description: 'nozomi が参照した rikka のバージョン',
+    example: '0.1.0',
+  }),
+  ping_module: z.string().min(1).openapi({
+    description: 'ping() が見つかったモジュール名',
+    example: 'rikka.api',
+  }),
+  checked_modules: z.array(z.string()).openapi({
+    description: 'ping() 探索時に確認したモジュール一覧',
+  }),
+  result: z.any().openapi({
+    description: 'nozomi 側 ping() の戻り値',
+    example: 'pong',
+  }),
+})
+
 export type RecordingUploadStatus = z.infer<typeof recordingUploadStatusSchema>
 export type TrajectoryStatus = z.infer<typeof trajectoryStatusSchema>
 export type UploadTarget = z.infer<typeof uploadTargetSchema>
