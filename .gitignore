@@ -3,3 +3,5 @@ deploy/apps/*.env
 deploy/seaweedfs/*.conf
 
 docs/
+
+.DS_Store
