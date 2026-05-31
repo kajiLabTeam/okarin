@@ -1,4 +1,5 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
+import { floorsRoutes } from './floors/index.js'
 import { nozomiRoutes } from './nozomi/index.js'
 import { pedestriansRoutes } from './pedestrians/index.js'
 import { recordingsRoutes } from './recordings/index.js'
@@ -7,6 +8,7 @@ import { trajectoriesRoutes } from './trajectories/index.js'
 export const registerApiRoutes = (app: OpenAPIHono) => {
   const api = new OpenAPIHono()
 
+  api.route('/floors', floorsRoutes)
   api.route('/nozomi', nozomiRoutes)
   api.route('/pedestrians', pedestriansRoutes)
   api.route('/recordings', recordingsRoutes)
