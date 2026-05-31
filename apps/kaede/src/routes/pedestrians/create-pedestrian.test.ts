@@ -1,0 +1,135 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createRouteTestApp } from '../create-route-test-app.js'
+import { registerCreatePedestrianRoute } from './create-pedestrian.js'
+
+const { createPedestrianMock } = vi.hoisted(() => ({
+  createPedestrianMock: vi.fn(),
+}))
+
+vi.mock('../../usecases/create-pedestrian.js', () => ({
+  createPedestrian: createPedestrianMock,
+}))
+
+describe('POST /api/pedestrians', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('pedestrian を作成して返す', async () => {
+    createPedestrianMock.mockResolvedValue({
+      pedestrian_id: '11111111-1111-4111-8111-111111111111',
+      display_name: 'test participant',
+      height: 1.72,
+      stride_length: 0.7,
+      attributes: {
+        label: 'test participant',
+      },
+      created_at: '2026-05-13T00:00:00.000Z',
+      updated_at: '2026-05-13T00:00:00.000Z',
+    })
+
+    const app = createRouteTestApp('/pedestrians', registerCreatePedestrianRoute)
+    const response = await app.request('/api/pedestrians', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        display_name: 'test participant',
+        height: 1.72,
+        stride_length: 0.7,
+        attributes: {
+          label: 'test participant',
+        },
+      }),
+    })
+
+    expect(response.status).toBe(201)
+    await expect(response.json()).resolves.toEqual({
+      pedestrian_id: '11111111-1111-4111-8111-111111111111',
+      display_name: 'test participant',
+      height: 1.72,
+      stride_length: 0.7,
+      attributes: {
+        label: 'test participant',
+      },
+      created_at: '2026-05-13T00:00:00.000Z',
+      updated_at: '2026-05-13T00:00:00.000Z',
+    })
+
+    expect(createPedestrianMock).toHaveBeenCalledWith({
+      display_name: 'test participant',
+      height: 1.72,
+      stride_length: 0.7,
+      attributes: {
+        label: 'test participant',
+      },
+    })
+  })
+
+  it('display_name だけで pedestrian を作成できる', async () => {
+    createPedestrianMock.mockResolvedValue({
+      pedestrian_id: '11111111-1111-4111-8111-111111111111',
+      display_name: 'minimal participant',
+      height: null,
+      stride_length: null,
+      attributes: {},
+      created_at: '2026-05-13T00:00:00.000Z',
+      updated_at: '2026-05-13T00:00:00.000Z',
+    })
+
+    const app = createRouteTestApp('/pedestrians', registerCreatePedestrianRoute)
+    const response = await app.request('/api/pedestrians', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        display_name: 'minimal participant',
+      }),
+    })
+
+    expect(response.status).toBe(201)
+    await expect(response.json()).resolves.toMatchObject({
+      display_name: 'minimal participant',
+      height: null,
+      stride_length: null,
+      attributes: {},
+    })
+
+    expect(createPedestrianMock).toHaveBeenCalledWith({
+      display_name: 'minimal participant',
+    })
+  })
+
+  it('負の height はバリデーションエラーを返し usecase を呼ばない', async () => {
+    const app = createRouteTestApp('/pedestrians', registerCreatePedestrianRoute)
+    const response = await app.request('/api/pedestrians', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        display_name: 'test participant',
+        height: -1,
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(createPedestrianMock).not.toHaveBeenCalled()
+  })
+
+  it('display_name がない場合はバリデーションエラーを返し usecase を呼ばない', async () => {
+    const app = createRouteTestApp('/pedestrians', registerCreatePedestrianRoute)
+    const response = await app.request('/api/pedestrians', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    })
+
+    expect(response.status).toBe(400)
+    expect(createPedestrianMock).not.toHaveBeenCalled()
+  })
+})

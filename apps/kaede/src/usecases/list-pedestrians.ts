@@ -2,9 +2,11 @@ import type { PedestriansListResponse } from '../schemas/pedestrians.js'
 import type { JsonValue } from '../services/db/generated.js'
 import { listPedestrians as listPedestrianRows } from '../services/pedestrians/index.js'
 
-const normalizeAttributes = (attributes: JsonValue): Record<string, unknown> => {
+type PedestrianAttributes = PedestriansListResponse['pedestrians'][number]['attributes']
+
+const normalizeAttributes = (attributes: JsonValue): PedestrianAttributes => {
   if (attributes && typeof attributes === 'object' && !Array.isArray(attributes)) {
-    return attributes as Record<string, unknown>
+    return attributes as PedestrianAttributes
   }
 
   return {}
@@ -16,6 +18,7 @@ export const listPedestrians = async (): Promise<PedestriansListResponse> => {
   return {
     pedestrians: pedestrians.map((pedestrian) => ({
       pedestrian_id: pedestrian.id,
+      display_name: pedestrian.display_name,
       height: pedestrian.height,
       stride_length: pedestrian.stride_length,
       attributes: normalizeAttributes(pedestrian.attributes),
