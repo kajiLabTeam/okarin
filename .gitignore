@@ -5,3 +5,5 @@ deploy/seaweedfs/*.conf
 docs/
 
 .DS_Store
+.pnpm-store/
+.mypy_cache/
