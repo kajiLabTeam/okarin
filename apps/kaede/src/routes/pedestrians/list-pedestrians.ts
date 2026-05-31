@@ -1,5 +1,5 @@
 import { createRoute } from '@hono/zod-openapi'
-import type { OpenAPIHono, RouteConfig  } from '@hono/zod-openapi'
+import type { OpenAPIHono, RouteConfig } from '@hono/zod-openapi'
 import { pedestriansListResponseSchema } from '../../schemas/pedestrians.js'
 import { listPedestrians } from '../../usecases/list-pedestrians.js'
 
