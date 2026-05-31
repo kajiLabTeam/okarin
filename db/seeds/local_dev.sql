@@ -21,7 +21,8 @@ new_floor AS (
   RETURNING id
 ),
 new_pedestrian AS (
-  INSERT INTO pedestrians DEFAULT VALUES
+  INSERT INTO pedestrians (display_name)
+  VALUES ('Local Dev Pedestrian')
   RETURNING id
 )
 SELECT
