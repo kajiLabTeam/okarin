@@ -28,3 +28,5 @@ export const pedestriansListResponseSchema = z.object({
     description: '計測対象として選択可能な pedestrian 一覧',
   }),
 })
+
+export type PedestriansListResponse = z.infer<typeof pedestriansListResponseSchema>

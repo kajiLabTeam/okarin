@@ -1,10 +1,10 @@
 import { createRoute } from '@hono/zod-openapi'
-import type { OpenAPIHono, RouteConfig } from '@hono/zod-openapi'
+import type { OpenAPIHono } from '@hono/zod-openapi'
 import { pedestriansListResponseSchema } from '../../schemas/pedestrians.js'
 import { listPedestrians } from '../../usecases/list-pedestrians.js'
 
 export const registerListPedestriansRoute = (app: OpenAPIHono) => {
-  const route: RouteConfig = createRoute({
+  const route = createRoute({
     method: 'get',
     path: '/',
     tags: ['Pedestrians'],

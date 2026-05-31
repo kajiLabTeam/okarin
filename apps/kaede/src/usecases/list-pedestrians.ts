@@ -1,15 +1,16 @@
+import type { PedestriansListResponse } from '../schemas/pedestrians.js'
 import type { JsonValue } from '../services/db/generated.js'
 import { listPedestrians as listPedestrianRows } from '../services/pedestrians/index.js'
 
-const normalizeAttributes = (attributes: JsonValue) => {
+const normalizeAttributes = (attributes: JsonValue): Record<string, unknown> => {
   if (attributes && typeof attributes === 'object' && !Array.isArray(attributes)) {
-    return attributes
+    return attributes as Record<string, unknown>
   }
 
   return {}
 }
 
-export const listPedestrians = async () => {
+export const listPedestrians = async (): Promise<PedestriansListResponse> => {
   const pedestrians = await listPedestrianRows()
 
   return {
