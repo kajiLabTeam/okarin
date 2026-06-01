@@ -17,20 +17,21 @@ export type CreateFloorResult =
     }
 
 export const createFloor = async (payload: CreateFloorRequest): Promise<CreateFloorResult> => {
-  const building = await findBuildingById(payload.building_id)
+  const buildingId: string = payload.building_id
+  const building = await findBuildingById(buildingId)
 
   if (!building) {
     return {
       ok: false,
       error: {
         type: 'BUILDING_NOT_FOUND',
-        buildingId: payload.building_id,
+        buildingId,
       },
     }
   }
 
-  const floorId = randomUUID()
   const mapImageExtension = payload.map_image_extension ?? 'png'
+  const floorId = randomUUID()
   const floor = await insertFloor({
     id: floorId,
     building_id: building.id,
