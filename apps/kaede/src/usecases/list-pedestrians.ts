@@ -1,10 +1,9 @@
 import type { PedestriansListResponse } from '../schemas/pedestrians.js'
-import type { JsonValue } from '../services/db/generated.js'
 import { listPedestrians as listPedestrianRows } from '../services/pedestrians/index.js'
 
 type PedestrianAttributes = PedestriansListResponse['pedestrians'][number]['attributes']
 
-const normalizeAttributes = (attributes: JsonValue): PedestrianAttributes => {
+const normalizeAttributes = (attributes: unknown): PedestrianAttributes => {
   if (attributes && typeof attributes === 'object' && !Array.isArray(attributes)) {
     return attributes as PedestrianAttributes
   }
