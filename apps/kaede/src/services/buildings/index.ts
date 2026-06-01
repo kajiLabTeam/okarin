@@ -1,1 +1,1 @@
-export { insertBuilding } from './building-repository.js'
+export { findBuildingById, insertBuilding } from './building-repository.js'

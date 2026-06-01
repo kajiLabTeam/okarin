@@ -34,3 +34,28 @@ export const floorsListResponseSchema = z.object({
     description: '計測場所として選択可能な floor 一覧',
   }),
 })
+
+export const mapImageExtensionSchema = z.enum(['svg', 'png']).openapi({
+  description: 'floor map 画像の拡張子',
+})
+
+export const createFloorRequestSchema = z.object({
+  building_id: uuidSchema.openapi({
+    description: 'floor を紐づける building の ID',
+  }),
+  level: z.number().int().openapi({
+    description: '階層',
+  }),
+  name: z.string().min(1).openapi({
+    description: 'floor の名称',
+  }),
+  scale: z.number().positive().nullable().optional().openapi({
+    description: '縮尺。未設定の場合は null',
+  }),
+  map_image_extension: mapImageExtensionSchema.optional().openapi({
+    description: 'floor map 画像の拡張子。未指定時は png',
+  }),
+})
+
+export type CreateFloorRequest = z.infer<typeof createFloorRequestSchema>
+export type FloorResponse = z.infer<typeof floorSchema>

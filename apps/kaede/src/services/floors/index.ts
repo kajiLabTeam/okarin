@@ -1,1 +1,1 @@
-export { listFloors } from './floor-repository.js'
+export { insertFloor, listFloors } from './floor-repository.js'
