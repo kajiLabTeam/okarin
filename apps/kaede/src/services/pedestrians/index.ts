@@ -1,1 +1,1 @@
-export { listPedestrians } from './pedestrian-repository.js'
+export { insertPedestrian, listPedestrians } from './pedestrian-repository.js'

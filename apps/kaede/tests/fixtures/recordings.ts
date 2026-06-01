@@ -42,7 +42,7 @@ export const createRecordingFixture = async (
 
   const pedestrian = await db
     .insertInto('pedestrians')
-    .defaultValues()
+    .values({ display_name: 'Fixture Pedestrian' })
     .returning(['id'])
     .executeTakeFirstOrThrow()
 

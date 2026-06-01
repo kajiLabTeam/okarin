@@ -47,6 +47,7 @@ export interface Floors {
 export interface Pedestrians {
   attributes: Generated<Json>
   created_at: Generated<Timestamp>
+  display_name: string
   height: number | null
   id: Generated<string>
   stride_length: number | null

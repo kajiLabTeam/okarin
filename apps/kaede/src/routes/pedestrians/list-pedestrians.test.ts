@@ -20,6 +20,7 @@ describe('GET /api/pedestrians', () => {
       pedestrians: [
         {
           pedestrian_id: '11111111-1111-4111-8111-111111111111',
+          display_name: 'test participant',
           height: 1.72,
           stride_length: 0.7,
           attributes: {
@@ -39,6 +40,7 @@ describe('GET /api/pedestrians', () => {
       pedestrians: [
         {
           pedestrian_id: '11111111-1111-4111-8111-111111111111',
+          display_name: 'test participant',
           height: 1.72,
           stride_length: 0.7,
           attributes: {

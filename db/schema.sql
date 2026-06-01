@@ -74,7 +74,9 @@ CREATE TABLE public.pedestrians (
     stride_length double precision,
     attributes jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    display_name text NOT NULL,
+    CONSTRAINT pedestrians_display_name_nonempty_chk CHECK ((length(btrim(display_name)) > 0))
 );
 
 
@@ -347,4 +349,5 @@ ALTER TABLE ONLY public.trajectory_constraints
 
 INSERT INTO public.schema_migrations (version) VALUES
     ('20260425120000'),
-    ('20260501110000');
+    ('20260501110000'),
+    ('20260531160000');
