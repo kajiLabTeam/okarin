@@ -1,4 +1,5 @@
 import { recordingUploadStatusSchema } from '../schemas/common.js'
+import type { UploadTarget } from '../schemas/common.js'
 import type { InitRecordingRequest } from '../schemas/recordings.js'
 import { db } from '../services/db/index.js'
 import { insertRecording } from '../services/recordings/index.js'
@@ -22,6 +23,7 @@ export type InitRecordingResult =
         upload_urls: {
           acce?: string
           gyro?: string
+          metadata?: string
           pressure?: string
           wifi?: string
         }
@@ -32,6 +34,14 @@ export type InitRecordingResult =
       ok: false
       error: InitRecordingError
     }
+
+const withRequiredMetadataTarget = (targets: UploadTarget[]): UploadTarget[] => {
+  if (targets.includes('metadata')) {
+    return targets
+  }
+
+  return [...targets, 'metadata']
+}
 
 export const initRecording = async (payload: InitRecordingRequest) => {
   const [pedestrian, floor] = await Promise.all([
@@ -63,15 +73,14 @@ export const initRecording = async (payload: InitRecordingRequest) => {
     } satisfies InitRecordingResult
   }
 
+  const uploadTargets = withRequiredMetadataTarget(payload.upload_targets)
+
   const recording = await insertRecording({
     pedestrian_id: payload.pedestrian_id,
     floor_id: payload.floor_id,
-    upload_targets: payload.upload_targets,
+    upload_targets: uploadTargets,
   })
-  const { expiresAt, uploadUrls } = await issueRecordingUploadUrls(
-    recording.id,
-    payload.upload_targets
-  )
+  const { expiresAt, uploadUrls } = await issueRecordingUploadUrls(recording.id, uploadTargets)
 
   return {
     ok: true,

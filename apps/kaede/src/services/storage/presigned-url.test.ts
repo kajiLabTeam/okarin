@@ -25,6 +25,9 @@ describe('storage presigned url service', () => {
     expect(buildRecordingRawObjectKey('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'gyro')).toBe(
       'recordings/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/raw/gyro.csv'
     )
+    expect(buildRecordingRawObjectKey('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'metadata')).toBe(
+      'recordings/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/raw/metadata.json'
+    )
   })
 
   it('PUT 用の署名付き URL を生成できる', async () => {
@@ -43,18 +46,20 @@ describe('storage presigned url service', () => {
     const recordingId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
     const now = new Date('2026-05-13T00:00:00.000Z')
 
-    const result = await issueRecordingUploadUrls(recordingId, ['acce', 'gyro'], now)
+    const result = await issueRecordingUploadUrls(recordingId, ['acce', 'gyro', 'metadata'], now)
 
     expect(result.expiresAt).toBe('2026-05-13T00:15:00.000Z')
     expect(result.uploadUrls.pressure).toBeUndefined()
     expect(result.uploadUrls.acce).toBeDefined()
     expect(result.uploadUrls.gyro).toBeDefined()
-    if (!result.uploadUrls.acce || !result.uploadUrls.gyro) {
-      throw new Error('expected upload URLs for acce and gyro')
+    expect(result.uploadUrls.metadata).toBeDefined()
+    if (!result.uploadUrls.acce || !result.uploadUrls.gyro || !result.uploadUrls.metadata) {
+      throw new Error('expected upload URLs for acce, gyro and metadata')
     }
 
     const acceUrl = new URL(result.uploadUrls.acce)
     const gyroUrl = new URL(result.uploadUrls.gyro)
+    const metadataUrl = new URL(result.uploadUrls.metadata)
 
     expect(acceUrl.origin).toBe('http://127.0.0.1:8333')
     expect(acceUrl.pathname).toBe(`/okarin-local/recordings/${recordingId}/raw/acce.csv`)
@@ -65,5 +70,6 @@ describe('storage presigned url service', () => {
     expect(acceUrl.searchParams.get('X-Amz-Signature')).toMatch(/^[0-9a-f]+$/)
 
     expect(gyroUrl.pathname).toBe(`/okarin-local/recordings/${recordingId}/raw/gyro.csv`)
+    expect(metadataUrl.pathname).toBe(`/okarin-local/recordings/${recordingId}/raw/metadata.json`)
   })
 })

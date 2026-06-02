@@ -44,6 +44,7 @@ describe('POST /api/recordings/init', () => {
     expect(body.upload_urls).toEqual({
       acce: expect.stringContaining(`/recordings/${body.recording_id}/raw/acce.csv`),
       gyro: expect.stringContaining(`/recordings/${body.recording_id}/raw/gyro.csv`),
+      metadata: expect.stringContaining(`/recordings/${body.recording_id}/raw/metadata.json`),
       wifi: expect.stringContaining(`/recordings/${body.recording_id}/raw/wifi.csv`),
     })
     expect(body.upload_urls.pressure).toBeUndefined()
@@ -59,7 +60,7 @@ describe('POST /api/recordings/init', () => {
     expect(created?.pedestrian_id).toBe(pedestrianId)
     expect(created?.floor_id).toBe(floorId)
     expect(created?.upload_status).toBe('accepted')
-    expect(created?.upload_targets).toEqual(['acce', 'gyro', 'wifi'])
+    expect(created?.upload_targets).toEqual(['acce', 'gyro', 'wifi', 'metadata'])
   })
 
   it('存在しない pedestrian_id は 404 を返す', async () => {

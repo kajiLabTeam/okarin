@@ -12,6 +12,11 @@ import {
 const uploadUrlsSchema = z.object({
   acce: z.string().url().optional().openapi({ description: '加速度センサ用のアップロード URL' }),
   gyro: z.string().url().optional().openapi({ description: 'ジャイロセンサ用のアップロード URL' }),
+  metadata: z
+    .string()
+    .url()
+    .optional()
+    .openapi({ description: '収録メタデータ用のアップロード URL' }),
   pressure: z.string().url().optional().openapi({ description: '気圧センサ用のアップロード URL' }),
   wifi: z.string().url().optional().openapi({ description: 'Wi-Fi スキャン用のアップロード URL' }),
 })

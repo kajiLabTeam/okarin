@@ -85,6 +85,7 @@ describe('initRecording', () => {
       uploadUrls: {
         acce: 'https://storage.example.test/acce',
         gyro: 'https://storage.example.test/gyro',
+        metadata: 'https://storage.example.test/metadata',
       },
     })
 
@@ -102,6 +103,7 @@ describe('initRecording', () => {
         upload_urls: {
           acce: 'https://storage.example.test/acce',
           gyro: 'https://storage.example.test/gyro',
+          metadata: 'https://storage.example.test/metadata',
         },
         expires_at: '2026-05-13T00:15:00.000Z',
       },
@@ -109,9 +111,13 @@ describe('initRecording', () => {
     expect(insertRecordingMock).toHaveBeenCalledWith({
       pedestrian_id: pedestrianId,
       floor_id: floorId,
-      upload_targets: ['acce', 'gyro'],
+      upload_targets: ['acce', 'gyro', 'metadata'],
     })
-    expect(issueRecordingUploadUrlsMock).toHaveBeenCalledWith(recordingId, ['acce', 'gyro'])
+    expect(issueRecordingUploadUrlsMock).toHaveBeenCalledWith(recordingId, [
+      'acce',
+      'gyro',
+      'metadata',
+    ])
   })
 
   it('pedestrian が存在しなければ PEDESTRIAN_NOT_FOUND を返す', async () => {

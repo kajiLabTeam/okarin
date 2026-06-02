@@ -13,8 +13,13 @@ vi.mock('../services/recordings/index.js', () => ({
 }))
 
 vi.mock('../services/storage/index.js', () => ({
-  buildRecordingRawObjectKey: (recordingId: string, target: string) =>
-    `recordings/${recordingId}/raw/${target}.csv`,
+  buildRecordingRawObjectKey: (recordingId: string, target: string) => {
+    if (target === 'metadata') {
+      return `recordings/${recordingId}/raw/metadata.json`
+    }
+
+    return `recordings/${recordingId}/raw/${target}.csv`
+  },
   listRecordingRawObjectKeys: listRecordingRawObjectKeysMock,
 }))
 
@@ -48,11 +53,12 @@ describe('completeUpload', () => {
     findRecordingByIdMock.mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',
       upload_status: 'accepted',
-      upload_targets: ['acce', 'gyro'],
+      upload_targets: ['acce', 'gyro', 'metadata'],
     })
     listRecordingRawObjectKeysMock.mockResolvedValue([
       'recordings/11111111-1111-4111-8111-111111111111/raw/acce.csv',
       'recordings/11111111-1111-4111-8111-111111111111/raw/gyro.csv',
+      'recordings/11111111-1111-4111-8111-111111111111/raw/metadata.json',
     ])
     markRecordingUploadReadyMock.mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',

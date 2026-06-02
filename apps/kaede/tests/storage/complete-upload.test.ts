@@ -27,11 +27,12 @@ describe('POST /api/recordings/:recordingId/complete-upload', () => {
   it('必要な raw が揃っていれば ready に更新する', async () => {
     const { recordingId } = await createRecordingFixture(db, {
       uploadStatus: 'accepted',
-      uploadTargets: ['acce', 'gyro'],
+      uploadTargets: ['acce', 'gyro', 'metadata'],
     })
 
     await putObjectText(s3, `recordings/${recordingId}/raw/acce.csv`, 'timestamp,x\n0,1\n')
     await putObjectText(s3, `recordings/${recordingId}/raw/gyro.csv`, 'timestamp,z\n0,2\n')
+    await putObjectText(s3, `recordings/${recordingId}/raw/metadata.json`, '{"schema_version":1}\n')
 
     const response = await app.request(`/api/recordings/${recordingId}/complete-upload`, {
       method: 'POST',
@@ -55,10 +56,11 @@ describe('POST /api/recordings/:recordingId/complete-upload', () => {
   it('不足 raw がある場合は missing_targets を返す', async () => {
     const { recordingId } = await createRecordingFixture(db, {
       uploadStatus: 'accepted',
-      uploadTargets: ['acce', 'gyro'],
+      uploadTargets: ['acce', 'gyro', 'metadata'],
     })
 
     await putObjectText(s3, `recordings/${recordingId}/raw/acce.csv`, 'timestamp,x\n0,1\n')
+    await putObjectText(s3, `recordings/${recordingId}/raw/gyro.csv`, 'timestamp,z\n0,2\n')
 
     const response = await app.request(`/api/recordings/${recordingId}/complete-upload`, {
       method: 'POST',
@@ -70,7 +72,7 @@ describe('POST /api/recordings/:recordingId/complete-upload', () => {
       error_message: 'some upload targets are missing',
       details: {
         recording_id: recordingId,
-        missing_targets: ['gyro'],
+        missing_targets: ['metadata'],
       },
     })
 
