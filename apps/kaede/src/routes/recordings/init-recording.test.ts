@@ -28,6 +28,7 @@ describe('POST /api/recordings/init', () => {
         upload_urls: {
           acce: 'https://example.test/acce',
           gyro: 'https://example.test/gyro',
+          metadata: 'https://example.test/metadata',
         },
         expires_at: '2026-05-13T00:15:00.000Z',
       },
@@ -53,6 +54,7 @@ describe('POST /api/recordings/init', () => {
       upload_urls: {
         acce: 'https://example.test/acce',
         gyro: 'https://example.test/gyro',
+        metadata: 'https://example.test/metadata',
       },
       expires_at: '2026-05-13T00:15:00.000Z',
     })

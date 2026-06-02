@@ -6,6 +6,7 @@ import { getS3Context } from './s3-client.js'
 export interface RecordingUploadUrls {
   acce?: string
   gyro?: string
+  metadata?: string
   pressure?: string
   wifi?: string
 }
@@ -18,6 +19,10 @@ export interface RecordingRawDownloadUrls {
 }
 
 export const buildRecordingRawObjectKey = (recordingId: string, target: UploadTarget) => {
+  if (target === 'metadata') {
+    return `recordings/${recordingId}/raw/metadata.json`
+  }
+
   return `recordings/${recordingId}/raw/${target}.csv`
 }
 

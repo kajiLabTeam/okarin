@@ -31,11 +31,12 @@ export const trajectoryStatusSchema = z
     },
   })
 
-export const uploadTargetSchema = z.enum(['acce', 'gyro', 'pressure', 'wifi']).openapi({
-  description: 'アップロード対象のセンサ種別',
+export const uploadTargetSchema = z.enum(['acce', 'gyro', 'metadata', 'pressure', 'wifi']).openapi({
+  description: 'アップロード対象の種別',
   'x-enum-descriptions': {
     acce: '加速度センサのデータ',
     gyro: 'ジャイロセンサのデータ',
+    metadata: '収録条件と端末情報のメタデータ',
     pressure: '気圧センサのデータ',
     wifi: 'Wi-Fi スキャンデータ',
   },

@@ -38,4 +38,29 @@ describe('presigned upload integration', () => {
     expect(uploadResponse.ok).toBe(true)
     await expect(readObjectText(s3, `recordings/${recordingId}/raw/acce.csv`)).resolves.toBe(csv)
   })
+
+  it('発行した presigned URL に PUT した metadata.json を取得できる', async () => {
+    const recordingId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    const metadata = '{"schema_version":1,"selected_sampling_rate":"100Hz"}\n'
+    const { uploadUrls } = await issueRecordingUploadUrls(recordingId, ['metadata'])
+    const uploadUrl = uploadUrls.metadata
+
+    expect(uploadUrl).toBeDefined()
+    if (!uploadUrl) {
+      throw new Error('metadata upload URL is not defined')
+    }
+
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      body: metadata,
+      headers: {
+        'content-type': 'application/json',
+      },
+    })
+
+    expect(uploadResponse.ok).toBe(true)
+    await expect(readObjectText(s3, `recordings/${recordingId}/raw/metadata.json`)).resolves.toBe(
+      metadata
+    )
+  })
 })
