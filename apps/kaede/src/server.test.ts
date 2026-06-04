@@ -72,4 +72,26 @@ describe('createApp auth wiring', () => {
 
     expect(response.status).toBe(200)
   })
+
+  it('/api/trajectories/callback は shared token なしでも callback route まで到達する', async () => {
+    const { createApp } = await import('./server.js')
+    const app = createApp()
+
+    const response = await app.request('/api/trajectories/callback', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        trajectory_id: '11111111-1111-4111-8111-111111111111',
+        status: 'completed',
+        callback_token: 'signed-token',
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      error_code: 'CALLBACK_PAYLOAD_INVALID',
+    })
+  })
 })
