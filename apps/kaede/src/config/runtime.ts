@@ -1,6 +1,7 @@
 import { getOptionalEnv, getRequiredEnv, normalizeBaseUrl, parsePositiveIntegerEnv } from './env.js'
 
 export interface AppRuntimeConfig {
+  apiSharedToken?: string
   env: string
   deployRef: string
   deployedAt: string
@@ -58,6 +59,7 @@ let storageRuntimeConfig: StorageRuntimeConfig | undefined
 
 export const getAppRuntimeConfig = (): AppRuntimeConfig => {
   appRuntimeConfig ??= {
+    apiSharedToken: process.env.KAEDE_API_SHARED_TOKEN,
     env: getOptionalEnv('APP_ENV', 'local'),
     deployRef: getOptionalEnv('APP_DEPLOY_REF', 'unknown'),
     deployedAt: getOptionalEnv('APP_DEPLOYED_AT', 'unknown'),

@@ -127,6 +127,40 @@ docker compose -p okarin-local -f docker/compose.yml -f docker/compose.local.yml
 - `deploy/seaweedfs/s3.staging.conf.example` と `deploy/seaweedfs/s3.production.conf.example` をベースに SeaweedFS の実ファイルを作成してください。
 - 各環境の compose override が対応する `env_file` を持ちます。必要なら `ENV_FILE` で上書きできます。
 
+### kaede API shared token 認証
+
+`kaede` には `KAEDE_API_SHARED_TOKEN` を使った認証 middleware があります。
+この値が設定されている環境では、`/api/*` へのリクエストに以下の header が必要です。
+
+```http
+Authorization: Bearer <KAEDE_API_SHARED_TOKEN>
+```
+
+token は環境ごとに別の値を使ってください。
+同じ token を test / staging / production で使い回すと、test 用に配った token で production API も叩けるためです。
+
+生成例:
+
+```sh
+openssl rand -hex 32
+```
+
+`deploy/env/*.env.example` には `KAEDE_API_SHARED_TOKEN` の項目があります。
+実際の `deploy/env/test.env` / `deploy/env/staging.env` / `deploy/env/production.env` では、placeholder ではなく生成した値に置き換えてください。
+
+local では `KAEDE_API_SHARED_TOKEN=` のように空のままにすると middleware は無効になります。
+スマホアプリから test 環境などを叩く場合は、API base URL と同じ環境の token を使ってください。
+
+例:
+
+```sh
+curl -H "Authorization: Bearer ${KAEDE_API_SHARED_TOKEN}" \
+  http://<kaede-host>:8080/api/pedestrians
+```
+
+`/api/trajectories/callback` は Nozomi からの callback 用 endpoint で、別途 callback token を検証するため shared token 認証の対象外です。
+また、`GET /` の health check は shared token なしでアクセスできます。
+
 ### test 手動デプロイ
 
 手動で `docker compose` を直接実行する場合は、runtime metadata 用ファイルを先に作成してください。
