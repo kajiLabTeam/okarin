@@ -3,6 +3,7 @@ import { Scalar } from '@scalar/hono-api-reference'
 import * as Sentry from '@sentry/node'
 import { HTTPException } from 'hono/http-exception'
 import { getRuntimeConfig } from './config/runtime.js'
+import { apiSharedTokenAuth } from './middleware/api-shared-token.js'
 import { registerApiRoutes } from './routes/index.js'
 
 export const createApp = () => {
@@ -31,6 +32,14 @@ export const createApp = () => {
       500
     )
   })
+
+  app.use(
+    '/api/*',
+    apiSharedTokenAuth({
+      exemptPaths: ['/api/trajectories/callback'],
+      token: runtimeConfig.app.apiSharedToken,
+    })
+  )
 
   const healthRoute = createRoute({
     method: 'get',
