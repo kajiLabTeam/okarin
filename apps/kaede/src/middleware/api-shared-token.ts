@@ -1,8 +1,6 @@
 import type { MiddlewareHandler } from 'hono'
 import { timingSafeEqual } from 'node:crypto'
 
-const bearerPrefix = 'Bearer '
-
 const isEqualToken = (actual: string, expected: string) => {
   const actualBuffer = Buffer.from(actual)
   const expectedBuffer = Buffer.from(expected)
@@ -12,6 +10,11 @@ const isEqualToken = (actual: string, expected: string) => {
   }
 
   return timingSafeEqual(actualBuffer, expectedBuffer)
+}
+
+const extractBearerToken = (authorization: string | undefined) => {
+  const match = authorization?.trim().match(/^bearer\s+(.+)$/i)
+  return match?.[1]?.trim()
 }
 
 export interface ApiSharedTokenAuthOptions {
@@ -29,10 +32,7 @@ export const apiSharedTokenAuth = ({
       return
     }
 
-    const authorization = c.req.header('authorization')
-    const actualToken = authorization?.startsWith(bearerPrefix)
-      ? authorization.slice(bearerPrefix.length)
-      : undefined
+    const actualToken = extractBearerToken(c.req.header('authorization'))
 
     if (!actualToken || !isEqualToken(actualToken, token)) {
       return c.json(

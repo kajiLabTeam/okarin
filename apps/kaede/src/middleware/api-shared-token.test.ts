@@ -40,6 +40,18 @@ describe('apiSharedTokenAuth', () => {
     expect(response.status).toBe(200)
   })
 
+  it('Bearer scheme の大小文字と余分な空白を許容する', async () => {
+    const app = createTestApp('shared-token')
+
+    const response = await app.request('/api/ping', {
+      headers: {
+        authorization: '  bearer    shared-token  ',
+      },
+    })
+
+    expect(response.status).toBe(200)
+  })
+
   it('Bearer token がなければ 401 を返す', async () => {
     const app = createTestApp('shared-token')
 
