@@ -17,6 +17,7 @@ type AuthError =
   | { type: 'AUTH_UNAUTHENTICATED' }
   | { type: 'AUTH_INVALID_CREDENTIALS' }
   | { type: 'AUTH_USER_DISABLED' }
+  | { type: 'AUTH_USER_LOCKED' }
   | { type: 'AUTH_SESSION_EXPIRED' }
   | { type: 'AUTH_SESSION_REVOKED' }
   | { type: 'AUTH_TEMPORARY_PASSWORD_EXPIRED' }
@@ -113,6 +114,9 @@ const assertTemporaryPasswordNotExpired = (
   return undefined
 }
 
+const MAX_FAILED_LOGIN_ATTEMPTS = 5
+const LOGIN_LOCK_DURATION_MS = 15 * 60 * 1000
+
 export const login = async (
   payload: LoginRequest,
   now: Date = new Date(),
@@ -134,9 +138,38 @@ export const login = async (
     }
   }
 
+  if (user.locked_until && user.locked_until > now) {
+    return {
+      ok: false,
+      error: { type: 'AUTH_USER_LOCKED' },
+    }
+  }
+
   const passwordMatches = await verifyPassword(user.password_hash, payload.password)
 
   if (!passwordMatches) {
+    const failedAttempts = user.failed_login_attempts + 1
+    const lockedUntil =
+      failedAttempts >= MAX_FAILED_LOGIN_ATTEMPTS
+        ? new Date(now.getTime() + LOGIN_LOCK_DURATION_MS)
+        : null
+
+    await executor
+      .updateTable('users')
+      .set({
+        failed_login_attempts: failedAttempts,
+        locked_until: lockedUntil,
+      })
+      .where('id', '=', user.id)
+      .execute()
+
+    if (lockedUntil) {
+      return {
+        ok: false,
+        error: { type: 'AUTH_USER_LOCKED' },
+      }
+    }
+
     return {
       ok: false,
       error: { type: 'AUTH_INVALID_CREDENTIALS' },
@@ -151,6 +184,15 @@ export const login = async (
       error: temporaryPasswordError,
     }
   }
+
+  await executor
+    .updateTable('users')
+    .set({
+      failed_login_attempts: 0,
+      locked_until: null,
+    })
+    .where('id', '=', user.id)
+    .execute()
 
   const { token } = await createSession({ userId: user.id, now }, executor)
   const response = await buildAuthUserResponse(user, executor)
@@ -305,6 +347,7 @@ export const authErrorStatus = (error: AuthError): 401 | 403 => {
       return 401
     case 'AUTH_TEMPORARY_PASSWORD_EXPIRED':
     case 'AUTH_USER_DISABLED':
+    case 'AUTH_USER_LOCKED':
       return 403
   }
 }

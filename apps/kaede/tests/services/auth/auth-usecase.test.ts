@@ -112,8 +112,8 @@ describe('auth usecase', () => {
     expect(session.expires_at).toEqual(new Date('2026-06-17T00:00:00.000Z'))
   })
 
-  it('login は password 不一致なら AUTH_INVALID_CREDENTIALS を返す', async () => {
-    await insertUser()
+  it('login は password 不一致なら failed_login_attempts を増やし AUTH_INVALID_CREDENTIALS を返す', async () => {
+    const user = await insertUser()
 
     const result = await login(
       {
@@ -130,6 +130,96 @@ describe('auth usecase', () => {
         type: 'AUTH_INVALID_CREDENTIALS',
       },
     })
+
+    const updated = await db
+      .selectFrom('users')
+      .selectAll()
+      .where('id', '=', user.id)
+      .executeTakeFirstOrThrow()
+    expect(updated.failed_login_attempts).toBe(1)
+  })
+
+  it('login は 5回連続失敗でアカウントをロックする', async () => {
+    const user = await insertUser()
+
+    // 4回失敗させる
+    for (let i = 0; i < 4; i++) {
+      await login(
+        { email: 'user@example.com', password: 'wrong-password' },
+        new Date('2026-06-10T00:00:00.000Z'),
+        db
+      )
+    }
+
+    // 5回目
+    const result = await login(
+      { email: 'user@example.com', password: 'wrong-password' },
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: { type: 'AUTH_USER_LOCKED' },
+    })
+
+    const updated = await db
+      .selectFrom('users')
+      .selectAll()
+      .where('id', '=', user.id)
+      .executeTakeFirstOrThrow()
+    expect(updated.failed_login_attempts).toBe(5)
+    expect(updated.locked_until).toEqual(new Date('2026-06-10T00:15:00.000Z'))
+  })
+
+  it('login はロック期間中なら AUTH_USER_LOCKED を返す', async () => {
+    const user = await insertUser()
+    await db
+      .updateTable('users')
+      .set({
+        locked_until: new Date('2026-06-10T00:15:00.000Z'),
+      })
+      .where('id', '=', user.id)
+      .execute()
+
+    const result = await login(
+      { email: 'user@example.com', password: 'temporary-password' },
+      new Date('2026-06-10T00:14:59.000Z'),
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: { type: 'AUTH_USER_LOCKED' },
+    })
+  })
+
+  it('login はロック期間を過ぎれば再度ログイン可能になりカウントをリセットする', async () => {
+    const user = await insertUser()
+    await db
+      .updateTable('users')
+      .set({
+        failed_login_attempts: 5,
+        locked_until: new Date('2026-06-10T00:15:00.000Z'),
+      })
+      .where('id', '=', user.id)
+      .execute()
+
+    const result = await login(
+      { email: 'user@example.com', password: 'temporary-password' },
+      new Date('2026-06-10T00:15:01.000Z'),
+      db
+    )
+
+    expect(result.ok).toBe(true)
+
+    const updated = await db
+      .selectFrom('users')
+      .selectAll()
+      .where('id', '=', user.id)
+      .executeTakeFirstOrThrow()
+    expect(updated.failed_login_attempts).toBe(0)
+    expect(updated.locked_until).toBeNull()
   })
 
   it('login は temporary password 期限切れなら AUTH_TEMPORARY_PASSWORD_EXPIRED を返す', async () => {

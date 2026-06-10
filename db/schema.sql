@@ -208,6 +208,8 @@ CREATE TABLE public.users (
     is_active boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    failed_login_attempts integer DEFAULT 0 NOT NULL,
+    locked_until timestamp with time zone,
     CONSTRAINT users_display_name_nonempty_chk CHECK ((length(btrim(display_name)) > 0)),
     CONSTRAINT users_email_nonempty_chk CHECK ((length(btrim(email)) > 0)),
     CONSTRAINT users_password_hash_nonempty_chk CHECK ((length(btrim(password_hash)) > 0)),
@@ -555,4 +557,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20260425120000'),
     ('20260501110000'),
     ('20260531160000'),
-    ('20260610050000');
+    ('20260610050000'),
+    ('20260610060000');

@@ -120,9 +120,11 @@ export interface Users {
   created_at: Generated<Timestamp>
   display_name: string
   email: string
+  failed_login_attempts: Generated<number>
   global_role: Generated<string>
   id: Generated<string>
   is_active: Generated<boolean>
+  locked_until: Timestamp | null
   password_changed_at: Timestamp | null
   password_hash: string
   password_must_change: Generated<boolean>
