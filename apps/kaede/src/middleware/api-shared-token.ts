@@ -22,12 +22,16 @@ export interface ApiSharedTokenAuthOptions {
   token?: string
 }
 
+const isExemptPath = (path: string, exemptPaths: string[]) => {
+  return exemptPaths.some((exemptPath) => path === exemptPath || path.startsWith(`${exemptPath}/`))
+}
+
 export const apiSharedTokenAuth = ({
   exemptPaths = [],
   token,
 }: ApiSharedTokenAuthOptions): MiddlewareHandler => {
   return async (c, next) => {
-    if (!token || exemptPaths.includes(c.req.path)) {
+    if (!token || isExemptPath(c.req.path, exemptPaths)) {
       await next()
       return
     }

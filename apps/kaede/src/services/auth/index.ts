@@ -3,6 +3,7 @@ export {
   createSession,
   findSessionByToken,
   findValidSessionByToken,
+  revokeAllSessionsByUserId,
   revokeSessionByToken,
   updateSessionLastSeen,
 } from './session-repository.js'
