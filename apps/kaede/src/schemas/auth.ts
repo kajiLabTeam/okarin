@@ -1,0 +1,41 @@
+import { z } from '@hono/zod-openapi'
+import { isoDatetimeSchema, uuidSchema } from './common.js'
+
+export const authMembershipSchema = z.object({
+  organization_id: uuidSchema,
+  organization_name: z.string().min(1),
+  role: z.enum(['member', 'manager']),
+})
+
+export const authUserSchema = z.object({
+  user_id: uuidSchema,
+  email: z.string().email(),
+  display_name: z.string().min(1),
+  global_role: z.enum(['none', 'admin']),
+  password_must_change: z.boolean(),
+  password_changed_at: isoDatetimeSchema.nullable(),
+  temporary_password_expires_at: isoDatetimeSchema.nullable(),
+  memberships: z.array(authMembershipSchema),
+})
+
+export const loginRequestSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+})
+
+export const authUserResponseSchema = z.object({
+  user: authUserSchema,
+})
+
+export const changePasswordRequestSchema = z.object({
+  current_password: z.string().min(1),
+  new_password: z.string().min(1),
+})
+
+export const authOkResponseSchema = z.object({
+  ok: z.literal(true),
+})
+
+export type AuthUserResponse = z.infer<typeof authUserResponseSchema>
+export type ChangePasswordRequest = z.infer<typeof changePasswordRequestSchema>
+export type LoginRequest = z.infer<typeof loginRequestSchema>

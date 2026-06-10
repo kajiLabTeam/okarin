@@ -13,6 +13,7 @@ const createTestApp = (token?: string) => {
     })
   )
   app.get('/api/ping', (c) => c.json({ ok: true }))
+  app.post('/api/auth/login', (c) => c.json({ ok: true }))
   app.post('/api/trajectories/callback', (c) => c.json({ ok: true }))
   app.get('/', (c) => c.json({ ok: true }))
 
@@ -80,6 +81,25 @@ describe('apiSharedTokenAuth', () => {
     const app = createTestApp('shared-token')
 
     const response = await app.request('/api/trajectories/callback', {
+      method: 'POST',
+    })
+
+    expect(response.status).toBe(200)
+  })
+
+  it('exempt path 配下は shared token なしで通す', async () => {
+    const app = new Hono()
+
+    app.use(
+      '/api/*',
+      apiSharedTokenAuth({
+        exemptPaths: ['/api/auth'],
+        token: 'shared-token',
+      })
+    )
+    app.post('/api/auth/login', (c) => c.json({ ok: true }))
+
+    const response = await app.request('/api/auth/login', {
       method: 'POST',
     })
 

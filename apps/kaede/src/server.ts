@@ -36,7 +36,7 @@ export const createApp = () => {
   app.use(
     '/api/*',
     apiSharedTokenAuth({
-      exemptPaths: ['/api/trajectories/callback'],
+      exemptPaths: ['/api/auth', '/api/trajectories/callback'],
       token: runtimeConfig.app.apiSharedToken,
     })
   )
