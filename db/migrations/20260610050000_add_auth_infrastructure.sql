@@ -16,6 +16,8 @@ CREATE TABLE users (
     CHECK (length(btrim(email)) > 0),
   CONSTRAINT users_display_name_nonempty_chk
     CHECK (length(btrim(display_name)) > 0),
+  CONSTRAINT users_password_hash_nonempty_chk
+    CHECK (length(btrim(password_hash)) > 0),
   CONSTRAINT users_global_role_chk
     CHECK (global_role IN ('none', 'admin'))
 );
@@ -47,7 +49,9 @@ CREATE TABLE sessions (
   expires_at timestamptz NOT NULL,
   revoked_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT NOW(),
-  last_seen_at timestamptz
+  last_seen_at timestamptz,
+  CONSTRAINT sessions_session_hash_nonempty_chk
+    CHECK (length(btrim(session_hash)) > 0)
 );
 
 ALTER TABLE pedestrians

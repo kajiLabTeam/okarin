@@ -39,7 +39,7 @@ describe('recording repository', () => {
 
     const pedestrian = await db
       .insertInto('pedestrians')
-      .values({ display_name: 'Recording Test Pedestrian A' })
+      .values({ display_name: 'Recording Test Pedestrian A', user_id: null })
       .returning(['id'])
       .executeTakeFirstOrThrow()
 
@@ -79,7 +79,7 @@ describe('recording repository', () => {
 
     const pedestrian = await db
       .insertInto('pedestrians')
-      .values({ display_name: 'Recording Test Pedestrian B' })
+      .values({ display_name: 'Recording Test Pedestrian B', user_id: null })
       .returning(['id'])
       .executeTakeFirstOrThrow()
 
@@ -117,7 +117,7 @@ describe('recording repository', () => {
 
     const pedestrian = await db
       .insertInto('pedestrians')
-      .values({ display_name: 'Recording Test Pedestrian C' })
+      .values({ display_name: 'Recording Test Pedestrian C', user_id: null })
       .returning(['id'])
       .executeTakeFirstOrThrow()
 

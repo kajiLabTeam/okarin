@@ -146,7 +146,8 @@ CREATE TABLE public.sessions (
     expires_at timestamp with time zone NOT NULL,
     revoked_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    last_seen_at timestamp with time zone
+    last_seen_at timestamp with time zone,
+    CONSTRAINT sessions_session_hash_nonempty_chk CHECK ((length(btrim(session_hash)) > 0))
 );
 
 
@@ -209,6 +210,7 @@ CREATE TABLE public.users (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT users_display_name_nonempty_chk CHECK ((length(btrim(display_name)) > 0)),
     CONSTRAINT users_email_nonempty_chk CHECK ((length(btrim(email)) > 0)),
+    CONSTRAINT users_password_hash_nonempty_chk CHECK ((length(btrim(password_hash)) > 0)),
     CONSTRAINT users_global_role_chk CHECK ((global_role = ANY (ARRAY['none'::text, 'admin'::text])))
 );
 
