@@ -188,12 +188,13 @@ describe('auth usecase', () => {
     expect(session.revoked_at).toEqual(new Date('2026-06-11T00:00:00.000Z'))
   })
 
-  it('changePassword は current password を検証して password 状態を更新する', async () => {
+  it('changePassword は current password を検証して password 状態を更新し、全セッションを無効化する', async () => {
     const user = await insertUser()
-    const { token } = await createSession({ userId: user.id }, db)
+    const { token: currentToken } = await createSession({ userId: user.id }, db)
+    const { token: _otherToken } = await createSession({ userId: user.id }, db)
 
     const result = await changePassword(
-      token,
+      currentToken,
       {
         current_password: 'temporary-password',
         new_password: 'new-password',
@@ -219,6 +220,17 @@ describe('auth usecase', () => {
     expect(updated.password_changed_at).toEqual(new Date('2026-06-10T00:00:00.000Z'))
     expect(updated.temporary_password_expires_at).toBeNull()
     await expect(verifyPassword(updated.password_hash, 'new-password')).resolves.toBe(true)
+
+    const sessions = await db
+      .selectFrom('sessions')
+      .selectAll()
+      .where('user_id', '=', user.id)
+      .execute()
+
+    expect(sessions).toHaveLength(2)
+    for (const session of sessions) {
+      expect(session.revoked_at).toEqual(new Date('2026-06-10T00:00:00.000Z'))
+    }
   })
 
   it('changePassword は current password 不一致なら AUTH_INVALID_CREDENTIALS を返す', async () => {

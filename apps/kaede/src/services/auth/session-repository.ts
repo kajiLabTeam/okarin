@@ -130,6 +130,21 @@ export const revokeSessionByToken = async (
     .executeTakeFirst()
 }
 
+export const revokeAllSessionsByUserId = async (
+  userId: string,
+  revokedAt: Date = new Date(),
+  executor: DbExecutor = db
+): Promise<void> => {
+  await executor
+    .updateTable('sessions')
+    .set({
+      revoked_at: revokedAt,
+    })
+    .where('user_id', '=', userId)
+    .where('revoked_at', 'is', null)
+    .execute()
+}
+
 export const updateSessionLastSeen = async (
   sessionId: string,
   lastSeenAt: Date = new Date(),

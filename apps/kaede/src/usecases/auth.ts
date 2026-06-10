@@ -3,6 +3,7 @@ import type { AuthUserResponse, ChangePasswordRequest, LoginRequest } from '../s
 import {
   createSession,
   findValidSessionByToken,
+  revokeAllSessionsByUserId,
   revokeSessionByToken,
 } from '../services/auth/index.js'
 import { hashPassword, verifyPassword } from '../services/auth/password.js'
@@ -286,6 +287,8 @@ export const changePassword = async (
     })
     .where('id', '=', user.id)
     .execute()
+
+  await revokeAllSessionsByUserId(user.id, now, executor)
 
   return {
     ok: true,
