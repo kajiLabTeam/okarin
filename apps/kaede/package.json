@@ -23,6 +23,7 @@
     "@hono/zod-openapi": "^0.19.10",
     "@scalar/hono-api-reference": "^0.10.9",
     "@sentry/node": "^10.51.0",
+    "argon2": "^0.44.0",
     "hono": "^4.12.9",
     "kysely": "^0.28.17",
     "pg": "^8.20.0",
