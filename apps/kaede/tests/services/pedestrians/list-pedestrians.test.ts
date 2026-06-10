@@ -24,6 +24,7 @@ describe('listPedestrians', () => {
         attributes: {
           device: 'Pixel 8',
         },
+        user_id: null,
       })
       .returning(['id'])
       .executeTakeFirstOrThrow()
@@ -49,6 +50,7 @@ describe('listPedestrians', () => {
         display_name: 'Older Pedestrian',
         created_at: new Date('2026-05-13T00:00:00.000Z'),
         updated_at: new Date('2026-05-13T00:00:00.000Z'),
+        user_id: null,
       })
       .returning(['id'])
       .executeTakeFirstOrThrow()
@@ -58,6 +60,7 @@ describe('listPedestrians', () => {
         display_name: 'Newer Pedestrian',
         created_at: new Date('2026-05-14T00:00:00.000Z'),
         updated_at: new Date('2026-05-14T00:00:00.000Z'),
+        user_id: null,
       })
       .returning(['id'])
       .executeTakeFirstOrThrow()

@@ -19,6 +19,7 @@ export const createPedestrian = async (
     height: payload.height ?? null,
     stride_length: payload.stride_length ?? null,
     attributes: payload.attributes ?? {},
+    user_id: null,
   })
 
   return {

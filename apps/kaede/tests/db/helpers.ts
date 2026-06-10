@@ -5,12 +5,16 @@ import type { DB } from '../../src/services/db/generated.js'
 export const resetDatabase = async (db: Kysely<DB>) => {
   await sql`
     TRUNCATE TABLE
+      sessions,
+      organization_memberships,
       trajectory_constraints,
       trajectories,
       recordings,
       pedestrians,
       floors,
-      buildings
+      buildings,
+      users,
+      organizations
     RESTART IDENTITY CASCADE
   `.execute(db)
 }

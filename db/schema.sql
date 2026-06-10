@@ -65,6 +65,33 @@ CREATE TABLE public.floors (
 
 
 --
+-- Name: organization_memberships; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_memberships (
+    organization_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    role text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organization_memberships_role_chk CHECK ((role = ANY (ARRAY['member'::text, 'manager'::text])))
+);
+
+
+--
+-- Name: organizations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organizations (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organizations_name_nonempty_chk CHECK ((length(btrim(name)) > 0))
+);
+
+
+--
 -- Name: pedestrians; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -76,6 +103,7 @@ CREATE TABLE public.pedestrians (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     display_name text NOT NULL,
+    user_id uuid,
     CONSTRAINT pedestrians_display_name_nonempty_chk CHECK ((length(btrim(display_name)) > 0))
 );
 
@@ -104,6 +132,22 @@ CREATE TABLE public.recordings (
 
 CREATE TABLE public.schema_migrations (
     version character varying NOT NULL
+);
+
+
+--
+-- Name: sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sessions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    session_hash text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    revoked_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_seen_at timestamp with time zone,
+    CONSTRAINT sessions_session_hash_nonempty_chk CHECK ((length(btrim(session_hash)) > 0))
 );
 
 
@@ -149,6 +193,29 @@ CREATE TABLE public.trajectory_constraints (
 
 
 --
+-- Name: users; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.users (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    email text NOT NULL,
+    password_hash text NOT NULL,
+    display_name text NOT NULL,
+    global_role text DEFAULT 'none'::text NOT NULL,
+    password_must_change boolean DEFAULT true NOT NULL,
+    password_changed_at timestamp with time zone,
+    temporary_password_expires_at timestamp with time zone,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT users_display_name_nonempty_chk CHECK ((length(btrim(display_name)) > 0)),
+    CONSTRAINT users_email_nonempty_chk CHECK ((length(btrim(email)) > 0)),
+    CONSTRAINT users_password_hash_nonempty_chk CHECK ((length(btrim(password_hash)) > 0)),
+    CONSTRAINT users_global_role_chk CHECK ((global_role = ANY (ARRAY['none'::text, 'admin'::text])))
+);
+
+
+--
 -- Name: buildings buildings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -165,11 +232,35 @@ ALTER TABLE ONLY public.floors
 
 
 --
+-- Name: organization_memberships organization_memberships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_memberships
+    ADD CONSTRAINT organization_memberships_pkey PRIMARY KEY (organization_id, user_id);
+
+
+--
+-- Name: organizations organizations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organizations
+    ADD CONSTRAINT organizations_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: pedestrians pedestrians_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.pedestrians
     ADD CONSTRAINT pedestrians_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: pedestrians pedestrians_user_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pedestrians
+    ADD CONSTRAINT pedestrians_user_id_key UNIQUE (user_id);
 
 
 --
@@ -189,6 +280,22 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
+-- Name: sessions sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sessions
+    ADD CONSTRAINT sessions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: sessions sessions_session_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sessions
+    ADD CONSTRAINT sessions_session_hash_key UNIQUE (session_hash);
+
+
+--
 -- Name: trajectories trajectories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -205,10 +312,33 @@ ALTER TABLE ONLY public.trajectory_constraints
 
 
 --
+-- Name: users users_email_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_email_key UNIQUE (email);
+
+
+--
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: floors_building_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX floors_building_id_idx ON public.floors USING btree (building_id);
+
+
+--
+-- Name: organization_memberships_user_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_memberships_user_id_idx ON public.organization_memberships USING btree (user_id);
 
 
 --
@@ -223,6 +353,27 @@ CREATE INDEX recordings_floor_id_created_at_active_idx ON public.recordings USIN
 --
 
 CREATE INDEX recordings_pedestrian_id_created_at_active_idx ON public.recordings USING btree (pedestrian_id, created_at DESC) WHERE (deleted_at IS NULL);
+
+
+--
+-- Name: sessions_expires_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX sessions_expires_at_idx ON public.sessions USING btree (expires_at);
+
+
+--
+-- Name: sessions_revoked_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX sessions_revoked_at_idx ON public.sessions USING btree (revoked_at);
+
+
+--
+-- Name: sessions_user_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX sessions_user_id_idx ON public.sessions USING btree (user_id);
 
 
 --
@@ -261,6 +412,20 @@ CREATE TRIGGER set_updated_at_floors BEFORE UPDATE ON public.floors FOR EACH ROW
 
 
 --
+-- Name: organization_memberships set_updated_at_organization_memberships; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER set_updated_at_organization_memberships BEFORE UPDATE ON public.organization_memberships FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: organizations set_updated_at_organizations; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER set_updated_at_organizations BEFORE UPDATE ON public.organizations FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
 -- Name: pedestrians set_updated_at_pedestrians; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -289,11 +454,42 @@ CREATE TRIGGER set_updated_at_trajectory_constraints BEFORE UPDATE ON public.tra
 
 
 --
+-- Name: users set_updated_at_users; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER set_updated_at_users BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
 -- Name: floors floors_building_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.floors
     ADD CONSTRAINT floors_building_id_fkey FOREIGN KEY (building_id) REFERENCES public.buildings(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: organization_memberships organization_memberships_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_memberships
+    ADD CONSTRAINT organization_memberships_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: organization_memberships organization_memberships_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_memberships
+    ADD CONSTRAINT organization_memberships_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: pedestrians pedestrians_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pedestrians
+    ADD CONSTRAINT pedestrians_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
 
 
 --
@@ -310,6 +506,14 @@ ALTER TABLE ONLY public.recordings
 
 ALTER TABLE ONLY public.recordings
     ADD CONSTRAINT recordings_pedestrian_id_fkey FOREIGN KEY (pedestrian_id) REFERENCES public.pedestrians(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: sessions sessions_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sessions
+    ADD CONSTRAINT sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
 
 
 --
@@ -350,4 +554,5 @@ ALTER TABLE ONLY public.trajectory_constraints
 INSERT INTO public.schema_migrations (version) VALUES
     ('20260425120000'),
     ('20260501110000'),
-    ('20260531160000');
+    ('20260531160000'),
+    ('20260610050000');

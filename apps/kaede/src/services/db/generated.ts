@@ -44,6 +44,21 @@ export interface Floors {
   updated_at: Generated<Timestamp>
 }
 
+export interface OrganizationMemberships {
+  created_at: Generated<Timestamp>
+  organization_id: string
+  role: string
+  updated_at: Generated<Timestamp>
+  user_id: string
+}
+
+export interface Organizations {
+  created_at: Generated<Timestamp>
+  id: Generated<string>
+  name: string
+  updated_at: Generated<Timestamp>
+}
+
 export interface Pedestrians {
   attributes: Generated<Json>
   created_at: Generated<Timestamp>
@@ -52,6 +67,7 @@ export interface Pedestrians {
   id: Generated<string>
   stride_length: number | null
   updated_at: Generated<Timestamp>
+  user_id: string | null
 }
 
 export interface Recordings {
@@ -63,6 +79,16 @@ export interface Recordings {
   updated_at: Generated<Timestamp>
   upload_status: Generated<string>
   upload_targets: string[]
+}
+
+export interface Sessions {
+  created_at: Generated<Timestamp>
+  expires_at: Timestamp
+  id: Generated<string>
+  last_seen_at: Timestamp | null
+  revoked_at: Timestamp | null
+  session_hash: string
+  user_id: string
 }
 
 export interface Trajectories {
@@ -90,11 +116,29 @@ export interface TrajectoryConstraints {
   y: number
 }
 
+export interface Users {
+  created_at: Generated<Timestamp>
+  display_name: string
+  email: string
+  global_role: Generated<string>
+  id: Generated<string>
+  is_active: Generated<boolean>
+  password_changed_at: Timestamp | null
+  password_hash: string
+  password_must_change: Generated<boolean>
+  temporary_password_expires_at: Timestamp | null
+  updated_at: Generated<Timestamp>
+}
+
 export interface DB {
   buildings: Buildings
   floors: Floors
+  organization_memberships: OrganizationMemberships
+  organizations: Organizations
   pedestrians: Pedestrians
   recordings: Recordings
+  sessions: Sessions
   trajectories: Trajectories
   trajectory_constraints: TrajectoryConstraints
+  users: Users
 }
