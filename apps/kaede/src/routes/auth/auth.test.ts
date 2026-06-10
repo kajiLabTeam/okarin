@@ -222,4 +222,55 @@ describe('auth routes', () => {
       error_message: 'temporary password expired',
     })
   })
+
+  describe('input validation', () => {
+    it('POST /api/auth/login は長すぎる email で 400 を返す', async () => {
+      const app = createAuthTestApp()
+      const response = await app.request('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: 'a'.repeat(245) + '@example.com', // 256 chars
+          password: 'password',
+        }),
+      })
+
+      expect(response.status).toBe(400)
+    })
+
+    it('POST /api/auth/login は長すぎる password で 400 を返す', async () => {
+      const app = createAuthTestApp()
+      const response = await app.request('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: 'user@example.com',
+          password: 'a'.repeat(101),
+        }),
+      })
+
+      expect(response.status).toBe(400)
+    })
+
+    it('POST /api/auth/change-password は長すぎる new_password で 400 を返す', async () => {
+      const app = createAuthTestApp()
+      const response = await app.request('/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          cookie: 'okarin_session=session-token',
+        },
+        body: JSON.stringify({
+          current_password: 'old-password',
+          new_password: 'a'.repeat(101),
+        }),
+      })
+
+      expect(response.status).toBe(400)
+    })
+  })
 })

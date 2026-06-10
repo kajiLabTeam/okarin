@@ -3,14 +3,14 @@ import { isoDatetimeSchema, uuidSchema } from './common.js'
 
 export const authMembershipSchema = z.object({
   organization_id: uuidSchema,
-  organization_name: z.string().min(1),
+  organization_name: z.string().min(1).max(255),
   role: z.enum(['member', 'manager']),
 })
 
 export const authUserSchema = z.object({
   user_id: uuidSchema,
-  email: z.string().email(),
-  display_name: z.string().min(1),
+  email: z.string().email().max(255),
+  display_name: z.string().min(1).max(255),
   global_role: z.enum(['none', 'admin']),
   password_must_change: z.boolean(),
   password_changed_at: isoDatetimeSchema.nullable(),
@@ -19,8 +19,8 @@ export const authUserSchema = z.object({
 })
 
 export const loginRequestSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email: z.string().email().max(255),
+  password: z.string().min(1).max(100),
 })
 
 export const authUserResponseSchema = z.object({
@@ -28,8 +28,8 @@ export const authUserResponseSchema = z.object({
 })
 
 export const changePasswordRequestSchema = z.object({
-  current_password: z.string().min(1),
-  new_password: z.string().min(1),
+  current_password: z.string().min(1).max(100),
+  new_password: z.string().min(1).max(100),
 })
 
 export const authOkResponseSchema = z.object({
