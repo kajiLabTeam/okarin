@@ -21,5 +21,9 @@ export const verifyPassword = async (passwordHash: string, password: string): Pr
     return false
   }
 
-  return argon2.verify(passwordHash, password)
+  try {
+    return await argon2.verify(passwordHash, password)
+  } catch {
+    return false
+  }
 }

@@ -62,6 +62,10 @@ export const findSessionByToken = async (
   token: string,
   executor: DbExecutor = db
 ): Promise<Session | undefined> => {
+  if (token.trim().length === 0) {
+    return undefined
+  }
+
   const sessionHash = hashSessionToken(token)
 
   return executor
@@ -110,6 +114,10 @@ export const revokeSessionByToken = async (
   revokedAt: Date = new Date(),
   executor: DbExecutor = db
 ): Promise<Session | undefined> => {
+  if (token.trim().length === 0) {
+    return undefined
+  }
+
   const sessionHash = hashSessionToken(token)
 
   return executor

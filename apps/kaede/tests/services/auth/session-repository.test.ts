@@ -77,6 +77,15 @@ describe('session repository', () => {
     })
   })
 
+  it('空 token は SESSION_NOT_FOUND を返す', async () => {
+    const result = await findValidSessionByToken('   ', new Date(), db)
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'SESSION_NOT_FOUND',
+    })
+  })
+
   it('期限切れ session は SESSION_EXPIRED を返す', async () => {
     const user = await insertUser()
     const now = new Date('2026-06-10T00:00:00.000Z')
@@ -113,6 +122,12 @@ describe('session repository', () => {
     const revoked = await revokeSessionByToken(token, revokedAt, db)
 
     expect(revoked?.revoked_at).toEqual(revokedAt)
+  })
+
+  it('空 token の revoke は no-op として扱う', async () => {
+    const revoked = await revokeSessionByToken('   ', new Date(), db)
+
+    expect(revoked).toBeUndefined()
   })
 
   it('last_seen_at を更新できる', async () => {

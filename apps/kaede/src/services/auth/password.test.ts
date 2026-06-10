@@ -21,6 +21,10 @@ describe('password service', () => {
     await expect(verifyPassword(passwordHash, 'wrong-password')).resolves.toBe(false)
   })
 
+  it('不正な password hash は検証に失敗する', async () => {
+    await expect(verifyPassword('not-a-valid-hash', 'any-password')).resolves.toBe(false)
+  })
+
   it('空 password は hash しない', async () => {
     await expect(hashPassword('   ')).rejects.toThrow('password must not be empty')
   })
