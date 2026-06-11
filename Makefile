@@ -34,7 +34,7 @@ help:
 	@echo "  make db-up ENV=local"
 	@echo "  make db-new ENV=local NAME=init"
 	@echo "  make db-seed-local ENV=local"
-	@echo "  make kaede-admin-create-user ENV=production ARGS=\"--email admin@example.com --password 'temporary-password'\""
+	@echo "  make kaede-admin-create-user ENV=production ARGS=\"--email admin@example.com\""
 	@echo "  make storage-init ENV=local"
 	@echo "  make storage-test"
 

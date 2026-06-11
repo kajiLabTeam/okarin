@@ -156,4 +156,24 @@ describe('createAdminUser', () => {
       true
     )
   })
+
+  it('returns a validation error when email is invalid', async () => {
+    const result = await createAdminUser(
+      {
+        email: 'invalid-email',
+        displayName: 'Admin',
+        password: 'password',
+        resetPassword: false,
+      },
+      now,
+      db
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) {
+      return
+    }
+    expect(result.error.type).toBe('VALIDATION_ERROR')
+    expect(result.error).toHaveProperty('message')
+  })
 })

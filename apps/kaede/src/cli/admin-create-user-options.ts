@@ -1,8 +1,9 @@
 export interface AdminCreateUserCliOptions {
   email: string
   displayName: string
-  password: string
+  password: string | undefined
   resetPassword: boolean
+  help: boolean
 }
 
 export type ParseAdminCreateUserCliArgsResult =
@@ -42,12 +43,18 @@ export const parseAdminCreateUserCliArgs = (
   let displayName: string | undefined
   let password: string | undefined
   let resetPassword = false
+  let help = false
 
   for (let index = 0; index < args.length; index++) {
     const arg = args[index]
 
     if (arg === '--reset-password') {
       resetPassword = true
+      continue
+    }
+
+    if (arg === '--help' || arg === '-h') {
+      help = true
       continue
     }
 
@@ -102,6 +109,19 @@ export const parseAdminCreateUserCliArgs = (
     }
   }
 
+  if (help) {
+    return {
+      ok: true,
+      value: {
+        email: '',
+        displayName: '',
+        password: '',
+        resetPassword: false,
+        help: true,
+      },
+    }
+  }
+
   const resolvedEmail = (email ?? env.ADMIN_EMAIL)?.trim()
   const resolvedDisplayName = (displayName ?? defaultDisplayName).trim()
   const resolvedPassword = password ?? env.ADMIN_PASSWORD
@@ -120,13 +140,6 @@ export const parseAdminCreateUserCliArgs = (
     }
   }
 
-  if (!resolvedPassword || resolvedPassword.trim().length === 0) {
-    return {
-      ok: false,
-      error: '--password or ADMIN_PASSWORD is required',
-    }
-  }
-
   return {
     ok: true,
     value: {
@@ -134,6 +147,7 @@ export const parseAdminCreateUserCliArgs = (
       displayName: resolvedDisplayName,
       password: resolvedPassword,
       resetPassword,
+      help: false,
     },
   }
 }

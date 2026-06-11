@@ -23,6 +23,7 @@ describe('parseAdminCreateUserCliArgs', () => {
         displayName: 'Root Admin',
         password: 'temporary-password',
         resetPassword: true,
+        help: false,
       },
     })
   })
@@ -40,6 +41,22 @@ describe('parseAdminCreateUserCliArgs', () => {
         displayName: 'Admin',
         password: 'temporary-password',
         resetPassword: false,
+        help: false,
+      },
+    })
+  })
+
+  it('handles --help flag', () => {
+    const result = parseAdminCreateUserCliArgs(['--help'], {})
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        email: '',
+        displayName: '',
+        password: '',
+        resetPassword: false,
+        help: true,
       },
     })
   })
