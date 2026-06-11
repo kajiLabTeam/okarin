@@ -1,4 +1,3 @@
-import type { Kysely, Selectable, Transaction } from 'kysely'
 import type { AuthUserResponse, ChangePasswordRequest, LoginRequest } from '../schemas/auth.js'
 import {
   createSession,
@@ -7,11 +6,14 @@ import {
   revokeSessionByToken,
 } from '../services/auth/index.js'
 import { hashPassword, verifyPassword } from '../services/auth/password.js'
-import type { Users } from '../services/db/generated.js'
-import { db } from '../services/db/index.js'
-import type { DB } from '../services/db/index.js'
-
-type DbExecutor = Kysely<DB> | Transaction<DB>
+import type { DbExecutor } from '../services/executor.js'
+import {
+  findUserByEmail,
+  findUserById,
+  listUserOrganizationMemberships,
+  updateUser,
+} from '../services/users/index.js'
+import type { User } from '../services/users/index.js'
 
 type AuthError =
   | { type: 'AUTH_UNAUTHENTICATED' }
@@ -51,35 +53,11 @@ const mapSessionError = (
   }
 }
 
-const findUserByEmail = async (
-  email: string,
-  executor: DbExecutor = db
-): Promise<Selectable<Users> | undefined> => {
-  return executor.selectFrom('users').selectAll().where('email', '=', email).executeTakeFirst()
-}
-
-const findUserById = async (
-  userId: string,
-  executor: DbExecutor = db
-): Promise<Selectable<Users> | undefined> => {
-  return executor.selectFrom('users').selectAll().where('id', '=', userId).executeTakeFirst()
-}
-
 const buildAuthUserResponse = async (
-  user: Selectable<Users>,
-  executor: DbExecutor = db
+  user: User,
+  executor?: DbExecutor
 ): Promise<AuthUserResponse> => {
-  const memberships = await executor
-    .selectFrom('organization_memberships as membership')
-    .innerJoin('organizations as organization', 'organization.id', 'membership.organization_id')
-    .select([
-      'membership.organization_id as organization_id',
-      'organization.name as organization_name',
-      'membership.role as role',
-    ])
-    .where('membership.user_id', '=', user.id)
-    .orderBy('organization.name', 'asc')
-    .execute()
+  const memberships = await listUserOrganizationMemberships(user.id, executor)
 
   return {
     user: {
@@ -99,10 +77,7 @@ const buildAuthUserResponse = async (
   }
 }
 
-const assertTemporaryPasswordNotExpired = (
-  user: Selectable<Users>,
-  now: Date
-): AuthError | undefined => {
+const assertTemporaryPasswordNotExpired = (user: User, now: Date): AuthError | undefined => {
   if (
     user.password_must_change &&
     user.temporary_password_expires_at &&
@@ -120,7 +95,7 @@ const LOGIN_LOCK_DURATION_MS = 15 * 60 * 1000
 export const login = async (
   payload: LoginRequest,
   now: Date = new Date(),
-  executor: DbExecutor = db
+  executor?: DbExecutor
 ): Promise<AuthResult<LoginResultValue>> => {
   const user = await findUserByEmail(payload.email, executor)
 
@@ -154,14 +129,14 @@ export const login = async (
         ? new Date(now.getTime() + LOGIN_LOCK_DURATION_MS)
         : null
 
-    await executor
-      .updateTable('users')
-      .set({
+    await updateUser(
+      user.id,
+      {
         failed_login_attempts: failedAttempts,
         locked_until: lockedUntil,
-      })
-      .where('id', '=', user.id)
-      .execute()
+      },
+      executor
+    )
 
     if (lockedUntil) {
       return {
@@ -185,14 +160,14 @@ export const login = async (
     }
   }
 
-  await executor
-    .updateTable('users')
-    .set({
+  await updateUser(
+    user.id,
+    {
       failed_login_attempts: 0,
       locked_until: null,
-    })
-    .where('id', '=', user.id)
-    .execute()
+    },
+    executor
+  )
 
   const { token } = await createSession({ userId: user.id, now }, executor)
   const response = await buildAuthUserResponse(user, executor)
@@ -209,7 +184,7 @@ export const login = async (
 export const getMe = async (
   sessionToken: string | undefined,
   now: Date = new Date(),
-  executor: DbExecutor = db
+  executor?: DbExecutor
 ): Promise<AuthResult<AuthUserResponse>> => {
   if (!sessionToken) {
     return {
@@ -252,7 +227,7 @@ export const getMe = async (
 export const logout = async (
   sessionToken: string | undefined,
   now: Date = new Date(),
-  executor: DbExecutor = db
+  executor?: DbExecutor
 ): Promise<{ ok: true }> => {
   if (sessionToken) {
     await revokeSessionByToken(sessionToken, now, executor)
@@ -265,7 +240,7 @@ export const changePassword = async (
   sessionToken: string | undefined,
   payload: ChangePasswordRequest,
   now: Date = new Date(),
-  executor: DbExecutor = db
+  executor?: DbExecutor
 ): Promise<AuthResult<{ ok: true }>> => {
   if (!sessionToken) {
     return {
@@ -319,16 +294,16 @@ export const changePassword = async (
 
   const passwordHash = await hashPassword(payload.new_password)
 
-  await executor
-    .updateTable('users')
-    .set({
+  await updateUser(
+    user.id,
+    {
       password_hash: passwordHash,
       password_must_change: false,
       password_changed_at: now,
       temporary_password_expires_at: null,
-    })
-    .where('id', '=', user.id)
-    .execute()
+    },
+    executor
+  )
 
   await revokeAllSessionsByUserId(user.id, now, executor)
 

@@ -1,9 +1,7 @@
-import type { Insertable, Kysely, Selectable, Transaction, Updateable } from 'kysely'
+import type { Insertable, Selectable, Updateable } from 'kysely'
 import type { Users } from '../db/generated.js'
 import { db } from '../db/index.js'
-import type { DB } from '../db/index.js'
-
-type DbExecutor = Kysely<DB> | Transaction<DB>
+import type { DbExecutor } from '../executor.js'
 
 export type User = Selectable<Users>
 export type NewUser = Insertable<Users>
@@ -14,6 +12,13 @@ export const findUserByEmail = async (
   executor: DbExecutor = db
 ): Promise<User | undefined> => {
   return executor.selectFrom('users').selectAll().where('email', '=', email).executeTakeFirst()
+}
+
+export const findUserById = async (
+  userId: string,
+  executor: DbExecutor = db
+): Promise<User | undefined> => {
+  return executor.selectFrom('users').selectAll().where('id', '=', userId).executeTakeFirst()
 }
 
 export const insertUser = async (newUser: NewUser, executor: DbExecutor = db): Promise<User> => {
@@ -31,4 +36,21 @@ export const updateUser = async (
     .where('id', '=', userId)
     .returningAll()
     .executeTakeFirstOrThrow()
+}
+
+export const listUserOrganizationMemberships = async (
+  userId: string,
+  executor: DbExecutor = db
+) => {
+  return executor
+    .selectFrom('organization_memberships as membership')
+    .innerJoin('organizations as organization', 'organization.id', 'membership.organization_id')
+    .select([
+      'membership.organization_id as organization_id',
+      'organization.name as organization_name',
+      'membership.role as role',
+    ])
+    .where('membership.user_id', '=', userId)
+    .orderBy('organization.name', 'asc')
+    .execute()
 }

@@ -1,15 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { selectFromMock, insertRecordingMock, issueRecordingUploadUrlsMock } = vi.hoisted(() => ({
-  selectFromMock: vi.fn(),
+const {
+  findFloorByIdMock,
+  findPedestrianByIdMock,
+  insertRecordingMock,
+  issueRecordingUploadUrlsMock,
+} = vi.hoisted(() => ({
+  findFloorByIdMock: vi.fn(),
+  findPedestrianByIdMock: vi.fn(),
   insertRecordingMock: vi.fn(),
   issueRecordingUploadUrlsMock: vi.fn(),
 }))
 
-vi.mock('../services/db/index.js', () => ({
-  db: {
-    selectFrom: selectFromMock,
-  },
+vi.mock('../services/floors/index.js', () => ({
+  findFloorById: findFloorByIdMock,
+}))
+
+vi.mock('../services/pedestrians/index.js', () => ({
+  findPedestrianById: findPedestrianByIdMock,
 }))
 
 vi.mock('../services/recordings/index.js', () => ({
@@ -22,28 +30,6 @@ vi.mock('../services/storage/index.js', () => ({
 
 import { initRecording } from './init-recording.js'
 
-const mockEntityLookup = (table: string, result: { id: string } | undefined) => {
-  const query = {
-    select: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    executeTakeFirst: vi.fn().mockResolvedValue(result),
-  }
-
-  selectFromMock.mockImplementation((requestedTable: string) => {
-    if (requestedTable !== table) {
-      return {
-        select: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
-        executeTakeFirst: vi.fn().mockResolvedValue(undefined),
-      }
-    }
-
-    return query
-  })
-
-  return query
-}
-
 const mockEntityLookups = ({
   pedestrian,
   floor,
@@ -51,15 +37,8 @@ const mockEntityLookups = ({
   pedestrian?: { id: string }
   floor?: { id: string }
 }) => {
-  selectFromMock.mockImplementation((table: string) => {
-    const result = table === 'pedestrians' ? pedestrian : floor
-
-    return {
-      select: vi.fn().mockReturnThis(),
-      where: vi.fn().mockReturnThis(),
-      executeTakeFirst: vi.fn().mockResolvedValue(result),
-    }
-  })
+  findPedestrianByIdMock.mockResolvedValue(pedestrian)
+  findFloorByIdMock.mockResolvedValue(floor)
 }
 
 describe('initRecording', () => {
@@ -172,9 +151,12 @@ describe('initRecording', () => {
     expect(issueRecordingUploadUrlsMock).not.toHaveBeenCalled()
   })
 
-  it('pedestrian lookup は pedestrians table を参照する', async () => {
-    const query = mockEntityLookup('pedestrians', {
+  it('pedestrian lookup は service 経由で pedestrian id を参照する', async () => {
+    findPedestrianByIdMock.mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',
+    })
+    findFloorByIdMock.mockResolvedValue({
+      id: '22222222-2222-4222-8222-222222222222',
     })
 
     await initRecording({
@@ -183,6 +165,7 @@ describe('initRecording', () => {
       upload_targets: ['acce', 'gyro'],
     })
 
-    expect(query.where).toHaveBeenCalledWith('id', '=', '11111111-1111-4111-8111-111111111111')
+    expect(findPedestrianByIdMock).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111')
+    expect(findFloorByIdMock).toHaveBeenCalledWith('22222222-2222-4222-8222-222222222222')
   })
 })

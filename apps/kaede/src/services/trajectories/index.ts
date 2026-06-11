@@ -2,6 +2,7 @@ export {
   findTrajectoryById,
   insertTrajectory,
   insertTrajectoryConstraints,
+  insertTrajectoryWithConstraints,
   markTrajectoryCompleted,
   markTrajectoryFailed,
   markTrajectoryProcessing,

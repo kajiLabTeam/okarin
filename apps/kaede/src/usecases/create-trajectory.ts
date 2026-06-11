@@ -3,7 +3,6 @@ import { getCallbackRuntimeConfig } from '../config/runtime.js'
 import { uploadTargetsSchema } from '../schemas/common.js'
 import type { RecordingIdParams } from '../schemas/recordings.js'
 import type { CreateTrajectoryRequest } from '../schemas/trajectories.js'
-import { db } from '../services/db/index.js'
 import { submitAnalyzeRequest } from '../services/nozomi/index.js'
 import { findRecordingById } from '../services/recordings/index.js'
 import {
@@ -12,8 +11,7 @@ import {
 } from '../services/storage/index.js'
 import { generateCallbackToken } from '../services/trajectories/callback-token.js'
 import {
-  insertTrajectory,
-  insertTrajectoryConstraints,
+  insertTrajectoryWithConstraints,
   markTrajectoryFailed,
   markTrajectoryProcessing,
 } from '../services/trajectories/index.js'
@@ -99,32 +97,22 @@ export const createTrajectory = async (
     }
   }
 
-  const trajectory = await db.transaction().execute(async (trx) => {
-    const insertedTrajectory = await insertTrajectory(
-      {
-        recording_id: recording.id,
-        floor_id: recording.floor_id,
-        status: 'accepted',
-      },
-      trx
-    )
-
-    await insertTrajectoryConstraints(
-      payload.constraints.map((constraint) => ({
-        trajectory_id: insertedTrajectory.id,
-        seq: constraint.seq,
-        point_type: constraint.point_type,
-        x: constraint.x,
-        y: constraint.y,
-        direction: constraint.direction ?? null,
-        relative_timestamp:
-          constraint.point_type === 'waypoint' ? constraint.relative_timestamp : null,
-      })),
-      trx
-    )
-
-    return insertedTrajectory
-  })
+  const trajectory = await insertTrajectoryWithConstraints(
+    {
+      recording_id: recording.id,
+      floor_id: recording.floor_id,
+      status: 'accepted',
+    },
+    payload.constraints.map((constraint) => ({
+      seq: constraint.seq,
+      point_type: constraint.point_type,
+      x: constraint.x,
+      y: constraint.y,
+      direction: constraint.direction ?? null,
+      relative_timestamp:
+        constraint.point_type === 'waypoint' ? constraint.relative_timestamp : null,
+    }))
+  )
 
   const processing = await markTrajectoryProcessing(trajectory.id)
   if (!processing) {
