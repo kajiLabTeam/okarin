@@ -1,11 +1,7 @@
-import type { Kysely, Transaction } from 'kysely'
 import { authUserSchema, loginRequestSchema } from '../schemas/auth.js'
 import { hashPassword } from '../services/auth/password.js'
-import { db } from '../services/db/index.js'
-import type { DB } from '../services/db/index.js'
+import type { DbExecutor } from '../services/executor.js'
 import { findUserByEmail, insertUser, updateUser } from '../services/users/index.js'
-
-type DbExecutor = Kysely<DB> | Transaction<DB>
 
 export type CreateAdminUserError =
   | { type: 'ADMIN_USER_ALREADY_EXISTS' }
@@ -39,7 +35,7 @@ const temporaryPasswordTtlMs = 24 * 60 * 60 * 1000
 export const createAdminUser = async (
   params: CreateAdminUserParams,
   now: Date = new Date(),
-  executor: DbExecutor = db
+  executor?: DbExecutor
 ): Promise<CreateAdminUserResult> => {
   const emailValidation = loginRequestSchema.shape.email.safeParse(params.email)
   if (!emailValidation.success) {

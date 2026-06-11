@@ -1,9 +1,8 @@
-import type { Insertable, Kysely, Selectable, Transaction } from 'kysely'
+import type { Insertable, Selectable } from 'kysely'
 import type { Floors } from '../db/generated.js'
 import { db } from '../db/index.js'
-import type { DB } from '../db/index.js'
+import type { DbExecutor } from '../executor.js'
 
-type DbExecutor = Kysely<DB> | Transaction<DB>
 type Floor = Selectable<Floors>
 type NewFloor = Insertable<Floors>
 
@@ -33,4 +32,11 @@ export const insertFloor = async (
   executor: DbExecutor = db
 ): Promise<Floor> => {
   return executor.insertInto('floors').values(newFloor).returningAll().executeTakeFirstOrThrow()
+}
+
+export const findFloorById = async (
+  floorId: string,
+  executor: DbExecutor = db
+): Promise<Pick<Floor, 'id'> | undefined> => {
+  return executor.selectFrom('floors').select('id').where('id', '=', floorId).executeTakeFirst()
 }

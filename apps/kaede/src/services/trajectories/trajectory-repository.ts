@@ -44,6 +44,25 @@ export const insertTrajectoryConstraints = async (
   await executor.insertInto('trajectory_constraints').values(constraints).execute()
 }
 
+export const insertTrajectoryWithConstraints = async (
+  trajectory: NewTrajectory,
+  constraints: Omit<NewTrajectoryConstraint, 'trajectory_id'>[]
+): Promise<Trajectory> => {
+  return db.transaction().execute(async (trx) => {
+    const insertedTrajectory = await insertTrajectory(trajectory, trx)
+
+    await insertTrajectoryConstraints(
+      constraints.map((constraint) => ({
+        ...constraint,
+        trajectory_id: insertedTrajectory.id,
+      })),
+      trx
+    )
+
+    return insertedTrajectory
+  })
+}
+
 export const updateTrajectory = async (
   trajectoryId: string,
   patch: TrajectoryUpdate,

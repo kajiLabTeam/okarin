@@ -1,7 +1,8 @@
 import { recordingUploadStatusSchema } from '../schemas/common.js'
 import type { UploadTarget } from '../schemas/common.js'
 import type { InitRecordingRequest } from '../schemas/recordings.js'
-import { db } from '../services/db/index.js'
+import { findFloorById } from '../services/floors/index.js'
+import { findPedestrianById } from '../services/pedestrians/index.js'
 import { insertRecording } from '../services/recordings/index.js'
 import { issueRecordingUploadUrls } from '../services/storage/index.js'
 
@@ -45,12 +46,8 @@ const withRequiredMetadataTarget = (targets: UploadTarget[]): UploadTarget[] => 
 
 export const initRecording = async (payload: InitRecordingRequest) => {
   const [pedestrian, floor] = await Promise.all([
-    db
-      .selectFrom('pedestrians')
-      .select('id')
-      .where('id', '=', payload.pedestrian_id)
-      .executeTakeFirst(),
-    db.selectFrom('floors').select('id').where('id', '=', payload.floor_id).executeTakeFirst(),
+    findPedestrianById(payload.pedestrian_id),
+    findFloorById(payload.floor_id),
   ])
 
   if (!pedestrian) {

@@ -3,8 +3,7 @@ import type { CallbackRuntimeConfig } from '../config/runtime.js'
 
 const {
   findRecordingByIdMock,
-  insertTrajectoryMock,
-  insertTrajectoryConstraintsMock,
+  insertTrajectoryWithConstraintsMock,
   markTrajectoryFailedMock,
   markTrajectoryProcessingMock,
   issueInternalRecordingRawDownloadUrlsMock,
@@ -14,8 +13,7 @@ const {
   getCallbackRuntimeConfigMock,
 } = vi.hoisted(() => ({
   findRecordingByIdMock: vi.fn(),
-  insertTrajectoryMock: vi.fn(),
-  insertTrajectoryConstraintsMock: vi.fn(),
+  insertTrajectoryWithConstraintsMock: vi.fn(),
   markTrajectoryFailedMock: vi.fn(),
   markTrajectoryProcessingMock: vi.fn(),
   issueInternalRecordingRawDownloadUrlsMock: vi.fn(),
@@ -34,8 +32,7 @@ vi.mock('../services/recordings/index.js', () => ({
 }))
 
 vi.mock('../services/trajectories/index.js', () => ({
-  insertTrajectory: insertTrajectoryMock,
-  insertTrajectoryConstraints: insertTrajectoryConstraintsMock,
+  insertTrajectoryWithConstraints: insertTrajectoryWithConstraintsMock,
   markTrajectoryFailed: markTrajectoryFailedMock,
   markTrajectoryProcessing: markTrajectoryProcessingMock,
 }))
@@ -51,14 +48,6 @@ vi.mock('../services/nozomi/index.js', () => ({
 
 vi.mock('../services/trajectories/callback-token.js', () => ({
   generateCallbackToken: generateCallbackTokenMock,
-}))
-
-vi.mock('../services/db/index.js', () => ({
-  db: {
-    transaction: () => ({
-      execute: async (callback: (trx: object) => Promise<unknown>) => callback({}),
-    }),
-  },
 }))
 
 vi.mock('../config/runtime.js', () => ({
@@ -87,13 +76,12 @@ describe('createTrajectory', () => {
       upload_status: 'ready',
       upload_targets: ['acce', 'gyro'],
     })
-    insertTrajectoryMock.mockResolvedValue({
+    insertTrajectoryWithConstraintsMock.mockResolvedValue({
       id: trajectoryId,
       recording_id: recordingId,
       floor_id: '33333333-3333-4333-8333-333333333333',
       status: 'accepted',
     })
-    insertTrajectoryConstraintsMock.mockResolvedValue(undefined)
     issueInternalRecordingRawDownloadUrlsMock.mockResolvedValue({
       expiresAt: '2026-05-17T00:15:00.000Z',
       rawDataUrls: {
@@ -132,7 +120,14 @@ describe('createTrajectory', () => {
         status: 'processing',
       },
     })
-    expect(insertTrajectoryConstraintsMock).toHaveBeenCalledWith([], {})
+    expect(insertTrajectoryWithConstraintsMock).toHaveBeenCalledWith(
+      {
+        recording_id: recordingId,
+        floor_id: '33333333-3333-4333-8333-333333333333',
+        status: 'accepted',
+      },
+      []
+    )
     expect(markTrajectoryProcessingMock).toHaveBeenCalledWith(trajectoryId)
     expect(submitAnalyzeRequestMock).toHaveBeenCalledWith({
       trajectory_id: trajectoryId,
@@ -222,13 +217,12 @@ describe('createTrajectory', () => {
       upload_status: 'ready',
       upload_targets: ['acce', 'gyro'],
     })
-    insertTrajectoryMock.mockResolvedValue({
+    insertTrajectoryWithConstraintsMock.mockResolvedValue({
       id: trajectoryId,
       recording_id: recordingId,
       floor_id: '33333333-3333-4333-8333-333333333333',
       status: 'accepted',
     })
-    insertTrajectoryConstraintsMock.mockResolvedValue(undefined)
     markTrajectoryProcessingMock.mockResolvedValue({
       id: trajectoryId,
       recording_id: recordingId,
@@ -281,13 +275,12 @@ describe('createTrajectory', () => {
       upload_status: 'ready',
       upload_targets: ['acce', 'gyro'],
     })
-    insertTrajectoryMock.mockResolvedValue({
+    insertTrajectoryWithConstraintsMock.mockResolvedValue({
       id: trajectoryId,
       recording_id: recordingId,
       floor_id: '33333333-3333-4333-8333-333333333333',
       status: 'accepted',
     })
-    insertTrajectoryConstraintsMock.mockResolvedValue(undefined)
     markTrajectoryProcessingMock.mockResolvedValue({
       id: trajectoryId,
       recording_id: recordingId,
