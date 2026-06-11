@@ -21,7 +21,7 @@ else
 $(error Unsupported ENV='$(ENV)'. Use local|staging|production)
 endif
 
-.PHONY: help pull up down logs ps config db-status db-up db-down db-dump db-new db-seed-local storage-init storage-test
+.PHONY: help pull up down logs ps config db-status db-up db-down db-dump db-new db-seed-local kaede-admin-create-user storage-init storage-test
 
 help:
 	@echo "Usage examples:"
@@ -34,6 +34,7 @@ help:
 	@echo "  make db-up ENV=local"
 	@echo "  make db-new ENV=local NAME=init"
 	@echo "  make db-seed-local ENV=local"
+	@echo "  make kaede-admin-create-user ENV=production ARGS=\"--email admin@example.com --password 'temporary-password'\""
 	@echo "  make storage-init ENV=local"
 	@echo "  make storage-test"
 
@@ -81,6 +82,9 @@ db-seed-local:
 	$(COMPOSE) $(COMPOSE_FILES) exec -T postgres \
 		sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' < ./db/seeds/local_dev.sql
 	@echo "  local dev seed data inserted successfully; see building_id, floor_id, pedestrian_id above"
+
+kaede-admin-create-user:
+	$(COMPOSE) $(COMPOSE_FILES) exec kaede node dist/cli/admin-create-user.js $(ARGS)
 
 storage-init:
 	$(COMPOSE) $(COMPOSE_FILES) --profile tools run --rm storage-bootstrap
