@@ -34,6 +34,22 @@ type AuthResult<T> =
       error: AuthError
     }
 
+export type ActiveSessionUserError =
+  | { type: 'AUTH_UNAUTHENTICATED' }
+  | { type: 'AUTH_SESSION_EXPIRED' }
+  | { type: 'AUTH_SESSION_REVOKED' }
+  | { type: 'AUTH_USER_DISABLED' }
+
+export type ActiveSessionUserResult =
+  | {
+      ok: true
+      value: User
+    }
+  | {
+      ok: false
+      error: ActiveSessionUserError
+    }
+
 export interface LoginResultValue extends AuthUserResponse {
   sessionToken: string
 }
@@ -43,6 +59,19 @@ const toIsoOrNull = (value: Date | null): string | null => value?.toISOString() 
 const mapSessionError = (
   error: 'SESSION_NOT_FOUND' | 'SESSION_EXPIRED' | 'SESSION_REVOKED'
 ): AuthError => {
+  switch (error) {
+    case 'SESSION_NOT_FOUND':
+      return { type: 'AUTH_UNAUTHENTICATED' }
+    case 'SESSION_EXPIRED':
+      return { type: 'AUTH_SESSION_EXPIRED' }
+    case 'SESSION_REVOKED':
+      return { type: 'AUTH_SESSION_REVOKED' }
+  }
+}
+
+const mapActiveSessionError = (
+  error: 'SESSION_NOT_FOUND' | 'SESSION_EXPIRED' | 'SESSION_REVOKED'
+): ActiveSessionUserError => {
   switch (error) {
     case 'SESSION_NOT_FOUND':
       return { type: 'AUTH_UNAUTHENTICATED' }
@@ -198,7 +227,7 @@ export const getMe = async (
   if (!sessionResult.ok) {
     return {
       ok: false,
-      error: mapSessionError(sessionResult.error),
+      error: mapActiveSessionError(sessionResult.error),
     }
   }
 
@@ -221,6 +250,49 @@ export const getMe = async (
   return {
     ok: true,
     value: await buildAuthUserResponse(user, executor),
+  }
+}
+
+export const requireActiveSessionUser = async (
+  sessionToken: string | undefined,
+  executor?: DbExecutor,
+  now: Date = new Date()
+): Promise<ActiveSessionUserResult> => {
+  if (!sessionToken) {
+    return {
+      ok: false,
+      error: { type: 'AUTH_UNAUTHENTICATED' },
+    }
+  }
+
+  const sessionResult = await findValidSessionByToken(sessionToken, now, executor)
+
+  if (!sessionResult.ok) {
+    return {
+      ok: false,
+      error: mapActiveSessionError(sessionResult.error),
+    }
+  }
+
+  const user = await findUserById(sessionResult.session.user_id, executor)
+
+  if (!user) {
+    return {
+      ok: false,
+      error: { type: 'AUTH_UNAUTHENTICATED' },
+    }
+  }
+
+  if (!user.is_active) {
+    return {
+      ok: false,
+      error: { type: 'AUTH_USER_DISABLED' },
+    }
+  }
+
+  return {
+    ok: true,
+    value: user,
   }
 }
 
