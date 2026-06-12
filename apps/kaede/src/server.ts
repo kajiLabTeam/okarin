@@ -3,7 +3,7 @@ import { Scalar } from '@scalar/hono-api-reference'
 import * as Sentry from '@sentry/node'
 import { HTTPException } from 'hono/http-exception'
 import { getRuntimeConfig } from './config/runtime.js'
-import { apiSharedTokenAuth } from './middleware/api-shared-token.js'
+import { requestActorMiddleware } from './middleware/request-actor.js'
 import { registerApiRoutes } from './routes/index.js'
 
 export const createApp = () => {
@@ -35,9 +35,9 @@ export const createApp = () => {
 
   app.use(
     '/api/*',
-    apiSharedTokenAuth({
+    requestActorMiddleware({
       exemptPaths: ['/api/auth', '/api/trajectories/callback'],
-      token: runtimeConfig.app.apiSharedToken,
+      sharedToken: runtimeConfig.app.apiSharedToken,
     })
   )
 

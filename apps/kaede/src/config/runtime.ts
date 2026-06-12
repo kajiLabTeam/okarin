@@ -57,10 +57,23 @@ let databaseRuntimeConfig: DatabaseRuntimeConfig | undefined
 let nozomiRuntimeConfig: NozomiRuntimeConfig | undefined
 let storageRuntimeConfig: StorageRuntimeConfig | undefined
 
+const isSharedTokenOptionalEnv = (env: string) => env === 'local' || env === 'test'
+
 export const getAppRuntimeConfig = (): AppRuntimeConfig => {
-  appRuntimeConfig ??= {
-    apiSharedToken: process.env.KAEDE_API_SHARED_TOKEN,
-    env: getOptionalEnv('APP_ENV', 'local'),
+  if (appRuntimeConfig) {
+    return appRuntimeConfig
+  }
+
+  const env = getOptionalEnv('APP_ENV', 'local')
+  const apiSharedToken = process.env.KAEDE_API_SHARED_TOKEN
+
+  if (!apiSharedToken && !isSharedTokenOptionalEnv(env)) {
+    throw new Error('KAEDE_API_SHARED_TOKEN is required outside local/test environments')
+  }
+
+  appRuntimeConfig = {
+    apiSharedToken,
+    env,
     deployRef: getOptionalEnv('APP_DEPLOY_REF', 'unknown'),
     deployedAt: getOptionalEnv('APP_DEPLOYED_AT', 'unknown'),
     host: getOptionalEnv('HOST', '0.0.0.0'),
