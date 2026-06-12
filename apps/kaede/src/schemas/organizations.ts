@@ -26,9 +26,11 @@ export const createOrganizationRequestSchema = z.object({
 
 export const organizationUserSchema = authUserSchema
   .omit({
+    global_role: true,
     memberships: true,
   })
   .extend({
+    is_active: z.boolean(),
     role: membershipRoleSchema,
     created_at: isoDatetimeSchema,
     updated_at: isoDatetimeSchema,

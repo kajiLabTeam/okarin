@@ -72,7 +72,7 @@ const toOrganizationUserResponse = (row: OrganizationUserRow): OrganizationUserR
   user_id: row.user_id,
   email: row.email,
   display_name: row.display_name,
-  global_role: row.global_role as 'none' | 'admin',
+  is_active: row.is_active,
   role: row.role as 'member' | 'manager',
   password_must_change: row.password_must_change,
   password_changed_at: row.password_changed_at?.toISOString() ?? null,
