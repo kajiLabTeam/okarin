@@ -13,6 +13,7 @@ export const listFloors = async () => {
     .select([
       'floors.id as floor_id',
       'floors.building_id',
+      'floors.organization_id',
       'buildings.name as building_name',
       'floors.level',
       'floors.name',

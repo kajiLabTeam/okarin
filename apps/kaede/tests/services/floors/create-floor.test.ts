@@ -15,9 +15,15 @@ describe('createFloor', () => {
   })
 
   it('building に紐づく floor を作成できる', async () => {
+    const organization = await db
+      .insertInto('organizations')
+      .values({ name: 'Floor Test Organization' })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+
     const building = await db
       .insertInto('buildings')
-      .values({ name: 'Floor Test Building' })
+      .values({ organization_id: organization.id, name: 'Floor Test Building' })
       .returning(['id'])
       .executeTakeFirstOrThrow()
 
@@ -36,6 +42,7 @@ describe('createFloor', () => {
 
     expect(result.value).toMatchObject({
       building_id: building.id,
+      organization_id: organization.id,
       building_name: 'Floor Test Building',
       level: 2,
       name: '2F',
@@ -51,6 +58,7 @@ describe('createFloor', () => {
     expect(floor).toMatchObject({
       id: result.value.floor_id,
       building_id: building.id,
+      organization_id: organization.id,
       level: 2,
       name: '2F',
       scale: 25,

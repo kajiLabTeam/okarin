@@ -30,11 +30,16 @@ export const createFloor = async (payload: CreateFloorRequest): Promise<CreateFl
     }
   }
 
+  if (!building.organization_id) {
+    throw new Error(`building ${building.id} does not have organization_id`)
+  }
+
   const mapImageExtension = payload.map_image_extension ?? 'png'
   const floorId = randomUUID()
   const floor = await insertFloor({
     id: floorId,
     building_id: building.id,
+    organization_id: building.organization_id,
     level: payload.level,
     name: payload.name,
     image_object_path: `maps/${building.id}/${floorId}.${mapImageExtension}`,
@@ -46,6 +51,7 @@ export const createFloor = async (payload: CreateFloorRequest): Promise<CreateFl
     value: {
       floor_id: floor.id,
       building_id: building.id,
+      organization_id: building.organization_id,
       building_name: building.name,
       level: floor.level,
       name: floor.name,

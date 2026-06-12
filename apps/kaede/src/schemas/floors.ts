@@ -9,6 +9,9 @@ export const floorSchema = z.object({
   building_id: uuidSchema.openapi({
     description: 'floor が属する building の ID',
   }),
+  organization_id: uuidSchema.openapi({
+    description: 'floor が属する organization の ID',
+  }),
   building_name: z.string().min(1).openapi({
     description: 'floor が属する building の名称',
   }),

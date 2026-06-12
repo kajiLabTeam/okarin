@@ -21,6 +21,7 @@ describe('GET /api/floors', () => {
         {
           floor_id: '22222222-2222-4222-8222-222222222222',
           building_id: '11111111-1111-4111-8111-111111111111',
+          organization_id: '99999999-9999-4999-8999-999999999999',
           building_name: 'Test Building',
           level: 1,
           name: '1F',
@@ -40,6 +41,7 @@ describe('GET /api/floors', () => {
         {
           floor_id: '22222222-2222-4222-8222-222222222222',
           building_id: '11111111-1111-4111-8111-111111111111',
+          organization_id: '99999999-9999-4999-8999-999999999999',
           building_name: 'Test Building',
           level: 1,
           name: '1F',

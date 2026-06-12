@@ -1,7 +1,24 @@
 import { createRoute } from '@hono/zod-openapi'
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { buildingSchema, createBuildingRequestSchema } from '../../schemas/buildings.js'
+import { errorResponseSchema } from '../../schemas/common.js'
 import { createBuilding } from '../../usecases/create-building.js'
+import type { CreateBuildingResult } from '../../usecases/create-building.js'
+
+type CreateBuildingError = Extract<CreateBuildingResult, { ok: false }>['error']
+
+const toCreateBuildingErrorResponse = (error: CreateBuildingError) => {
+  return {
+    body: {
+      error_code: error.type,
+      error_message: 'organization not found',
+      details: {
+        organization_id: error.organizationId,
+      },
+    },
+    status: 404 as const,
+  }
+}
 
 export const registerCreateBuildingRoute = (app: OpenAPIHono) => {
   const route = createRoute({
@@ -27,6 +44,14 @@ export const registerCreateBuildingRoute = (app: OpenAPIHono) => {
           },
         },
       },
+      404: {
+        description: 'organization not found',
+        content: {
+          'application/json': {
+            schema: errorResponseSchema,
+          },
+        },
+      },
     },
   })
 
@@ -34,6 +59,11 @@ export const registerCreateBuildingRoute = (app: OpenAPIHono) => {
     const payload = c.req.valid('json')
     const result = await createBuilding(payload)
 
-    return c.json(result, 201)
+    if (!result.ok) {
+      const error = toCreateBuildingErrorResponse(result.error)
+      return c.json(error.body, error.status)
+    }
+
+    return c.json(result.value, 201)
   })
 }
