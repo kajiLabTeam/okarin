@@ -26,9 +26,11 @@ export const createOrganizationRequestSchema = z.object({
 
 export const organizationUserSchema = authUserSchema
   .omit({
+    global_role: true,
     memberships: true,
   })
   .extend({
+    is_active: z.boolean(),
     role: membershipRoleSchema,
     created_at: isoDatetimeSchema,
     updated_at: isoDatetimeSchema,
@@ -58,6 +60,14 @@ export const createOrganizationUserRequestSchema = z
     }
   })
 
+export const createOrganizationMembershipRequestSchema = z.object({
+  user_id: uuidSchema,
+  role: membershipRoleSchema,
+})
+
+export type CreateOrganizationMembershipRequest = z.infer<
+  typeof createOrganizationMembershipRequestSchema
+>
 export type CreateOrganizationRequest = z.infer<typeof createOrganizationRequestSchema>
 export type CreateOrganizationUserRequest = z.infer<typeof createOrganizationUserRequestSchema>
 export type MembershipRole = z.infer<typeof membershipRoleSchema>

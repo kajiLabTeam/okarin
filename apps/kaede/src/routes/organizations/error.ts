@@ -7,6 +7,7 @@ const errorStatuses: Record<OrganizationError['type'], 401 | 403 | 404 | 409> = 
   AUTH_UNAUTHENTICATED: 401,
   AUTH_USER_DISABLED: 403,
   ORGANIZATION_NOT_FOUND: 404,
+  USER_NOT_FOUND: 404,
   USER_ALREADY_EXISTS: 409,
 }
 
@@ -17,6 +18,7 @@ const errorMessages: Record<OrganizationError['type'], string> = {
   AUTH_UNAUTHENTICATED: 'login required',
   AUTH_USER_DISABLED: 'user is disabled',
   ORGANIZATION_NOT_FOUND: 'organization not found',
+  USER_NOT_FOUND: 'user not found',
   USER_ALREADY_EXISTS: 'user already exists',
 }
 

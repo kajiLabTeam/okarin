@@ -8,6 +8,7 @@ export {
   listOrganizationUsers,
   listUserOrganizationMemberships,
   updateUser,
+  upsertOrganizationMembership,
 } from './user-repository.js'
 export type {
   NewOrganizationMembership,
