@@ -6,6 +6,9 @@ export const buildingSchema = z.object({
   building_id: uuidSchema.openapi({
     description: 'building の ID',
   }),
+  organization_id: uuidSchema.openapi({
+    description: 'building が属する organization の ID',
+  }),
   name: z.string().min(1).openapi({
     description: 'building の名称',
   }),
@@ -24,6 +27,9 @@ export const buildingSchema = z.object({
 })
 
 export const createBuildingRequestSchema = z.object({
+  organization_id: uuidSchema.openapi({
+    description: 'building を所属させる organization の ID',
+  }),
   name: z.string().min(1).openapi({
     description: 'building の名称',
   }),

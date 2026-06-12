@@ -17,12 +17,16 @@ describe('POST /api/buildings', () => {
 
   it('building を作成して返す', async () => {
     createBuildingMock.mockResolvedValue({
-      building_id: '11111111-1111-4111-8111-111111111111',
-      name: 'Test Building',
-      latitude: 35.681236,
-      longitude: 139.767125,
-      created_at: '2026-05-13T00:00:00.000Z',
-      updated_at: '2026-05-13T00:00:00.000Z',
+      ok: true,
+      value: {
+        building_id: '11111111-1111-4111-8111-111111111111',
+        organization_id: '99999999-9999-4999-8999-999999999999',
+        name: 'Test Building',
+        latitude: 35.681236,
+        longitude: 139.767125,
+        created_at: '2026-05-13T00:00:00.000Z',
+        updated_at: '2026-05-13T00:00:00.000Z',
+      },
     })
 
     const app = createRouteTestApp('/buildings', registerCreateBuildingRoute)
@@ -32,6 +36,7 @@ describe('POST /api/buildings', () => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
+        organization_id: '99999999-9999-4999-8999-999999999999',
         name: 'Test Building',
         latitude: 35.681236,
         longitude: 139.767125,
@@ -41,6 +46,7 @@ describe('POST /api/buildings', () => {
     expect(response.status).toBe(201)
     await expect(response.json()).resolves.toEqual({
       building_id: '11111111-1111-4111-8111-111111111111',
+      organization_id: '99999999-9999-4999-8999-999999999999',
       name: 'Test Building',
       latitude: 35.681236,
       longitude: 139.767125,
@@ -49,6 +55,7 @@ describe('POST /api/buildings', () => {
     })
 
     expect(createBuildingMock).toHaveBeenCalledWith({
+      organization_id: '99999999-9999-4999-8999-999999999999',
       name: 'Test Building',
       latitude: 35.681236,
       longitude: 139.767125,
@@ -57,12 +64,16 @@ describe('POST /api/buildings', () => {
 
   it('name だけで building を作成できる', async () => {
     createBuildingMock.mockResolvedValue({
-      building_id: '11111111-1111-4111-8111-111111111111',
-      name: 'Test Building',
-      latitude: null,
-      longitude: null,
-      created_at: '2026-05-13T00:00:00.000Z',
-      updated_at: '2026-05-13T00:00:00.000Z',
+      ok: true,
+      value: {
+        building_id: '11111111-1111-4111-8111-111111111111',
+        organization_id: '99999999-9999-4999-8999-999999999999',
+        name: 'Test Building',
+        latitude: null,
+        longitude: null,
+        created_at: '2026-05-13T00:00:00.000Z',
+        updated_at: '2026-05-13T00:00:00.000Z',
+      },
     })
 
     const app = createRouteTestApp('/buildings', registerCreateBuildingRoute)
@@ -72,6 +83,7 @@ describe('POST /api/buildings', () => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
+        organization_id: '99999999-9999-4999-8999-999999999999',
         name: 'Test Building',
       }),
     })
@@ -84,7 +96,39 @@ describe('POST /api/buildings', () => {
     })
 
     expect(createBuildingMock).toHaveBeenCalledWith({
+      organization_id: '99999999-9999-4999-8999-999999999999',
       name: 'Test Building',
+    })
+  })
+
+  it('存在しない organization_id は 404 を返す', async () => {
+    createBuildingMock.mockResolvedValue({
+      ok: false,
+      error: {
+        type: 'ORGANIZATION_NOT_FOUND',
+        organizationId: '99999999-9999-4999-8999-999999999999',
+      },
+    })
+
+    const app = createRouteTestApp('/buildings', registerCreateBuildingRoute)
+    const response = await app.request('/api/buildings', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        organization_id: '99999999-9999-4999-8999-999999999999',
+        name: 'Test Building',
+      }),
+    })
+
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'ORGANIZATION_NOT_FOUND',
+      error_message: 'organization not found',
+      details: {
+        organization_id: '99999999-9999-4999-8999-999999999999',
+      },
     })
   })
 
@@ -96,6 +140,39 @@ describe('POST /api/buildings', () => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({}),
+    })
+
+    expect(response.status).toBe(400)
+    expect(createBuildingMock).not.toHaveBeenCalled()
+  })
+
+  it('organization_id がない場合はバリデーションエラーを返し usecase を呼ばない', async () => {
+    const app = createRouteTestApp('/buildings', registerCreateBuildingRoute)
+    const response = await app.request('/api/buildings', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: 'Test Building',
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(createBuildingMock).not.toHaveBeenCalled()
+  })
+
+  it('organization_id が UUID 形式でない場合はバリデーションエラーを返し usecase を呼ばない', async () => {
+    const app = createRouteTestApp('/buildings', registerCreateBuildingRoute)
+    const response = await app.request('/api/buildings', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        organization_id: 'invalid-organization-id',
+        name: 'Test Building',
+      }),
     })
 
     expect(response.status).toBe(400)

@@ -23,6 +23,7 @@ describe('POST /api/floors', () => {
       value: {
         floor_id: '22222222-2222-4222-8222-222222222222',
         building_id: buildingId,
+        organization_id: '99999999-9999-4999-8999-999999999999',
         building_name: 'Test Building',
         level: 1,
         name: '1F',
@@ -51,6 +52,7 @@ describe('POST /api/floors', () => {
     await expect(response.json()).resolves.toEqual({
       floor_id: '22222222-2222-4222-8222-222222222222',
       building_id: buildingId,
+      organization_id: '99999999-9999-4999-8999-999999999999',
       building_name: 'Test Building',
       level: 1,
       name: '1F',
