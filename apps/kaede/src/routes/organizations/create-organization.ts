@@ -55,7 +55,7 @@ export const registerCreateOrganizationRoute = (app: OpenAPIHono) => {
 
     if (!result.ok) {
       const error = toOrganizationErrorResponse(result.error)
-      return c.json(error.body, error.status)
+      return c.json(error.body, error.status as 401 | 403)
     }
 
     return c.json(result.value, 201)
