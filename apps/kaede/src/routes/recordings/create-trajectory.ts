@@ -42,7 +42,7 @@ export const registerCreateTrajectoryRoute = (app: OpenAPIHono) => {
         },
       },
       404: {
-        description: 'recording が存在しない',
+        description: 'recording または floor が存在しない',
         content: {
           'application/json': {
             schema: errorResponseSchema,
@@ -120,6 +120,34 @@ export const registerCreateTrajectoryRoute = (app: OpenAPIHono) => {
               },
             },
             500
+          )
+
+        case 'FLOOR_NOT_FOUND':
+          return c.json(
+            {
+              error_code: result.error.type,
+              error_message: 'recording floor not found',
+              details: {
+                recording_id: result.error.recordingId,
+                floor_id: result.error.floorId,
+              },
+            },
+            404
+          )
+
+        case 'RESOURCE_ORGANIZATION_MISMATCH':
+          return c.json(
+            {
+              error_code: result.error.type,
+              error_message: 'recording and floor belong to different organizations',
+              details: {
+                recording_id: result.error.recordingId,
+                recording_organization_id: result.error.recordingOrganizationId,
+                floor_id: result.error.floorId,
+                floor_organization_id: result.error.floorOrganizationId,
+              },
+            },
+            409
           )
 
         case 'TRAJECTORY_ANALYZE_PREPARATION_FAILED':

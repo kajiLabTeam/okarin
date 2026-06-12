@@ -5,7 +5,10 @@ import {
   callbackRequestSchema,
   callbackErrorCodeSchema,
   cloneAndReanalyzeRequestSchema,
+  createTrajectoryResponseSchema,
   createTrajectoryRequestSchema,
+  retriedTrajectoryResponseSchema,
+  trajectoryStatusResponseSchema,
   trajectoryMapDataQuerySchema,
   trajectoryIdParamsSchema,
   batchTrajectoryMapDataRequestSchema,
@@ -14,6 +17,43 @@ import {
 describe('trajectory schemas', () => {
   it('createTrajectoryRequestSchema は constraints を省略した入力を受け入れる', () => {
     const result = createTrajectoryRequestSchema.safeParse({})
+
+    expect(result.success).toBe(true)
+  })
+
+  it('createTrajectoryResponseSchema は organization_id を含むレスポンスを受け入れる', () => {
+    const result = createTrajectoryResponseSchema.safeParse({
+      trajectory_id: '33333333-3333-4333-8333-333333333333',
+      recording_id: '11111111-1111-4111-8111-111111111111',
+      organization_id: '99999999-9999-4999-8999-999999999999',
+      status: 'processing',
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('trajectoryStatusResponseSchema は organization_id を含むレスポンスを受け入れる', () => {
+    const result = trajectoryStatusResponseSchema.safeParse({
+      trajectory_id: '33333333-3333-4333-8333-333333333333',
+      recording_id: '11111111-1111-4111-8111-111111111111',
+      organization_id: '99999999-9999-4999-8999-999999999999',
+      status: 'failed',
+      error_code: 'NOZOMI_REQUEST_FAILED',
+      error_message: 'failed to submit analyze request to nozomi',
+      failed_at: '2026-05-13T00:00:00.000Z',
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('retriedTrajectoryResponseSchema は organization_id を含むレスポンスを受け入れる', () => {
+    const result = retriedTrajectoryResponseSchema.safeParse({
+      source_trajectory_id: '33333333-3333-4333-8333-333333333333',
+      trajectory_id: '44444444-4444-4444-8444-444444444444',
+      recording_id: '11111111-1111-4111-8111-111111111111',
+      organization_id: '99999999-9999-4999-8999-999999999999',
+      status: 'processing',
+    })
 
     expect(result.success).toBe(true)
   })

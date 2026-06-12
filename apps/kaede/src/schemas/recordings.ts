@@ -50,6 +50,9 @@ export const initRecordingResponseSchema = z.object({
   recording_id: uuidSchema.openapi({
     description: '作成された recording の ID',
   }),
+  organization_id: uuidSchema.openapi({
+    description: 'recording が所属する organization の ID',
+  }),
   upload_status: recordingUploadStatusSchema,
   upload_urls: uploadUrlsSchema.openapi({
     description: '各アップロード対象に対応する署名付き URL',
@@ -106,6 +109,9 @@ export const recordingDetailResponseSchema = z.object({
   floor_id: uuidSchema.openapi({
     description: '紐づく floor の ID',
   }),
+  organization_id: uuidSchema.openapi({
+    description: 'recording が所属する organization の ID',
+  }),
   upload_status: recordingUploadStatusSchema,
   upload_targets: uploadTargetsSchema,
   created_at: isoDatetimeSchema.openapi({
@@ -125,6 +131,9 @@ export const recordingTrajectoriesResponseSchema = z.object({
       z.object({
         trajectory_id: uuidSchema.openapi({
           description: 'trajectory の ID',
+        }),
+        organization_id: uuidSchema.openapi({
+          description: 'trajectory が所属する organization の ID',
         }),
         status: trajectoryStatusSchema,
         created_at: isoDatetimeSchema.openapi({

@@ -39,6 +39,14 @@ export const registerInitRecordingRoute = (app: OpenAPIHono) => {
           },
         },
       },
+      409: {
+        description: 'pedestrian と floor の organization が一致しない',
+        content: {
+          'application/json': {
+            schema: errorResponseSchema,
+          },
+        },
+      },
     },
   })
 
@@ -69,6 +77,22 @@ export const registerInitRecordingRoute = (app: OpenAPIHono) => {
           },
         },
         404
+      )
+    }
+
+    if (!result.ok && result.error.type === 'RESOURCE_ORGANIZATION_MISMATCH') {
+      return c.json(
+        {
+          error_code: result.error.type,
+          error_message: 'pedestrian and floor belong to different organizations',
+          details: {
+            pedestrian_id: result.error.pedestrianId,
+            pedestrian_organization_id: result.error.pedestrianOrganizationId,
+            floor_id: result.error.floorId,
+            floor_organization_id: result.error.floorOrganizationId,
+          },
+        },
+        409
       )
     }
 

@@ -29,10 +29,10 @@ export const insertPedestrian = async (
 export const findPedestrianById = async (
   pedestrianId: string,
   executor: DbExecutor = db
-): Promise<Pick<Pedestrian, 'id'> | undefined> => {
+): Promise<Pick<Pedestrian, 'id' | 'organization_id'> | undefined> => {
   return executor
     .selectFrom('pedestrians')
-    .select('id')
+    .select(['id', 'organization_id'])
     .where('id', '=', pedestrianId)
     .executeTakeFirst()
 }

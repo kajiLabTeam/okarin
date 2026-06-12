@@ -44,7 +44,7 @@ CREATE TABLE public.buildings (
     longitude double precision,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    organization_id uuid
+    organization_id uuid NOT NULL
 );
 
 
@@ -61,7 +61,7 @@ CREATE TABLE public.floors (
     scale double precision,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    organization_id uuid,
+    organization_id uuid NOT NULL,
     CONSTRAINT floors_image_object_path_format_chk CHECK ((image_object_path ~ '^maps/[0-9a-fA-F-]+/[0-9a-fA-F-]+\.(svg|png)$'::text))
 );
 
@@ -106,7 +106,7 @@ CREATE TABLE public.pedestrians (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     display_name text NOT NULL,
     user_id uuid,
-    organization_id uuid,
+    organization_id uuid NOT NULL,
     CONSTRAINT pedestrians_display_name_nonempty_chk CHECK ((length(btrim(display_name)) > 0))
 );
 
@@ -124,7 +124,7 @@ CREATE TABLE public.recordings (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     deleted_at timestamp with time zone,
-    organization_id uuid,
+    organization_id uuid NOT NULL,
     CONSTRAINT recordings_upload_status_chk CHECK ((upload_status = ANY (ARRAY['accepted'::text, 'ready'::text, 'failed'::text]))),
     CONSTRAINT recordings_upload_targets_nonempty_chk CHECK ((cardinality(upload_targets) >= 1))
 );
@@ -170,7 +170,7 @@ CREATE TABLE public.trajectories (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     deleted_at timestamp with time zone,
-    organization_id uuid,
+    organization_id uuid NOT NULL,
     CONSTRAINT trajectories_failed_at_chk CHECK ((((status = 'failed'::text) AND (failed_at IS NOT NULL)) OR ((status <> 'failed'::text) AND (failed_at IS NULL)))),
     CONSTRAINT trajectories_status_chk CHECK ((status = ANY (ARRAY['accepted'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
 );

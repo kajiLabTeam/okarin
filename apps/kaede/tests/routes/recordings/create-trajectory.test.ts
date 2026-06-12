@@ -58,7 +58,7 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
   })
 
   it('trajectory と constraints を作成し processing を返す', async () => {
-    const { recordingId } = await createRecordingFixture(db, {
+    const { organizationId, recordingId } = await createRecordingFixture(db, {
       uploadStatus: 'ready',
       uploadTargets: ['acce', 'gyro'],
     })
@@ -97,6 +97,7 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
 
     const body = createTrajectoryResponseSchema.parse(await response.json())
     expect(body.recording_id).toBe(recordingId)
+    expect(body.organization_id).toBe(organizationId)
     expect(body.status).toBe('processing')
 
     const created = await db
@@ -106,6 +107,7 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
       .executeTakeFirstOrThrow()
 
     expect(created.recording_id).toBe(recordingId)
+    expect(created.organization_id).toBe(organizationId)
     expect(created.status).toBe('processing')
     expect(created.error_code).toBeNull()
     expect(created.error_message).toBeNull()

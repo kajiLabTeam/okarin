@@ -183,6 +183,9 @@ export const createTrajectoryResponseSchema = z.object({
   recording_id: uuidSchema.openapi({
     description: '元になった recording の ID',
   }),
+  organization_id: uuidSchema.openapi({
+    description: 'trajectory が所属する organization の ID',
+  }),
   status: z.literal('processing').openapi({
     description: 'trajectory 作成直後は processing 固定',
   }),
@@ -272,6 +275,9 @@ export const trajectoryStatusResponseSchema = z.object({
   }),
   recording_id: uuidSchema.openapi({
     description: '紐づく recording の ID',
+  }),
+  organization_id: uuidSchema.openapi({
+    description: 'trajectory が所属する organization の ID',
   }),
   status: trajectoryStatusSchema,
   error_code: z.string().nullable().openapi({
@@ -371,6 +377,9 @@ export const retriedTrajectoryResponseSchema = z.object({
   }),
   recording_id: uuidSchema.openapi({
     description: '元になった recording の ID',
+  }),
+  organization_id: uuidSchema.openapi({
+    description: 'trajectory が所属する organization の ID',
   }),
   status: z.literal('processing').openapi({
     description: '再解析開始直後の状態',

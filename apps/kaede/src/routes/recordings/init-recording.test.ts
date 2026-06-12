@@ -19,11 +19,13 @@ describe('POST /api/recordings/init', () => {
     const pedestrianId = '11111111-1111-4111-8111-111111111111'
     const floorId = '22222222-2222-4222-8222-222222222222'
     const recordingId = '33333333-3333-4333-8333-333333333333'
+    const organizationId = '99999999-9999-4999-8999-999999999999'
 
     initRecordingMock.mockResolvedValue({
       ok: true,
       value: {
         recording_id: recordingId,
+        organization_id: organizationId,
         upload_status: 'accepted',
         upload_urls: {
           acce: 'https://example.test/acce',
@@ -50,6 +52,7 @@ describe('POST /api/recordings/init', () => {
     expect(response.status).toBe(201)
     await expect(response.json()).resolves.toEqual({
       recording_id: recordingId,
+      organization_id: organizationId,
       upload_status: 'accepted',
       upload_urls: {
         acce: 'https://example.test/acce',
@@ -132,6 +135,47 @@ describe('POST /api/recordings/init', () => {
       error_message: 'pedestrian_id does not exist',
       details: {
         pedestrian_id: pedestrianId,
+      },
+    })
+  })
+
+  it('pedestrian と floor の organization が異なる場合は 409 を返す', async () => {
+    const pedestrianId = '11111111-1111-4111-8111-111111111111'
+    const floorId = '22222222-2222-4222-8222-222222222222'
+
+    initRecordingMock.mockResolvedValue({
+      ok: false,
+      error: {
+        type: 'RESOURCE_ORGANIZATION_MISMATCH',
+        pedestrianId,
+        pedestrianOrganizationId: '99999999-9999-4999-8999-999999999999',
+        floorId,
+        floorOrganizationId: '88888888-8888-4888-8888-888888888888',
+      },
+    })
+
+    const app = createRouteTestApp('/recordings', registerInitRecordingRoute)
+    const response = await app.request('/api/recordings/init', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        pedestrian_id: pedestrianId,
+        floor_id: floorId,
+        upload_targets: ['acce', 'gyro'],
+      }),
+    })
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'RESOURCE_ORGANIZATION_MISMATCH',
+      error_message: 'pedestrian and floor belong to different organizations',
+      details: {
+        pedestrian_id: pedestrianId,
+        pedestrian_organization_id: '99999999-9999-4999-8999-999999999999',
+        floor_id: floorId,
+        floor_organization_id: '88888888-8888-4888-8888-888888888888',
       },
     })
   })

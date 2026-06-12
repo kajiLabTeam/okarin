@@ -20,7 +20,7 @@ describe('trajectory repository', () => {
   })
 
   it('accepted を processing に更新できる', async () => {
-    const { floor, recording } = await createRecordingFixture(db, {
+    const { floor, organization, recording } = await createRecordingFixture(db, {
       uploadTargets: ['acce', 'gyro'],
       floorLevel: 1,
       floorName: '1F',
@@ -31,6 +31,7 @@ describe('trajectory repository', () => {
       {
         recording_id: recording.id,
         floor_id: floor.id,
+        organization_id: organization.id,
         status: 'accepted',
       },
       db
@@ -42,7 +43,7 @@ describe('trajectory repository', () => {
   })
 
   it('completed は failed に更新しない', async () => {
-    const { floor, recording } = await createRecordingFixture(db, {
+    const { floor, organization, recording } = await createRecordingFixture(db, {
       uploadTargets: ['acce', 'gyro'],
       floorLevel: 1,
       floorName: '1F',
@@ -53,6 +54,7 @@ describe('trajectory repository', () => {
       {
         recording_id: recording.id,
         floor_id: floor.id,
+        organization_id: organization.id,
         status: 'completed',
       },
       db

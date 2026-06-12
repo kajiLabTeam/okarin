@@ -3,6 +3,7 @@ import { getCallbackRuntimeConfig } from '../config/runtime.js'
 import { uploadTargetsSchema } from '../schemas/common.js'
 import type { RecordingIdParams } from '../schemas/recordings.js'
 import type { CreateTrajectoryRequest } from '../schemas/trajectories.js'
+import { findFloorById } from '../services/floors/index.js'
 import { submitAnalyzeRequest } from '../services/nozomi/index.js'
 import { findRecordingById } from '../services/recordings/index.js'
 import {
@@ -32,6 +33,18 @@ export type CreateTrajectoryError =
       invalidTargets: string[]
     }
   | {
+      type: 'FLOOR_NOT_FOUND'
+      floorId: string
+      recordingId: string
+    }
+  | {
+      type: 'RESOURCE_ORGANIZATION_MISMATCH'
+      recordingId: string
+      recordingOrganizationId: string
+      floorId: string
+      floorOrganizationId: string
+    }
+  | {
       type: 'NOZOMI_REQUEST_FAILED'
       recordingId: string
       trajectoryId: string
@@ -48,6 +61,7 @@ export type CreateTrajectoryResult =
       value: {
         trajectory_id: string
         recording_id: string
+        organization_id: string
         status: 'processing'
       }
     }
@@ -57,6 +71,12 @@ export type CreateTrajectoryResult =
     }
 
 const getCallbackUrl = () => `${getCallbackRuntimeConfig().baseUrl}/api/trajectories/callback`
+
+const throwOrganizationInvariantError = (message: string): never => {
+  const error = new Error(message)
+  Sentry.captureException(error)
+  throw error
+}
 
 export const createTrajectory = async (
   params: RecordingIdParams,
@@ -97,10 +117,45 @@ export const createTrajectory = async (
     }
   }
 
+  if (!recording.organization_id) {
+    throwOrganizationInvariantError(`recording ${recording.id} does not have organization_id`)
+  }
+
+  const floor = await findFloorById(recording.floor_id)
+
+  if (!floor) {
+    return {
+      ok: false,
+      error: {
+        type: 'FLOOR_NOT_FOUND',
+        floorId: recording.floor_id,
+        recordingId: recording.id,
+      },
+    }
+  }
+
+  if (!floor.organization_id) {
+    throwOrganizationInvariantError(`floor ${floor.id} does not have organization_id`)
+  }
+
+  if (recording.organization_id !== floor.organization_id) {
+    return {
+      ok: false,
+      error: {
+        type: 'RESOURCE_ORGANIZATION_MISMATCH',
+        recordingId: recording.id,
+        recordingOrganizationId: recording.organization_id,
+        floorId: floor.id,
+        floorOrganizationId: floor.organization_id,
+      },
+    }
+  }
+
   const trajectory = await insertTrajectoryWithConstraints(
     {
       recording_id: recording.id,
       floor_id: recording.floor_id,
+      organization_id: recording.organization_id,
       status: 'accepted',
     },
     payload.constraints.map((constraint) => ({
@@ -188,6 +243,7 @@ export const createTrajectory = async (
     value: {
       trajectory_id: processing.id,
       recording_id: processing.recording_id,
+      organization_id: processing.organization_id,
       status: 'processing',
     },
   }

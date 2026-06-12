@@ -10,6 +10,44 @@ import { resetDatabase } from '../../db/helpers.js'
 
 const db = createDb()
 
+const createRecordingParents = async (suffix: string) => {
+  const organization = await db
+    .insertInto('organizations')
+    .values({ name: `Recording Test Organization ${suffix}` })
+    .returning(['id'])
+    .executeTakeFirstOrThrow()
+
+  const building = await db
+    .insertInto('buildings')
+    .values({ name: `Building ${suffix}`, organization_id: organization.id })
+    .returning(['id'])
+    .executeTakeFirstOrThrow()
+
+  const floor = await db
+    .insertInto('floors')
+    .values({
+      building_id: building.id,
+      organization_id: organization.id,
+      level: 1,
+      name: '1F',
+      image_object_path: `maps/${building.id}/11111111-1111-4111-8111-111111111111.png`,
+    })
+    .returning(['id'])
+    .executeTakeFirstOrThrow()
+
+  const pedestrian = await db
+    .insertInto('pedestrians')
+    .values({
+      display_name: `Recording Test Pedestrian ${suffix}`,
+      organization_id: organization.id,
+      user_id: null,
+    })
+    .returning(['id'])
+    .executeTakeFirstOrThrow()
+
+  return { organization, building, floor, pedestrian }
+}
+
 describe('recording repository', () => {
   beforeEach(async () => {
     await resetDatabase(db)
@@ -20,33 +58,13 @@ describe('recording repository', () => {
   })
 
   it('recording を登録して取得できる', async () => {
-    const building = await db
-      .insertInto('buildings')
-      .values({ name: 'Building A' })
-      .returning(['id'])
-      .executeTakeFirstOrThrow()
-
-    const floor = await db
-      .insertInto('floors')
-      .values({
-        building_id: building.id,
-        level: 1,
-        name: '1F',
-        image_object_path: `maps/${building.id}/11111111-1111-4111-8111-111111111111.png`,
-      })
-      .returning(['id'])
-      .executeTakeFirstOrThrow()
-
-    const pedestrian = await db
-      .insertInto('pedestrians')
-      .values({ display_name: 'Recording Test Pedestrian A', user_id: null })
-      .returning(['id'])
-      .executeTakeFirstOrThrow()
+    const { organization, floor, pedestrian } = await createRecordingParents('A')
 
     const created = await insertRecording(
       {
         pedestrian_id: pedestrian.id,
         floor_id: floor.id,
+        organization_id: organization.id,
         upload_targets: ['acce', 'gyro'],
       },
       db
@@ -60,33 +78,13 @@ describe('recording repository', () => {
   })
 
   it('upload_status を ready に更新できる', async () => {
-    const building = await db
-      .insertInto('buildings')
-      .values({ name: 'Building B' })
-      .returning(['id'])
-      .executeTakeFirstOrThrow()
-
-    const floor = await db
-      .insertInto('floors')
-      .values({
-        building_id: building.id,
-        level: 2,
-        name: '2F',
-        image_object_path: `maps/${building.id}/22222222-2222-4222-8222-222222222222.svg`,
-      })
-      .returning(['id'])
-      .executeTakeFirstOrThrow()
-
-    const pedestrian = await db
-      .insertInto('pedestrians')
-      .values({ display_name: 'Recording Test Pedestrian B', user_id: null })
-      .returning(['id'])
-      .executeTakeFirstOrThrow()
+    const { organization, floor, pedestrian } = await createRecordingParents('B')
 
     const created = await insertRecording(
       {
         pedestrian_id: pedestrian.id,
         floor_id: floor.id,
+        organization_id: organization.id,
         upload_targets: ['acce', 'gyro', 'wifi'],
       },
       db
@@ -98,33 +96,13 @@ describe('recording repository', () => {
   })
 
   it('accepted 以外の upload_status は ready に更新しない', async () => {
-    const building = await db
-      .insertInto('buildings')
-      .values({ name: 'Building C' })
-      .returning(['id'])
-      .executeTakeFirstOrThrow()
-
-    const floor = await db
-      .insertInto('floors')
-      .values({
-        building_id: building.id,
-        level: 3,
-        name: '3F',
-        image_object_path: `maps/${building.id}/33333333-3333-4333-8333-333333333333.svg`,
-      })
-      .returning(['id'])
-      .executeTakeFirstOrThrow()
-
-    const pedestrian = await db
-      .insertInto('pedestrians')
-      .values({ display_name: 'Recording Test Pedestrian C', user_id: null })
-      .returning(['id'])
-      .executeTakeFirstOrThrow()
+    const { organization, floor, pedestrian } = await createRecordingParents('C')
 
     const created = await insertRecording(
       {
         pedestrian_id: pedestrian.id,
         floor_id: floor.id,
+        organization_id: organization.id,
         upload_targets: ['acce', 'gyro'],
       },
       db
