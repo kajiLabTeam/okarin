@@ -15,9 +15,16 @@ describe('listPedestrians', () => {
   })
 
   it('pedestrian 一覧を返す', async () => {
+    const organization = await db
+      .insertInto('organizations')
+      .values({ name: 'List Pedestrian Organization' })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+
     const pedestrian = await db
       .insertInto('pedestrians')
       .values({
+        organization_id: organization.id,
         display_name: 'List Pedestrian',
         height: 1.72,
         stride_length: 0.7,
@@ -34,6 +41,7 @@ describe('listPedestrians', () => {
     expect(result.pedestrians).toHaveLength(1)
     expect(result.pedestrians[0]).toMatchObject({
       pedestrian_id: pedestrian.id,
+      organization_id: organization.id,
       display_name: 'List Pedestrian',
       height: 1.72,
       stride_length: 0.7,
@@ -44,9 +52,16 @@ describe('listPedestrians', () => {
   })
 
   it('作成日時、ID の順で並ぶ', async () => {
+    const organization = await db
+      .insertInto('organizations')
+      .values({ name: 'Ordering Pedestrian Organization' })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+
     const older = await db
       .insertInto('pedestrians')
       .values({
+        organization_id: organization.id,
         display_name: 'Older Pedestrian',
         created_at: new Date('2026-05-13T00:00:00.000Z'),
         updated_at: new Date('2026-05-13T00:00:00.000Z'),
@@ -57,6 +72,7 @@ describe('listPedestrians', () => {
     const newer = await db
       .insertInto('pedestrians')
       .values({
+        organization_id: organization.id,
         display_name: 'Newer Pedestrian',
         created_at: new Date('2026-05-14T00:00:00.000Z'),
         updated_at: new Date('2026-05-14T00:00:00.000Z'),

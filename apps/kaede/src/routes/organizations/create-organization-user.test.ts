@@ -147,6 +147,91 @@ describe('POST /api/organizations/:organizationId/users', () => {
     })
   })
 
+  it('create_pedestrian=true で nested pedestrian を organization_id 付きで返す', async () => {
+    createOrganizationUserForSessionMock.mockResolvedValue({
+      ok: true,
+      value: {
+        user_id: '22222222-2222-4222-8222-222222222222',
+        email: 'member@example.com',
+        display_name: 'Member A',
+        is_active: true,
+        role: 'member',
+        password_must_change: true,
+        password_changed_at: null,
+        temporary_password_expires_at: '2026-06-12T00:00:00.000Z',
+        created_at: '2026-06-11T00:00:00.000Z',
+        updated_at: '2026-06-11T00:00:00.000Z',
+        pedestrian: {
+          pedestrian_id: '33333333-3333-4333-8333-333333333333',
+          organization_id: '11111111-1111-4111-8111-111111111111',
+          display_name: 'Pedestrian A',
+          height: 170.5,
+          stride_length: 72,
+          attributes: {
+            team: 'A',
+          },
+          created_at: '2026-06-11T00:00:00.000Z',
+          updated_at: '2026-06-11T00:00:00.000Z',
+        },
+      },
+    })
+
+    const app = createRouteTestApp('/organizations', registerCreateOrganizationUserRoute)
+    const response = await app.request(
+      '/api/organizations/11111111-1111-4111-8111-111111111111/users',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          cookie: 'okarin_session=session-token',
+        },
+        body: JSON.stringify({
+          email: 'member@example.com',
+          display_name: 'Member A',
+          role: 'member',
+          temporary_password: 'initial-password',
+          create_pedestrian: true,
+          pedestrian: {
+            display_name: 'Pedestrian A',
+            height: 170.5,
+            stride_length: 72,
+            attributes: {
+              team: 'A',
+            },
+          },
+        }),
+      }
+    )
+
+    expect(response.status).toBe(201)
+    await expect(response.json()).resolves.toMatchObject({
+      pedestrian: {
+        pedestrian_id: '33333333-3333-4333-8333-333333333333',
+        organization_id: '11111111-1111-4111-8111-111111111111',
+        display_name: 'Pedestrian A',
+      },
+    })
+    expect(createOrganizationUserForSessionMock).toHaveBeenCalledWith(
+      'session-token',
+      '11111111-1111-4111-8111-111111111111',
+      {
+        email: 'member@example.com',
+        display_name: 'Member A',
+        role: 'member',
+        temporary_password: 'initial-password',
+        create_pedestrian: true,
+        pedestrian: {
+          display_name: 'Pedestrian A',
+          height: 170.5,
+          stride_length: 72,
+          attributes: {
+            team: 'A',
+          },
+        },
+      }
+    )
+  })
+
   it('create_pedestrian=true で pedestrian がない場合は 400 を返し usecase を呼ばない', async () => {
     const app = createRouteTestApp('/organizations', registerCreateOrganizationUserRoute)
     const response = await app.request(

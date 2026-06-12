@@ -14,6 +14,9 @@ export const pedestrianSchema = z.object({
   pedestrian_id: uuidSchema.openapi({
     description: 'pedestrian の ID',
   }),
+  organization_id: uuidSchema.openapi({
+    description: 'pedestrian が属する organization の ID',
+  }),
   display_name: z.string().min(1).openapi({
     description: 'pedestrian を画面上で識別する表示名',
   }),
@@ -40,7 +43,7 @@ export const pedestriansListResponseSchema = z.object({
   }),
 })
 
-export const createPedestrianRequestSchema = z.object({
+export const createPedestrianWithoutOrganizationRequestSchema = z.object({
   display_name: z.string().min(1).openapi({
     description: 'pedestrian を画面上で識別する表示名',
   }),
@@ -55,6 +58,16 @@ export const createPedestrianRequestSchema = z.object({
   }),
 })
 
+export const createPedestrianRequestSchema =
+  createPedestrianWithoutOrganizationRequestSchema.extend({
+    organization_id: uuidSchema.openapi({
+      description: 'pedestrian を所属させる organization の ID',
+    }),
+  })
+
 export type PedestriansListResponse = z.infer<typeof pedestriansListResponseSchema>
 export type CreatePedestrianRequest = z.infer<typeof createPedestrianRequestSchema>
+export type CreatePedestrianWithoutOrganizationRequest = z.infer<
+  typeof createPedestrianWithoutOrganizationRequestSchema
+>
 export type PedestrianResponse = z.infer<typeof pedestrianSchema>

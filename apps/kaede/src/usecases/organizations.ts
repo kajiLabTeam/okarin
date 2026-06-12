@@ -68,6 +68,17 @@ const normalizeAttributes = (
   return {}
 }
 
+const requirePedestrianOrganizationId = (
+  pedestrianId: string,
+  organizationId: string | null
+): string => {
+  if (!organizationId) {
+    throw new Error(`pedestrian ${pedestrianId} does not have organization_id`)
+  }
+
+  return organizationId
+}
+
 const toOrganizationUserResponse = (row: OrganizationUserRow): OrganizationUserResponse => ({
   user_id: row.user_id,
   email: row.email,
@@ -83,6 +94,10 @@ const toOrganizationUserResponse = (row: OrganizationUserRow): OrganizationUserR
     row.pedestrian_id && row.pedestrian_created_at && row.pedestrian_updated_at
       ? {
           pedestrian_id: row.pedestrian_id,
+          organization_id: requirePedestrianOrganizationId(
+            row.pedestrian_id,
+            row.pedestrian_organization_id
+          ),
           display_name: row.pedestrian_display_name ?? '',
           height: row.pedestrian_height,
           stride_length: row.pedestrian_stride_length,
@@ -319,6 +334,7 @@ export const createOrganizationUserForSession = async (
     if (payload.create_pedestrian && payload.pedestrian) {
       await insertPedestrian(
         {
+          organization_id: organizationId,
           display_name: payload.pedestrian.display_name.trim(),
           height: payload.pedestrian.height ?? null,
           stride_length: payload.pedestrian.stride_length ?? null,

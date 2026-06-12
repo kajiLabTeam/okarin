@@ -17,15 +17,19 @@ describe('POST /api/pedestrians', () => {
 
   it('pedestrian を作成して返す', async () => {
     createPedestrianMock.mockResolvedValue({
-      pedestrian_id: '11111111-1111-4111-8111-111111111111',
-      display_name: 'test participant',
-      height: 1.72,
-      stride_length: 0.7,
-      attributes: {
-        label: 'test participant',
+      ok: true,
+      value: {
+        pedestrian_id: '11111111-1111-4111-8111-111111111111',
+        organization_id: '99999999-9999-4999-8999-999999999999',
+        display_name: 'test participant',
+        height: 1.72,
+        stride_length: 0.7,
+        attributes: {
+          label: 'test participant',
+        },
+        created_at: '2026-05-13T00:00:00.000Z',
+        updated_at: '2026-05-13T00:00:00.000Z',
       },
-      created_at: '2026-05-13T00:00:00.000Z',
-      updated_at: '2026-05-13T00:00:00.000Z',
     })
 
     const app = createRouteTestApp('/pedestrians', registerCreatePedestrianRoute)
@@ -35,6 +39,7 @@ describe('POST /api/pedestrians', () => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
+        organization_id: '99999999-9999-4999-8999-999999999999',
         display_name: 'test participant',
         height: 1.72,
         stride_length: 0.7,
@@ -47,6 +52,7 @@ describe('POST /api/pedestrians', () => {
     expect(response.status).toBe(201)
     await expect(response.json()).resolves.toEqual({
       pedestrian_id: '11111111-1111-4111-8111-111111111111',
+      organization_id: '99999999-9999-4999-8999-999999999999',
       display_name: 'test participant',
       height: 1.72,
       stride_length: 0.7,
@@ -58,6 +64,7 @@ describe('POST /api/pedestrians', () => {
     })
 
     expect(createPedestrianMock).toHaveBeenCalledWith({
+      organization_id: '99999999-9999-4999-8999-999999999999',
       display_name: 'test participant',
       height: 1.72,
       stride_length: 0.7,
@@ -69,13 +76,17 @@ describe('POST /api/pedestrians', () => {
 
   it('display_name だけで pedestrian を作成できる', async () => {
     createPedestrianMock.mockResolvedValue({
-      pedestrian_id: '11111111-1111-4111-8111-111111111111',
-      display_name: 'minimal participant',
-      height: null,
-      stride_length: null,
-      attributes: {},
-      created_at: '2026-05-13T00:00:00.000Z',
-      updated_at: '2026-05-13T00:00:00.000Z',
+      ok: true,
+      value: {
+        pedestrian_id: '11111111-1111-4111-8111-111111111111',
+        organization_id: '99999999-9999-4999-8999-999999999999',
+        display_name: 'minimal participant',
+        height: null,
+        stride_length: null,
+        attributes: {},
+        created_at: '2026-05-13T00:00:00.000Z',
+        updated_at: '2026-05-13T00:00:00.000Z',
+      },
     })
 
     const app = createRouteTestApp('/pedestrians', registerCreatePedestrianRoute)
@@ -85,6 +96,7 @@ describe('POST /api/pedestrians', () => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
+        organization_id: '99999999-9999-4999-8999-999999999999',
         display_name: 'minimal participant',
       }),
     })
@@ -98,7 +110,39 @@ describe('POST /api/pedestrians', () => {
     })
 
     expect(createPedestrianMock).toHaveBeenCalledWith({
+      organization_id: '99999999-9999-4999-8999-999999999999',
       display_name: 'minimal participant',
+    })
+  })
+
+  it('存在しない organization_id は 404 を返す', async () => {
+    createPedestrianMock.mockResolvedValue({
+      ok: false,
+      error: {
+        type: 'ORGANIZATION_NOT_FOUND',
+        organizationId: '99999999-9999-4999-8999-999999999999',
+      },
+    })
+
+    const app = createRouteTestApp('/pedestrians', registerCreatePedestrianRoute)
+    const response = await app.request('/api/pedestrians', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        organization_id: '99999999-9999-4999-8999-999999999999',
+        display_name: 'test participant',
+      }),
+    })
+
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'ORGANIZATION_NOT_FOUND',
+      error_message: 'organization not found',
+      details: {
+        organization_id: '99999999-9999-4999-8999-999999999999',
+      },
     })
   })
 
@@ -110,8 +154,42 @@ describe('POST /api/pedestrians', () => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
+        organization_id: '99999999-9999-4999-8999-999999999999',
         display_name: 'test participant',
         height: -1,
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(createPedestrianMock).not.toHaveBeenCalled()
+  })
+
+  it('organization_id がない場合はバリデーションエラーを返し usecase を呼ばない', async () => {
+    const app = createRouteTestApp('/pedestrians', registerCreatePedestrianRoute)
+    const response = await app.request('/api/pedestrians', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        display_name: 'test participant',
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(createPedestrianMock).not.toHaveBeenCalled()
+  })
+
+  it('organization_id が UUID 形式でない場合はバリデーションエラーを返し usecase を呼ばない', async () => {
+    const app = createRouteTestApp('/pedestrians', registerCreatePedestrianRoute)
+    const response = await app.request('/api/pedestrians', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        organization_id: 'invalid-organization-id',
+        display_name: 'test participant',
       }),
     })
 
@@ -126,7 +204,9 @@ describe('POST /api/pedestrians', () => {
       headers: {
         'content-type': 'application/json',
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({
+        organization_id: '99999999-9999-4999-8999-999999999999',
+      }),
     })
 
     expect(response.status).toBe(400)

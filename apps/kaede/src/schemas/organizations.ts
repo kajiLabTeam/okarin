@@ -1,7 +1,10 @@
 import { z } from '@hono/zod-openapi'
 import { authUserSchema, loginRequestSchema } from './auth.js'
 import { isoDatetimeSchema, uuidSchema } from './common.js'
-import { createPedestrianRequestSchema, pedestrianSchema } from './pedestrians.js'
+import {
+  createPedestrianWithoutOrganizationRequestSchema,
+  pedestrianSchema,
+} from './pedestrians.js'
 
 export const membershipRoleSchema = z.enum(['member', 'manager'])
 
@@ -48,7 +51,7 @@ export const createOrganizationUserRequestSchema = z
     role: membershipRoleSchema,
     temporary_password: loginRequestSchema.shape.password,
     create_pedestrian: z.boolean().default(false),
-    pedestrian: createPedestrianRequestSchema.optional(),
+    pedestrian: createPedestrianWithoutOrganizationRequestSchema.optional(),
   })
   .superRefine((payload, ctx) => {
     if (payload.create_pedestrian && !payload.pedestrian) {
