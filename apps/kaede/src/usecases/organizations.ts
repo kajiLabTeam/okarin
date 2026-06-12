@@ -16,6 +16,7 @@ import type { Organization } from '../services/organizations/index.js'
 import { insertPedestrian } from '../services/pedestrians/index.js'
 import {
   findOrganizationMembership,
+  findOrganizationUserById,
   findUserByEmail,
   insertOrganizationMembership,
   insertUser,
@@ -327,8 +328,10 @@ export const createOrganizationUserForSession = async (
     return user
   })
 
-  const createdOrganizationUser = (await listOrganizationUsers(organizationId, executor)).find(
-    (user) => user.user_id === createdUser.id
+  const createdOrganizationUser: OrganizationUserRow | undefined = await findOrganizationUserById(
+    organizationId,
+    createdUser.id,
+    executor
   )
 
   if (!createdOrganizationUser) {

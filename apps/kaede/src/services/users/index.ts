@@ -1,5 +1,6 @@
 export {
   findOrganizationMembership,
+  findOrganizationUserById,
   findUserByEmail,
   findUserById,
   insertOrganizationMembership,

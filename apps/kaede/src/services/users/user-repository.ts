@@ -84,11 +84,8 @@ export const insertOrganizationMembership = async (
     .executeTakeFirstOrThrow()
 }
 
-export const listOrganizationUsers = async (
-  organizationId: string,
-  executor: DbExecutor = db
-): Promise<OrganizationUserRow[]> => {
-  return executor
+const organizationUsersQuery = (executor: DbExecutor) =>
+  executor
     .selectFrom('organization_memberships as membership')
     .innerJoin('users as user', 'user.id', 'membership.user_id')
     .leftJoin('pedestrians as pedestrian', 'pedestrian.user_id', 'user.id')
@@ -111,10 +108,27 @@ export const listOrganizationUsers = async (
       'pedestrian.created_at as pedestrian_created_at',
       'pedestrian.updated_at as pedestrian_updated_at',
     ])
+
+export const listOrganizationUsers = async (
+  organizationId: string,
+  executor: DbExecutor = db
+): Promise<OrganizationUserRow[]> => {
+  return organizationUsersQuery(executor)
     .where('membership.organization_id', '=', organizationId)
     .orderBy('user.email', 'asc')
     .orderBy('user.id', 'asc')
     .execute()
+}
+
+export const findOrganizationUserById = async (
+  organizationId: string,
+  userId: string,
+  executor: DbExecutor = db
+): Promise<OrganizationUserRow | undefined> => {
+  return organizationUsersQuery(executor)
+    .where('membership.organization_id', '=', organizationId)
+    .where('user.id', '=', userId)
+    .executeTakeFirst()
 }
 
 export const listUserOrganizationMemberships = async (
