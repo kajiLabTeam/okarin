@@ -18,7 +18,7 @@ describe('POST /api/recordings/init', () => {
   })
 
   it('recording を作成しアップロード URL を返す', async () => {
-    const { floorId, pedestrianId } = await createRecordingFixture(db)
+    const { floorId, organizationId, pedestrianId } = await createRecordingFixture(db)
 
     const response = await app.request('/api/recordings/init', {
       method: 'POST',
@@ -40,6 +40,7 @@ describe('POST /api/recordings/init', () => {
     expect(body.recording_id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
     )
+    expect(body.organization_id).toBe(organizationId)
     expect(body.upload_status).toBe('accepted')
     expect(body.upload_urls).toEqual({
       acce: expect.stringContaining(`/recordings/${body.recording_id}/raw/acce.csv`),
@@ -59,6 +60,7 @@ describe('POST /api/recordings/init', () => {
     expect(created).toBeDefined()
     expect(created?.pedestrian_id).toBe(pedestrianId)
     expect(created?.floor_id).toBe(floorId)
+    expect(created?.organization_id).toBe(organizationId)
     expect(created?.upload_status).toBe('accepted')
     expect(created?.upload_targets).toEqual(['acce', 'gyro', 'wifi', 'metadata'])
   })

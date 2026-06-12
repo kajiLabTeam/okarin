@@ -9,6 +9,7 @@ export interface CreateRecordingFixtureParams {
   buildingName?: string
   floorLevel?: number
   floorName?: string
+  organizationName?: string
 }
 
 export const createRecordingFixture = async (
@@ -21,11 +22,18 @@ export const createRecordingFixture = async (
     buildingName = 'Fixture Building',
     floorLevel = 3,
     floorName = `${floorLevel}F`,
+    organizationName = 'Fixture Organization',
   } = params
+
+  const organization = await db
+    .insertInto('organizations')
+    .values({ name: organizationName })
+    .returning(['id'])
+    .executeTakeFirstOrThrow()
 
   const building = await db
     .insertInto('buildings')
-    .values({ name: buildingName })
+    .values({ name: buildingName, organization_id: organization.id })
     .returning(['id'])
     .executeTakeFirstOrThrow()
 
@@ -33,6 +41,7 @@ export const createRecordingFixture = async (
     .insertInto('floors')
     .values({
       building_id: building.id,
+      organization_id: organization.id,
       level: floorLevel,
       name: floorName,
       image_object_path: `maps/${building.id}/11111111-1111-4111-8111-111111111111.png`,
@@ -42,7 +51,11 @@ export const createRecordingFixture = async (
 
   const pedestrian = await db
     .insertInto('pedestrians')
-    .values({ display_name: 'Fixture Pedestrian', user_id: null })
+    .values({
+      display_name: 'Fixture Pedestrian',
+      organization_id: organization.id,
+      user_id: null,
+    })
     .returning(['id'])
     .executeTakeFirstOrThrow()
 
@@ -50,6 +63,7 @@ export const createRecordingFixture = async (
     {
       pedestrian_id: pedestrian.id,
       floor_id: floor.id,
+      organization_id: organization.id,
       upload_status: uploadStatus,
       upload_targets: uploadTargets,
     },
@@ -61,6 +75,8 @@ export const createRecordingFixture = async (
     floorId: floor.id,
     pedestrianId: pedestrian.id,
     recordingId: recording.id,
+    organizationId: organization.id,
+    organization,
     building,
     floor,
     pedestrian,

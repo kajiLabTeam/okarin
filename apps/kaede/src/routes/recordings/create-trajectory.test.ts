@@ -18,12 +18,14 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
   it('trajectory を processing として返す', async () => {
     const recordingId = '11111111-1111-4111-8111-111111111111'
     const trajectoryId = '22222222-2222-4222-8222-222222222222'
+    const organizationId = '99999999-9999-4999-8999-999999999999'
 
     createTrajectoryMock.mockResolvedValue({
       ok: true,
       value: {
         trajectory_id: trajectoryId,
         recording_id: recordingId,
+        organization_id: organizationId,
         status: 'processing',
       },
     })
@@ -43,6 +45,7 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
     await expect(response.json()).resolves.toEqual({
       trajectory_id: trajectoryId,
       recording_id: recordingId,
+      organization_id: organizationId,
       status: 'processing',
     })
     expect(createTrajectoryMock).toHaveBeenCalledWith(
@@ -117,6 +120,80 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
       details: {
         recording_id: recordingId,
         upload_status: 'accepted',
+      },
+    })
+  })
+
+  it('recording の floor が存在しない場合は 404 を返す', async () => {
+    const recordingId = '11111111-1111-4111-8111-111111111111'
+    const floorId = '33333333-3333-4333-8333-333333333333'
+
+    createTrajectoryMock.mockResolvedValue({
+      ok: false,
+      error: {
+        type: 'FLOOR_NOT_FOUND',
+        recordingId,
+        floorId,
+      },
+    })
+
+    const app = createRouteTestApp('/recordings', registerCreateTrajectoryRoute)
+    const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        constraints: [],
+      }),
+    })
+
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'FLOOR_NOT_FOUND',
+      error_message: 'recording floor not found',
+      details: {
+        recording_id: recordingId,
+        floor_id: floorId,
+      },
+    })
+  })
+
+  it('recording と floor の organization が異なる場合は 409 を返す', async () => {
+    const recordingId = '11111111-1111-4111-8111-111111111111'
+    const floorId = '33333333-3333-4333-8333-333333333333'
+
+    createTrajectoryMock.mockResolvedValue({
+      ok: false,
+      error: {
+        type: 'RESOURCE_ORGANIZATION_MISMATCH',
+        recordingId,
+        recordingOrganizationId: '99999999-9999-4999-8999-999999999999',
+        floorId,
+        floorOrganizationId: '88888888-8888-4888-8888-888888888888',
+      },
+    })
+
+    const app = createRouteTestApp('/recordings', registerCreateTrajectoryRoute)
+    const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        constraints: [],
+      }),
+    })
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'RESOURCE_ORGANIZATION_MISMATCH',
+      error_message: 'recording and floor belong to different organizations',
+      details: {
+        recording_id: recordingId,
+        recording_organization_id: '99999999-9999-4999-8999-999999999999',
+        floor_id: floorId,
+        floor_organization_id: '88888888-8888-4888-8888-888888888888',
       },
     })
   })

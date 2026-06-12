@@ -34,8 +34,8 @@ const mockEntityLookups = ({
   pedestrian,
   floor,
 }: {
-  pedestrian?: { id: string }
-  floor?: { id: string }
+  pedestrian?: { id: string; organization_id: string }
+  floor?: { id: string; organization_id: string }
 }) => {
   findPedestrianByIdMock.mockResolvedValue(pedestrian)
   findFloorByIdMock.mockResolvedValue(floor)
@@ -50,13 +50,15 @@ describe('initRecording', () => {
     const pedestrianId = '11111111-1111-4111-8111-111111111111'
     const floorId = '22222222-2222-4222-8222-222222222222'
     const recordingId = '33333333-3333-4333-8333-333333333333'
+    const organizationId = '99999999-9999-4999-8999-999999999999'
 
     mockEntityLookups({
-      pedestrian: { id: pedestrianId },
-      floor: { id: floorId },
+      pedestrian: { id: pedestrianId, organization_id: organizationId },
+      floor: { id: floorId, organization_id: organizationId },
     })
     insertRecordingMock.mockResolvedValue({
       id: recordingId,
+      organization_id: organizationId,
       upload_status: 'accepted',
     })
     issueRecordingUploadUrlsMock.mockResolvedValue({
@@ -78,6 +80,7 @@ describe('initRecording', () => {
       ok: true,
       value: {
         recording_id: recordingId,
+        organization_id: organizationId,
         upload_status: 'accepted',
         upload_urls: {
           acce: 'https://storage.example.test/acce',
@@ -90,6 +93,7 @@ describe('initRecording', () => {
     expect(insertRecordingMock).toHaveBeenCalledWith({
       pedestrian_id: pedestrianId,
       floor_id: floorId,
+      organization_id: organizationId,
       upload_targets: ['acce', 'gyro', 'metadata'],
     })
     expect(issueRecordingUploadUrlsMock).toHaveBeenCalledWith(recordingId, [
@@ -105,7 +109,7 @@ describe('initRecording', () => {
 
     mockEntityLookups({
       pedestrian: undefined,
-      floor: { id: floorId },
+      floor: { id: floorId, organization_id: '99999999-9999-4999-8999-999999999999' },
     })
 
     const result = await initRecording({
@@ -130,7 +134,7 @@ describe('initRecording', () => {
     const floorId = '22222222-2222-4222-8222-222222222222'
 
     mockEntityLookups({
-      pedestrian: { id: pedestrianId },
+      pedestrian: { id: pedestrianId, organization_id: '99999999-9999-4999-8999-999999999999' },
       floor: undefined,
     })
 
@@ -151,12 +155,45 @@ describe('initRecording', () => {
     expect(issueRecordingUploadUrlsMock).not.toHaveBeenCalled()
   })
 
+  it('pedestrian と floor の organization が異なれば RESOURCE_ORGANIZATION_MISMATCH を返す', async () => {
+    const pedestrianId = '11111111-1111-4111-8111-111111111111'
+    const floorId = '22222222-2222-4222-8222-222222222222'
+    const pedestrianOrganizationId = '99999999-9999-4999-8999-999999999999'
+    const floorOrganizationId = '88888888-8888-4888-8888-888888888888'
+
+    mockEntityLookups({
+      pedestrian: { id: pedestrianId, organization_id: pedestrianOrganizationId },
+      floor: { id: floorId, organization_id: floorOrganizationId },
+    })
+
+    const result = await initRecording({
+      pedestrian_id: pedestrianId,
+      floor_id: floorId,
+      upload_targets: ['acce', 'gyro'],
+    })
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'RESOURCE_ORGANIZATION_MISMATCH',
+        pedestrianId,
+        pedestrianOrganizationId,
+        floorId,
+        floorOrganizationId,
+      },
+    })
+    expect(insertRecordingMock).not.toHaveBeenCalled()
+    expect(issueRecordingUploadUrlsMock).not.toHaveBeenCalled()
+  })
+
   it('pedestrian lookup は service 経由で pedestrian id を参照する', async () => {
     findPedestrianByIdMock.mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',
+      organization_id: '99999999-9999-4999-8999-999999999999',
     })
     findFloorByIdMock.mockResolvedValue({
       id: '22222222-2222-4222-8222-222222222222',
+      organization_id: '99999999-9999-4999-8999-999999999999',
     })
 
     await initRecording({

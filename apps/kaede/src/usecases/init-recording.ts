@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node'
 import { recordingUploadStatusSchema } from '../schemas/common.js'
 import type { UploadTarget } from '../schemas/common.js'
 import type { InitRecordingRequest } from '../schemas/recordings.js'
@@ -15,11 +16,19 @@ export type InitRecordingError =
       type: 'FLOOR_NOT_FOUND'
       floorId: string
     }
+  | {
+      type: 'RESOURCE_ORGANIZATION_MISMATCH'
+      pedestrianId: string
+      pedestrianOrganizationId: string
+      floorId: string
+      floorOrganizationId: string
+    }
 export type InitRecordingResult =
   | {
       ok: true
       value: {
         recording_id: string
+        organization_id: string
         upload_status: 'accepted' | 'ready' | 'failed'
         upload_urls: {
           acce?: string
@@ -42,6 +51,12 @@ const withRequiredMetadataTarget = (targets: UploadTarget[]): UploadTarget[] => 
   }
 
   return [...targets, 'metadata']
+}
+
+const throwOrganizationInvariantError = (message: string): never => {
+  const error = new Error(message)
+  Sentry.captureException(error)
+  throw error
 }
 
 export const initRecording = async (payload: InitRecordingRequest) => {
@@ -70,11 +85,33 @@ export const initRecording = async (payload: InitRecordingRequest) => {
     } satisfies InitRecordingResult
   }
 
+  if (!pedestrian.organization_id) {
+    throwOrganizationInvariantError(`pedestrian ${pedestrian.id} does not have organization_id`)
+  }
+
+  if (!floor.organization_id) {
+    throwOrganizationInvariantError(`floor ${floor.id} does not have organization_id`)
+  }
+
+  if (pedestrian.organization_id !== floor.organization_id) {
+    return {
+      ok: false,
+      error: {
+        type: 'RESOURCE_ORGANIZATION_MISMATCH',
+        pedestrianId: pedestrian.id,
+        pedestrianOrganizationId: pedestrian.organization_id,
+        floorId: floor.id,
+        floorOrganizationId: floor.organization_id,
+      },
+    } satisfies InitRecordingResult
+  }
+
   const uploadTargets = withRequiredMetadataTarget(payload.upload_targets)
 
   const recording = await insertRecording({
     pedestrian_id: payload.pedestrian_id,
     floor_id: payload.floor_id,
+    organization_id: pedestrian.organization_id,
     upload_targets: uploadTargets,
   })
   const { expiresAt, uploadUrls } = await issueRecordingUploadUrls(recording.id, uploadTargets)
@@ -83,6 +120,7 @@ export const initRecording = async (payload: InitRecordingRequest) => {
     ok: true,
     value: {
       recording_id: recording.id,
+      organization_id: recording.organization_id,
       upload_status: recordingUploadStatusSchema.parse(recording.upload_status),
       upload_urls: uploadUrls,
       expires_at: expiresAt,

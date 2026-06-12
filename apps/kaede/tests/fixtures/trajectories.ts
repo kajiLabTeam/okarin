@@ -25,6 +25,7 @@ export const createTrajectoryFixture = async (
     {
       recording_id: recordingFixture.recording.id,
       floor_id: recordingFixture.floor.id,
+      organization_id: recordingFixture.organization.id,
       status: trajectoryStatus,
     },
     db
