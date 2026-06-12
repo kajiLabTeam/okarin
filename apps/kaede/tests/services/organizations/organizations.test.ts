@@ -3,6 +3,7 @@ import { createSession } from '../../../src/services/auth/index.js'
 import { verifyPassword } from '../../../src/services/auth/password.js'
 import { createDb } from '../../../src/services/db/client.js'
 import {
+  createOrUpdateOrganizationMembershipForSession,
   createOrganizationUserForSession,
   createOrganizationForSession,
   listOrganizationUsersForSession,
@@ -397,6 +398,275 @@ describe('organizations usecase', () => {
       ok: false,
       error: {
         type: 'USER_ALREADY_EXISTS',
+      },
+    })
+  })
+
+  it('admin can add an existing user to an organization as member', async () => {
+    const organization = await createOrganization()
+    const admin = await createUserWithSession({
+      email: 'admin@example.com',
+      globalRole: 'admin',
+    })
+    const member = await createUserWithSession({
+      email: 'member@example.com',
+      globalRole: 'none',
+    })
+
+    const result = await createOrUpdateOrganizationMembershipForSession(
+      admin.sessionToken,
+      organization.id,
+      {
+        user_id: member.user.id,
+        role: 'member',
+      },
+      db
+    )
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        email: 'member@example.com',
+        role: 'member',
+      },
+    })
+
+    const membership = await db
+      .selectFrom('organization_memberships')
+      .selectAll()
+      .where('organization_id', '=', organization.id)
+      .where('user_id', '=', member.user.id)
+      .executeTakeFirstOrThrow()
+
+    expect(membership.role).toBe('member')
+  })
+
+  it('admin can promote an existing membership to manager', async () => {
+    const organization = await createOrganization()
+    const admin = await createUserWithSession({
+      email: 'admin@example.com',
+      globalRole: 'admin',
+    })
+    const member = await createUserWithSession({
+      email: 'member@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'member',
+      },
+    })
+
+    const result = await createOrUpdateOrganizationMembershipForSession(
+      admin.sessionToken,
+      organization.id,
+      {
+        user_id: member.user.id,
+        role: 'manager',
+      },
+      db
+    )
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        email: 'member@example.com',
+        role: 'manager',
+      },
+    })
+
+    const membership = await db
+      .selectFrom('organization_memberships')
+      .selectAll()
+      .where('organization_id', '=', organization.id)
+      .where('user_id', '=', member.user.id)
+      .executeTakeFirstOrThrow()
+
+    expect(membership.role).toBe('manager')
+  })
+
+  it('manager can add an existing user to their organization as member', async () => {
+    const organization = await createOrganization()
+    const manager = await createUserWithSession({
+      email: 'manager@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'manager',
+      },
+    })
+    const member = await createUserWithSession({
+      email: 'member@example.com',
+      globalRole: 'none',
+    })
+
+    const result = await createOrUpdateOrganizationMembershipForSession(
+      manager.sessionToken,
+      organization.id,
+      {
+        user_id: member.user.id,
+        role: 'member',
+      },
+      db
+    )
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        email: 'member@example.com',
+        role: 'member',
+      },
+    })
+  })
+
+  it('manager cannot create or promote manager memberships', async () => {
+    const organization = await createOrganization()
+    const manager = await createUserWithSession({
+      email: 'manager@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'manager',
+      },
+    })
+    const member = await createUserWithSession({
+      email: 'member@example.com',
+      globalRole: 'none',
+    })
+
+    const result = await createOrUpdateOrganizationMembershipForSession(
+      manager.sessionToken,
+      organization.id,
+      {
+        user_id: member.user.id,
+        role: 'manager',
+      },
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'AUTH_FORBIDDEN',
+      },
+    })
+  })
+
+  it('manager cannot add memberships in another organization', async () => {
+    const organization = await createOrganization()
+    const otherOrganization = await createOrganization('Group B')
+    const manager = await createUserWithSession({
+      email: 'manager@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'manager',
+      },
+    })
+    const member = await createUserWithSession({
+      email: 'member@example.com',
+      globalRole: 'none',
+    })
+
+    const result = await createOrUpdateOrganizationMembershipForSession(
+      manager.sessionToken,
+      otherOrganization.id,
+      {
+        user_id: member.user.id,
+        role: 'member',
+      },
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'AUTH_FORBIDDEN',
+      },
+    })
+  })
+
+  it('member cannot add memberships', async () => {
+    const organization = await createOrganization()
+    const memberActor = await createUserWithSession({
+      email: 'member-actor@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'member',
+      },
+    })
+    const member = await createUserWithSession({
+      email: 'member@example.com',
+      globalRole: 'none',
+    })
+
+    const result = await createOrUpdateOrganizationMembershipForSession(
+      memberActor.sessionToken,
+      organization.id,
+      {
+        user_id: member.user.id,
+        role: 'member',
+      },
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'AUTH_FORBIDDEN',
+      },
+    })
+  })
+
+  it('membership upsert returns ORGANIZATION_NOT_FOUND for missing organization', async () => {
+    const admin = await createUserWithSession({
+      email: 'admin@example.com',
+      globalRole: 'admin',
+    })
+    const member = await createUserWithSession({
+      email: 'member@example.com',
+      globalRole: 'none',
+    })
+
+    const result = await createOrUpdateOrganizationMembershipForSession(
+      admin.sessionToken,
+      '11111111-1111-4111-8111-111111111111',
+      {
+        user_id: member.user.id,
+        role: 'member',
+      },
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'ORGANIZATION_NOT_FOUND',
+      },
+    })
+  })
+
+  it('membership upsert returns USER_NOT_FOUND for missing user', async () => {
+    const organization = await createOrganization()
+    const admin = await createUserWithSession({
+      email: 'admin@example.com',
+      globalRole: 'admin',
+    })
+
+    const result = await createOrUpdateOrganizationMembershipForSession(
+      admin.sessionToken,
+      organization.id,
+      {
+        user_id: '11111111-1111-4111-8111-111111111111',
+        role: 'member',
+      },
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'USER_NOT_FOUND',
       },
     })
   })

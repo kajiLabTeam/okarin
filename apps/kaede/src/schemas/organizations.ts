@@ -58,6 +58,14 @@ export const createOrganizationUserRequestSchema = z
     }
   })
 
+export const createOrganizationMembershipRequestSchema = z.object({
+  user_id: uuidSchema,
+  role: membershipRoleSchema,
+})
+
+export type CreateOrganizationMembershipRequest = z.infer<
+  typeof createOrganizationMembershipRequestSchema
+>
 export type CreateOrganizationRequest = z.infer<typeof createOrganizationRequestSchema>
 export type CreateOrganizationUserRequest = z.infer<typeof createOrganizationUserRequestSchema>
 export type MembershipRole = z.infer<typeof membershipRoleSchema>

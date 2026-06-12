@@ -84,6 +84,22 @@ export const insertOrganizationMembership = async (
     .executeTakeFirstOrThrow()
 }
 
+export const upsertOrganizationMembership = async (
+  membership: NewOrganizationMembership,
+  executor: DbExecutor = db
+): Promise<OrganizationMembership> => {
+  return executor
+    .insertInto('organization_memberships')
+    .values(membership)
+    .onConflict((oc) =>
+      oc.columns(['organization_id', 'user_id']).doUpdateSet({
+        role: membership.role,
+      })
+    )
+    .returningAll()
+    .executeTakeFirstOrThrow()
+}
+
 const organizationUsersQuery = (executor: DbExecutor) =>
   executor
     .selectFrom('organization_memberships as membership')

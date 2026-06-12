@@ -1,4 +1,5 @@
 import type {
+  CreateOrganizationMembershipRequest,
   CreateOrganizationRequest,
   CreateOrganizationUserRequest,
   OrganizationResponse,
@@ -18,9 +19,11 @@ import {
   findOrganizationMembership,
   findOrganizationUserById,
   findUserByEmail,
+  findUserById,
   insertOrganizationMembership,
   insertUser,
   listOrganizationUsers,
+  upsertOrganizationMembership,
 } from '../services/users/index.js'
 import type { OrganizationUserRow } from '../services/users/index.js'
 import { requireActiveSessionUser } from './auth.js'
@@ -32,6 +35,7 @@ export type OrganizationError =
   | { type: 'AUTH_USER_DISABLED' }
   | { type: 'AUTH_FORBIDDEN' }
   | { type: 'ORGANIZATION_NOT_FOUND' }
+  | { type: 'USER_NOT_FOUND' }
   | { type: 'USER_ALREADY_EXISTS' }
 
 export type OrganizationResult<T> =
@@ -341,5 +345,54 @@ export const createOrganizationUserForSession = async (
   return {
     ok: true,
     value: toOrganizationUserResponse(createdOrganizationUser),
+  }
+}
+
+export const createOrUpdateOrganizationMembershipForSession = async (
+  sessionToken: string | undefined,
+  organizationId: string,
+  payload: CreateOrganizationMembershipRequest,
+  executor?: DbExecutor
+): Promise<OrganizationResult<OrganizationUserResponse>> => {
+  const actor = await requireOrganizationManagerOrAdmin(sessionToken, organizationId, executor)
+
+  if (!actor.ok) {
+    return actor
+  }
+
+  if (actor.value.globalRole !== 'admin' && payload.role !== 'member') {
+    return {
+      ok: false,
+      error: { type: 'AUTH_FORBIDDEN' },
+    }
+  }
+
+  const user = await findUserById(payload.user_id, executor)
+
+  if (!user) {
+    return {
+      ok: false,
+      error: { type: 'USER_NOT_FOUND' },
+    }
+  }
+
+  await upsertOrganizationMembership(
+    {
+      organization_id: organizationId,
+      user_id: payload.user_id,
+      role: payload.role,
+    },
+    executor
+  )
+
+  const organizationUser = await findOrganizationUserById(organizationId, payload.user_id, executor)
+
+  if (!organizationUser) {
+    throw new Error('organization user not found after membership upsert')
+  }
+
+  return {
+    ok: true,
+    value: toOrganizationUserResponse(organizationUser),
   }
 }
