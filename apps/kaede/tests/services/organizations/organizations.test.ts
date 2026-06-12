@@ -313,6 +313,7 @@ describe('organizations usecase', () => {
         email: 'member@example.com',
         role: 'member',
         pedestrian: {
+          organization_id: organization.id,
           display_name: 'Pedestrian A',
           height: 170.5,
           stride_length: 72,
@@ -326,11 +327,16 @@ describe('organizations usecase', () => {
     const pedestrian = await db
       .selectFrom('pedestrians')
       .innerJoin('users', 'users.id', 'pedestrians.user_id')
-      .select(['pedestrians.display_name as display_name', 'users.email as email'])
+      .select([
+        'pedestrians.organization_id as organization_id',
+        'pedestrians.display_name as display_name',
+        'users.email as email',
+      ])
       .where('users.email', '=', 'member@example.com')
       .executeTakeFirstOrThrow()
 
     expect(pedestrian).toEqual({
+      organization_id: organization.id,
       display_name: 'Pedestrian A',
       email: 'member@example.com',
     })

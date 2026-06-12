@@ -21,6 +21,7 @@ export interface OrganizationUserRow {
   updated_at: Date
   role: string
   pedestrian_id: string | null
+  pedestrian_organization_id: string | null
   pedestrian_display_name: string | null
   pedestrian_height: number | null
   pedestrian_stride_length: number | null
@@ -117,6 +118,7 @@ const organizationUsersQuery = (executor: DbExecutor) =>
       'user.updated_at as updated_at',
       'membership.role as role',
       'pedestrian.id as pedestrian_id',
+      'pedestrian.organization_id as pedestrian_organization_id',
       'pedestrian.display_name as pedestrian_display_name',
       'pedestrian.height as pedestrian_height',
       'pedestrian.stride_length as pedestrian_stride_length',

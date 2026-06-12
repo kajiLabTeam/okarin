@@ -11,12 +11,21 @@ const normalizeAttributes = (attributes: unknown): PedestrianAttributes => {
   return {}
 }
 
+const requireOrganizationId = (pedestrianId: string, organizationId: string | null): string => {
+  if (!organizationId) {
+    throw new Error(`pedestrian ${pedestrianId} does not have organization_id`)
+  }
+
+  return organizationId
+}
+
 export const listPedestrians = async (): Promise<PedestriansListResponse> => {
   const pedestrians = await listPedestrianRows()
 
   return {
     pedestrians: pedestrians.map((pedestrian) => ({
       pedestrian_id: pedestrian.id,
+      organization_id: requireOrganizationId(pedestrian.id, pedestrian.organization_id),
       display_name: pedestrian.display_name,
       height: pedestrian.height,
       stride_length: pedestrian.stride_length,
