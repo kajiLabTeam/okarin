@@ -43,7 +43,8 @@ CREATE TABLE public.buildings (
     latitude double precision,
     longitude double precision,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    organization_id uuid
 );
 
 
@@ -60,6 +61,7 @@ CREATE TABLE public.floors (
     scale double precision,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    organization_id uuid,
     CONSTRAINT floors_image_object_path_format_chk CHECK ((image_object_path ~ '^maps/[0-9a-fA-F-]+/[0-9a-fA-F-]+\.(svg|png)$'::text))
 );
 
@@ -104,6 +106,7 @@ CREATE TABLE public.pedestrians (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     display_name text NOT NULL,
     user_id uuid,
+    organization_id uuid,
     CONSTRAINT pedestrians_display_name_nonempty_chk CHECK ((length(btrim(display_name)) > 0))
 );
 
@@ -121,6 +124,7 @@ CREATE TABLE public.recordings (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     deleted_at timestamp with time zone,
+    organization_id uuid,
     CONSTRAINT recordings_upload_status_chk CHECK ((upload_status = ANY (ARRAY['accepted'::text, 'ready'::text, 'failed'::text]))),
     CONSTRAINT recordings_upload_targets_nonempty_chk CHECK ((cardinality(upload_targets) >= 1))
 );
@@ -166,6 +170,7 @@ CREATE TABLE public.trajectories (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     deleted_at timestamp with time zone,
+    organization_id uuid,
     CONSTRAINT trajectories_failed_at_chk CHECK ((((status = 'failed'::text) AND (failed_at IS NOT NULL)) OR ((status <> 'failed'::text) AND (failed_at IS NULL)))),
     CONSTRAINT trajectories_status_chk CHECK ((status = ANY (ARRAY['accepted'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
 );
@@ -330,10 +335,24 @@ ALTER TABLE ONLY public.users
 
 
 --
+-- Name: buildings_organization_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX buildings_organization_id_idx ON public.buildings USING btree (organization_id);
+
+
+--
 -- Name: floors_building_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX floors_building_id_idx ON public.floors USING btree (building_id);
+
+
+--
+-- Name: floors_organization_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX floors_organization_id_idx ON public.floors USING btree (organization_id);
 
 
 --
@@ -344,10 +363,24 @@ CREATE INDEX organization_memberships_user_id_idx ON public.organization_members
 
 
 --
+-- Name: pedestrians_organization_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX pedestrians_organization_id_idx ON public.pedestrians USING btree (organization_id);
+
+
+--
 -- Name: recordings_floor_id_created_at_active_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX recordings_floor_id_created_at_active_idx ON public.recordings USING btree (floor_id, created_at DESC) WHERE (deleted_at IS NULL);
+
+
+--
+-- Name: recordings_organization_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX recordings_organization_id_idx ON public.recordings USING btree (organization_id);
 
 
 --
@@ -376,6 +409,13 @@ CREATE INDEX sessions_revoked_at_idx ON public.sessions USING btree (revoked_at)
 --
 
 CREATE INDEX sessions_user_id_idx ON public.sessions USING btree (user_id);
+
+
+--
+-- Name: trajectories_organization_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX trajectories_organization_id_idx ON public.trajectories USING btree (organization_id);
 
 
 --
@@ -463,11 +503,27 @@ CREATE TRIGGER set_updated_at_users BEFORE UPDATE ON public.users FOR EACH ROW E
 
 
 --
+-- Name: buildings buildings_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.buildings
+    ADD CONSTRAINT buildings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: floors floors_building_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.floors
     ADD CONSTRAINT floors_building_id_fkey FOREIGN KEY (building_id) REFERENCES public.buildings(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: floors floors_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.floors
+    ADD CONSTRAINT floors_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
 
 
 --
@@ -487,6 +543,14 @@ ALTER TABLE ONLY public.organization_memberships
 
 
 --
+-- Name: pedestrians pedestrians_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pedestrians
+    ADD CONSTRAINT pedestrians_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: pedestrians pedestrians_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -500,6 +564,14 @@ ALTER TABLE ONLY public.pedestrians
 
 ALTER TABLE ONLY public.recordings
     ADD CONSTRAINT recordings_floor_id_fkey FOREIGN KEY (floor_id) REFERENCES public.floors(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: recordings recordings_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.recordings
+    ADD CONSTRAINT recordings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
 
 
 --
@@ -524,6 +596,14 @@ ALTER TABLE ONLY public.sessions
 
 ALTER TABLE ONLY public.trajectories
     ADD CONSTRAINT trajectories_floor_id_fkey FOREIGN KEY (floor_id) REFERENCES public.floors(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: trajectories trajectories_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.trajectories
+    ADD CONSTRAINT trajectories_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
 
 
 --
@@ -558,4 +638,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20260501110000'),
     ('20260531160000'),
     ('20260610050000'),
-    ('20260610060000');
+    ('20260610060000'),
+    ('20260610070000');

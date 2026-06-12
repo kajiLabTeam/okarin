@@ -30,6 +30,7 @@ export interface Buildings {
   latitude: number | null
   longitude: number | null
   name: string
+  organization_id: string | null
   updated_at: Generated<Timestamp>
 }
 
@@ -40,6 +41,7 @@ export interface Floors {
   image_object_path: string
   level: number
   name: string
+  organization_id: string | null
   scale: number | null
   updated_at: Generated<Timestamp>
 }
@@ -65,6 +67,7 @@ export interface Pedestrians {
   display_name: string
   height: number | null
   id: Generated<string>
+  organization_id: string | null
   stride_length: number | null
   updated_at: Generated<Timestamp>
   user_id: string | null
@@ -75,6 +78,7 @@ export interface Recordings {
   deleted_at: Timestamp | null
   floor_id: string
   id: Generated<string>
+  organization_id: string | null
   pedestrian_id: string
   updated_at: Generated<Timestamp>
   upload_status: Generated<string>
@@ -99,6 +103,7 @@ export interface Trajectories {
   failed_at: Timestamp | null
   floor_id: string
   id: Generated<string>
+  organization_id: string | null
   recording_id: string
   status: Generated<string>
   updated_at: Generated<Timestamp>
