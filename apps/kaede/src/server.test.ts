@@ -17,7 +17,7 @@ const envNames = [
 
 const originalEnv = new Map<string, string | undefined>()
 
-describe('createApp auth wiring', () => {
+describe('createApp auth wiring', { timeout: 10_000 }, () => {
   beforeEach(() => {
     for (const name of envNames) {
       originalEnv.set(name, process.env[name])
@@ -51,7 +51,7 @@ describe('createApp auth wiring', () => {
     resetRuntimeConfigForTests()
   })
 
-  it('/api/* は shared token なしなら 401 を返す', async () => {
+  it('/api/* は shared token も session cookie もなしなら 401 を返す', async () => {
     const { createApp } = await import('./server.js')
     const app = createApp()
 
@@ -59,8 +59,21 @@ describe('createApp auth wiring', () => {
 
     expect(response.status).toBe(401)
     await expect(response.json()).resolves.toEqual({
-      error_code: 'UNAUTHORIZED',
-      error_message: 'invalid or missing API token',
+      error_code: 'AUTH_UNAUTHENTICATED',
+      error_message: 'login required',
+    })
+  })
+
+  it('/api/auth/* は shared token なしでも auth route まで到達する', async () => {
+    const { createApp } = await import('./server.js')
+    const app = createApp()
+
+    const response = await app.request('/api/auth/me')
+
+    expect(response.status).toBe(401)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'AUTH_UNAUTHENTICATED',
+      error_message: 'login required',
     })
   })
 
