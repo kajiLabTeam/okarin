@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRouteTestApp } from '../create-route-test-app.js'
 import { registerCreateBuildingRoute } from './create-building.js'
 
+const serviceClientActor = {
+  type: 'service_client',
+  name: 'shared_token',
+} as const
+
 const { createBuildingMock } = vi.hoisted(() => ({
   createBuildingMock: vi.fn(),
 }))
@@ -29,7 +34,9 @@ describe('POST /api/buildings', () => {
       },
     })
 
-    const app = createRouteTestApp('/buildings', registerCreateBuildingRoute)
+    const app = createRouteTestApp('/buildings', registerCreateBuildingRoute, {
+      actor: serviceClientActor,
+    })
     const response = await app.request('/api/buildings', {
       method: 'POST',
       headers: {
@@ -54,7 +61,7 @@ describe('POST /api/buildings', () => {
       updated_at: '2026-05-13T00:00:00.000Z',
     })
 
-    expect(createBuildingMock).toHaveBeenCalledWith({
+    expect(createBuildingMock).toHaveBeenCalledWith(serviceClientActor, {
       organization_id: '99999999-9999-4999-8999-999999999999',
       name: 'Test Building',
       latitude: 35.681236,
@@ -76,7 +83,9 @@ describe('POST /api/buildings', () => {
       },
     })
 
-    const app = createRouteTestApp('/buildings', registerCreateBuildingRoute)
+    const app = createRouteTestApp('/buildings', registerCreateBuildingRoute, {
+      actor: serviceClientActor,
+    })
     const response = await app.request('/api/buildings', {
       method: 'POST',
       headers: {
@@ -95,7 +104,7 @@ describe('POST /api/buildings', () => {
       longitude: null,
     })
 
-    expect(createBuildingMock).toHaveBeenCalledWith({
+    expect(createBuildingMock).toHaveBeenCalledWith(serviceClientActor, {
       organization_id: '99999999-9999-4999-8999-999999999999',
       name: 'Test Building',
     })
@@ -110,7 +119,9 @@ describe('POST /api/buildings', () => {
       },
     })
 
-    const app = createRouteTestApp('/buildings', registerCreateBuildingRoute)
+    const app = createRouteTestApp('/buildings', registerCreateBuildingRoute, {
+      actor: serviceClientActor,
+    })
     const response = await app.request('/api/buildings', {
       method: 'POST',
       headers: {
@@ -129,6 +140,64 @@ describe('POST /api/buildings', () => {
       details: {
         organization_id: '99999999-9999-4999-8999-999999999999',
       },
+    })
+  })
+
+  it('dashboard write 権限がない場合は 403 を返す', async () => {
+    createBuildingMock.mockResolvedValue({
+      ok: false,
+      error: {
+        type: 'AUTH_DASHBOARD_FORBIDDEN',
+      },
+    })
+
+    const app = createRouteTestApp('/buildings', registerCreateBuildingRoute, {
+      actor: serviceClientActor,
+    })
+    const response = await app.request('/api/buildings', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        organization_id: '99999999-9999-4999-8999-999999999999',
+        name: 'Test Building',
+      }),
+    })
+
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'AUTH_DASHBOARD_FORBIDDEN',
+      error_message: 'dashboard access forbidden',
+    })
+  })
+
+  it('organization 権限がない場合は 403 を返す', async () => {
+    createBuildingMock.mockResolvedValue({
+      ok: false,
+      error: {
+        type: 'AUTH_ORGANIZATION_FORBIDDEN',
+      },
+    })
+
+    const app = createRouteTestApp('/buildings', registerCreateBuildingRoute, {
+      actor: serviceClientActor,
+    })
+    const response = await app.request('/api/buildings', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        organization_id: '99999999-9999-4999-8999-999999999999',
+        name: 'Test Building',
+      }),
+    })
+
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'AUTH_ORGANIZATION_FORBIDDEN',
+      error_message: 'organization access forbidden',
     })
   })
 

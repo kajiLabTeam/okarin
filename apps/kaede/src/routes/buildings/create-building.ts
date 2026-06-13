@@ -1,5 +1,7 @@
 import { createRoute } from '@hono/zod-openapi'
 import type { OpenAPIHono } from '@hono/zod-openapi'
+import { requireRequestActor } from '../../middleware/request-actor-context.js'
+import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
 import { buildingSchema, createBuildingRequestSchema } from '../../schemas/buildings.js'
 import { errorResponseSchema } from '../../schemas/common.js'
 import { createBuilding } from '../../usecases/create-building.js'
@@ -8,6 +10,26 @@ import type { CreateBuildingResult } from '../../usecases/create-building.js'
 type CreateBuildingError = Extract<CreateBuildingResult, { ok: false }>['error']
 
 const toCreateBuildingErrorResponse = (error: CreateBuildingError) => {
+  if (error.type === 'AUTH_DASHBOARD_FORBIDDEN') {
+    return {
+      body: {
+        error_code: error.type,
+        error_message: 'dashboard access forbidden',
+      },
+      status: 403 as const,
+    }
+  }
+
+  if (error.type === 'AUTH_ORGANIZATION_FORBIDDEN') {
+    return {
+      body: {
+        error_code: error.type,
+        error_message: 'organization access forbidden',
+      },
+      status: 403 as const,
+    }
+  }
+
   return {
     body: {
       error_code: error.type,
@@ -20,7 +42,7 @@ const toCreateBuildingErrorResponse = (error: CreateBuildingError) => {
   }
 }
 
-export const registerCreateBuildingRoute = (app: OpenAPIHono) => {
+export const registerCreateBuildingRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
   const route = createRoute({
     method: 'post',
     path: '/',
@@ -52,12 +74,21 @@ export const registerCreateBuildingRoute = (app: OpenAPIHono) => {
           },
         },
       },
+      403: {
+        description: 'permission denied',
+        content: {
+          'application/json': {
+            schema: errorResponseSchema,
+          },
+        },
+      },
     },
   })
 
   app.openapi(route, async (c) => {
     const payload = c.req.valid('json')
-    const result = await createBuilding(payload)
+    const actor = requireRequestActor(c)
+    const result = await createBuilding(actor, payload)
 
     if (!result.ok) {
       const error = toCreateBuildingErrorResponse(result.error)
