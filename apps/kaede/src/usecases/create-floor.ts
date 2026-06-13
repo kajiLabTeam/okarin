@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto'
+import type { RequestActor } from '../middleware/request-actor-context.js'
 import type { CreateFloorRequest, FloorResponse } from '../schemas/floors.js'
 import { findBuildingById } from '../services/buildings/index.js'
 import { insertFloor } from '../services/floors/index.js'
+import type { AuthorizationError } from './authorization.js'
+import { requireDashboardWriteAccess } from './authorization.js'
 
 export type CreateFloorResult =
   | {
@@ -15,8 +18,15 @@ export type CreateFloorResult =
         buildingId: string
       }
     }
+  | {
+      ok: false
+      error: AuthorizationError
+    }
 
-export const createFloor = async (payload: CreateFloorRequest): Promise<CreateFloorResult> => {
+export const createFloor = async (
+  actor: RequestActor,
+  payload: CreateFloorRequest
+): Promise<CreateFloorResult> => {
   const buildingId: string = payload.building_id
   const building = await findBuildingById(buildingId)
 
@@ -32,6 +42,12 @@ export const createFloor = async (payload: CreateFloorRequest): Promise<CreateFl
 
   if (!building.organization_id) {
     throw new Error(`building ${building.id} does not have organization_id`)
+  }
+
+  const authorization = requireDashboardWriteAccess(actor, building.organization_id)
+
+  if (!authorization.ok) {
+    return authorization
   }
 
   const mapImageExtension = payload.map_image_extension ?? 'png'

@@ -1,9 +1,11 @@
 import type { OpenAPIHono, RouteConfig } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
+import { requireRequestActor } from '../../middleware/request-actor-context.js'
+import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
 import { floorsListResponseSchema } from '../../schemas/floors.js'
 import { listFloors } from '../../usecases/list-floors.js'
 
-export const registerListFloorsRoute = (app: OpenAPIHono) => {
+export const registerListFloorsRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
   const route: RouteConfig = createRoute({
     method: 'get',
     path: '/',
@@ -22,7 +24,8 @@ export const registerListFloorsRoute = (app: OpenAPIHono) => {
   })
 
   app.openapi(route, async (c) => {
-    const result = await listFloors()
+    const actor = requireRequestActor(c)
+    const result = await listFloors(actor)
 
     return c.json(result, 200)
   })

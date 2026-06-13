@@ -4,40 +4,19 @@ import { timingSafeEqual } from 'node:crypto'
 import { sessionCookieName } from '../routes/auth/cookie.js'
 import { findValidSessionByToken } from '../services/auth/index.js'
 import { findUserById, listUserOrganizationMemberships } from '../services/users/index.js'
-
-export interface UserActorMembership {
-  organization_id: string
-  organization_name: string
-  role: 'member' | 'manager'
-}
-
-export interface UserRequestActor {
-  type: 'user'
-  user_id: string
-  email: string
-  global_role: 'none' | 'admin'
-  password_must_change: boolean
-  memberships: UserActorMembership[]
-}
-
-export interface ServiceClientRequestActor {
-  type: 'service_client'
-  name: 'shared_token'
-}
-
-export type RequestActor = UserRequestActor | ServiceClientRequestActor
-
-export interface RequestActorVariables {
-  requestActor?: RequestActor
-}
-
-export interface RequestActorHonoEnv {
-  Variables: RequestActorVariables
-}
+import type { RequestActorHonoEnv } from './request-actor-context.js'
+import { setRequestActor } from './request-actor-context.js'
+export type {
+  RequestActor,
+  RequestActorHonoEnv,
+  RequestActorVariables,
+  ServiceClientRequestActor,
+  UserActorMembership,
+  UserRequestActor,
+} from './request-actor-context.js'
+export { getRequestActor, requireRequestActor, setRequestActor } from './request-actor-context.js'
 
 type RequestActorContext = Context<RequestActorHonoEnv>
-
-const requestActorKey = 'requestActor' satisfies keyof RequestActorVariables
 
 const isEqualToken = (actual: string, expected: string) => {
   const actualBuffer = Buffer.from(actual)
@@ -98,24 +77,6 @@ const sharedTokenAuthError = (c: RequestActorContext) => {
     },
     401
   )
-}
-
-export const setRequestActor = (c: RequestActorContext, actor: RequestActor) => {
-  c.set(requestActorKey, actor)
-}
-
-export const getRequestActor = (c: RequestActorContext): RequestActor | undefined => {
-  return c.get(requestActorKey)
-}
-
-export const requireRequestActor = (c: RequestActorContext): RequestActor => {
-  const actor = getRequestActor(c)
-
-  if (!actor) {
-    throw new Error('request actor is not set')
-  }
-
-  return actor
 }
 
 export interface RequestActorMiddlewareOptions {

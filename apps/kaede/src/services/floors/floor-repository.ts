@@ -6,8 +6,16 @@ import type { DbExecutor } from '../executor.js'
 type Floor = Selectable<Floors>
 type NewFloor = Insertable<Floors>
 
-export const listFloors = async () => {
-  return db
+export interface ListFloorsOptions {
+  organizationIds?: string[]
+}
+
+export const listFloors = async ({ organizationIds }: ListFloorsOptions = {}) => {
+  if (organizationIds?.length === 0) {
+    return []
+  }
+
+  let query = db
     .selectFrom('floors')
     .innerJoin('buildings', 'buildings.id', 'floors.building_id')
     .select([
@@ -21,6 +29,12 @@ export const listFloors = async () => {
       'floors.created_at',
       'floors.updated_at',
     ])
+
+  if (organizationIds) {
+    query = query.where('floors.organization_id', 'in', organizationIds)
+  }
+
+  return query
     .orderBy('buildings.name', 'asc')
     .orderBy('floors.level', 'asc')
     .orderBy('floors.name', 'asc')

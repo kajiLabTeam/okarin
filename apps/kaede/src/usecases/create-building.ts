@@ -1,6 +1,9 @@
+import type { RequestActor } from '../middleware/request-actor-context.js'
 import type { BuildingResponse, CreateBuildingRequest } from '../schemas/buildings.js'
 import { insertBuilding } from '../services/buildings/index.js'
 import { findOrganizationById } from '../services/organizations/index.js'
+import type { AuthorizationError } from './authorization.js'
+import { requireDashboardWriteAccess } from './authorization.js'
 
 export type CreateBuildingResult =
   | {
@@ -14,8 +17,13 @@ export type CreateBuildingResult =
         organizationId: string
       }
     }
+  | {
+      ok: false
+      error: AuthorizationError
+    }
 
 export const createBuilding = async (
+  actor: RequestActor,
   payload: CreateBuildingRequest
 ): Promise<CreateBuildingResult> => {
   const organization = await findOrganizationById(payload.organization_id)
@@ -28,6 +36,12 @@ export const createBuilding = async (
         organizationId: payload.organization_id,
       },
     }
+  }
+
+  const authorization = requireDashboardWriteAccess(actor, organization.id)
+
+  if (!authorization.ok) {
+    return authorization
   }
 
   const building = await insertBuilding({

@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRouteTestApp } from '../create-route-test-app.js'
 import { registerListFloorsRoute } from './list-floors.js'
 
+const serviceClientActor = {
+  type: 'service_client',
+  name: 'shared_token',
+} as const
+
 const { listFloorsMock } = vi.hoisted(() => ({
   listFloorsMock: vi.fn(),
 }))
@@ -32,7 +37,9 @@ describe('GET /api/floors', () => {
       ],
     })
 
-    const app = createRouteTestApp('/floors', registerListFloorsRoute)
+    const app = createRouteTestApp('/floors', registerListFloorsRoute, {
+      actor: serviceClientActor,
+    })
     const response = await app.request('/api/floors')
 
     expect(response.status).toBe(200)
@@ -52,6 +59,6 @@ describe('GET /api/floors', () => {
       ],
     })
 
-    expect(listFloorsMock).toHaveBeenCalledWith()
+    expect(listFloorsMock).toHaveBeenCalledWith(serviceClientActor)
   })
 })

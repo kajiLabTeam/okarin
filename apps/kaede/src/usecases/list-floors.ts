@@ -1,4 +1,6 @@
+import type { RequestActor } from '../middleware/request-actor-context.js'
 import { listFloors as listFloorRows } from '../services/floors/index.js'
+import { accessibleOrganizationIds } from './authorization.js'
 
 const requireOrganizationId = (floorId: string, organizationId: string | null): string => {
   if (!organizationId) {
@@ -8,8 +10,10 @@ const requireOrganizationId = (floorId: string, organizationId: string | null): 
   return organizationId
 }
 
-export const listFloors = async () => {
-  const floors = await listFloorRows()
+export const listFloors = async (actor: RequestActor) => {
+  const floors = await listFloorRows({
+    organizationIds: accessibleOrganizationIds(actor),
+  })
 
   return {
     floors: floors.map((floor) => ({
