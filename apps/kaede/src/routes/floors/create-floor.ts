@@ -6,27 +6,15 @@ import { errorResponseSchema } from '../../schemas/common.js'
 import { createFloorRequestSchema, floorSchema } from '../../schemas/floors.js'
 import { createFloor } from '../../usecases/create-floor.js'
 import type { CreateFloorResult } from '../../usecases/create-floor.js'
+import { toAuthorizationErrorResponse } from '../authorization-error.js'
 
 type CreateFloorError = Extract<CreateFloorResult, { ok: false }>['error']
 
 const toCreateFloorErrorResponse = (error: CreateFloorError) => {
   switch (error.type) {
     case 'AUTH_DASHBOARD_FORBIDDEN':
-      return {
-        body: {
-          error_code: error.type,
-          error_message: 'dashboard access forbidden',
-        },
-        status: 403 as const,
-      }
     case 'AUTH_ORGANIZATION_FORBIDDEN':
-      return {
-        body: {
-          error_code: error.type,
-          error_message: 'organization access forbidden',
-        },
-        status: 403 as const,
-      }
+      return toAuthorizationErrorResponse(error)
     case 'BUILDING_NOT_FOUND':
       return {
         body: {

@@ -6,39 +6,26 @@ import { buildingSchema, createBuildingRequestSchema } from '../../schemas/build
 import { errorResponseSchema } from '../../schemas/common.js'
 import { createBuilding } from '../../usecases/create-building.js'
 import type { CreateBuildingResult } from '../../usecases/create-building.js'
+import { toAuthorizationErrorResponse } from '../authorization-error.js'
 
 type CreateBuildingError = Extract<CreateBuildingResult, { ok: false }>['error']
 
 const toCreateBuildingErrorResponse = (error: CreateBuildingError) => {
-  if (error.type === 'AUTH_DASHBOARD_FORBIDDEN') {
-    return {
-      body: {
-        error_code: error.type,
-        error_message: 'dashboard access forbidden',
-      },
-      status: 403 as const,
-    }
-  }
-
-  if (error.type === 'AUTH_ORGANIZATION_FORBIDDEN') {
-    return {
-      body: {
-        error_code: error.type,
-        error_message: 'organization access forbidden',
-      },
-      status: 403 as const,
-    }
-  }
-
-  return {
-    body: {
-      error_code: error.type,
-      error_message: 'organization not found',
-      details: {
-        organization_id: error.organizationId,
-      },
-    },
-    status: 404 as const,
+  switch (error.type) {
+    case 'AUTH_DASHBOARD_FORBIDDEN':
+    case 'AUTH_ORGANIZATION_FORBIDDEN':
+      return toAuthorizationErrorResponse(error)
+    case 'ORGANIZATION_NOT_FOUND':
+      return {
+        body: {
+          error_code: error.type,
+          error_message: 'organization not found',
+          details: {
+            organization_id: error.organizationId,
+          },
+        },
+        status: 404 as const,
+      }
   }
 }
 
