@@ -7,6 +7,14 @@ type DbExecutor = Kysely<DB> | Transaction<DB>
 type Recording = Selectable<Recordings>
 type NewRecording = Insertable<Recordings>
 type RecordingUpdate = Updateable<Recordings>
+export type { Recording }
+
+export interface RecordingAuthorizationRow {
+  id: string
+  organization_id: string
+  pedestrian_id: string
+  pedestrian_user_id: string | null
+}
 
 const activeRecordingsQuery = (executor: DbExecutor) =>
   executor.selectFrom('recordings').where('deleted_at', 'is', null)
@@ -18,6 +26,22 @@ export const findRecordingById = async (
   return activeRecordingsQuery(executor)
     .selectAll()
     .where('id', '=', recordingId)
+    .executeTakeFirst()
+}
+
+export const findRecordingAuthorizationById = async (
+  recordingId: string,
+  executor: DbExecutor = db
+): Promise<RecordingAuthorizationRow | undefined> => {
+  return activeRecordingsQuery(executor)
+    .innerJoin('pedestrians', 'pedestrians.id', 'recordings.pedestrian_id')
+    .select([
+      'recordings.id as id',
+      'recordings.organization_id as organization_id',
+      'recordings.pedestrian_id as pedestrian_id',
+      'pedestrians.user_id as pedestrian_user_id',
+    ])
+    .where('recordings.id', '=', recordingId)
     .executeTakeFirst()
 }
 

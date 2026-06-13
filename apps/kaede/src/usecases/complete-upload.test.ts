@@ -1,13 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { RequestActor } from '../middleware/request-actor-context.js'
 
-const { findRecordingByIdMock, listRecordingRawObjectKeysMock, markRecordingUploadReadyMock } =
-  vi.hoisted(() => ({
-    findRecordingByIdMock: vi.fn(),
-    listRecordingRawObjectKeysMock: vi.fn(),
-    markRecordingUploadReadyMock: vi.fn(),
-  }))
+const {
+  findRecordingAuthorizationByIdMock,
+  findRecordingByIdMock,
+  listRecordingRawObjectKeysMock,
+  markRecordingUploadReadyMock,
+} = vi.hoisted(() => ({
+  findRecordingAuthorizationByIdMock: vi.fn(),
+  findRecordingByIdMock: vi.fn(),
+  listRecordingRawObjectKeysMock: vi.fn(),
+  markRecordingUploadReadyMock: vi.fn(),
+}))
 
 vi.mock('../services/recordings/index.js', () => ({
+  findRecordingAuthorizationById: findRecordingAuthorizationByIdMock,
   findRecordingById: findRecordingByIdMock,
   markRecordingUploadReady: markRecordingUploadReadyMock,
 }))
@@ -25,6 +32,17 @@ vi.mock('../services/storage/index.js', () => ({
 
 import { completeUpload } from './complete-upload.js'
 
+const serviceClientActor: RequestActor = { type: 'service_client', name: 'shared_token' }
+
+const mockRecordingAuthorization = (recordingId: string) => {
+  findRecordingAuthorizationByIdMock.mockResolvedValue({
+    id: recordingId,
+    organization_id: '99999999-9999-4999-8999-999999999999',
+    pedestrian_id: '22222222-2222-4222-8222-222222222222',
+    pedestrian_user_id: null,
+  })
+}
+
 describe('completeUpload', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -34,7 +52,7 @@ describe('completeUpload', () => {
     findRecordingByIdMock.mockResolvedValue(undefined)
 
     await expect(
-      completeUpload({
+      completeUpload(serviceClientActor, {
         recordingId: '11111111-1111-4111-8111-111111111111',
       })
     ).resolves.toEqual({
@@ -50,11 +68,14 @@ describe('completeUpload', () => {
   })
 
   it('全 target が存在する場合 ready に更新する', async () => {
+    const recordingId = '11111111-1111-4111-8111-111111111111'
+
     findRecordingByIdMock.mockResolvedValue({
-      id: '11111111-1111-4111-8111-111111111111',
+      id: recordingId,
       upload_status: 'accepted',
       upload_targets: ['acce', 'gyro', 'metadata'],
     })
+    mockRecordingAuthorization(recordingId)
     listRecordingRawObjectKeysMock.mockResolvedValue([
       'recordings/11111111-1111-4111-8111-111111111111/raw/acce.csv',
       'recordings/11111111-1111-4111-8111-111111111111/raw/gyro.csv',
@@ -66,8 +87,8 @@ describe('completeUpload', () => {
     })
 
     await expect(
-      completeUpload({
-        recordingId: '11111111-1111-4111-8111-111111111111',
+      completeUpload(serviceClientActor, {
+        recordingId,
       })
     ).resolves.toEqual({
       ok: true,
@@ -86,18 +107,21 @@ describe('completeUpload', () => {
   })
 
   it('不足 target がある場合 missing_targets を返す', async () => {
+    const recordingId = '11111111-1111-4111-8111-111111111111'
+
     findRecordingByIdMock.mockResolvedValue({
-      id: '11111111-1111-4111-8111-111111111111',
+      id: recordingId,
       upload_status: 'accepted',
       upload_targets: ['acce', 'gyro', 'wifi'],
     })
+    mockRecordingAuthorization(recordingId)
     listRecordingRawObjectKeysMock.mockResolvedValue([
       'recordings/11111111-1111-4111-8111-111111111111/raw/acce.csv',
     ])
 
     await expect(
-      completeUpload({
-        recordingId: '11111111-1111-4111-8111-111111111111',
+      completeUpload(serviceClientActor, {
+        recordingId,
       })
     ).resolves.toEqual({
       ok: false,
@@ -112,15 +136,18 @@ describe('completeUpload', () => {
   })
 
   it('ready または failed は finalized として拒否する', async () => {
+    const recordingId = '11111111-1111-4111-8111-111111111111'
+
     findRecordingByIdMock.mockResolvedValue({
-      id: '11111111-1111-4111-8111-111111111111',
+      id: recordingId,
       upload_status: 'failed',
       upload_targets: ['acce', 'gyro'],
     })
+    mockRecordingAuthorization(recordingId)
 
     await expect(
-      completeUpload({
-        recordingId: '11111111-1111-4111-8111-111111111111',
+      completeUpload(serviceClientActor, {
+        recordingId,
       })
     ).resolves.toEqual({
       ok: false,
@@ -136,15 +163,18 @@ describe('completeUpload', () => {
   })
 
   it('recording.upload_targets に不正値がある場合は制御されたエラーを返す', async () => {
+    const recordingId = '11111111-1111-4111-8111-111111111111'
+
     findRecordingByIdMock.mockResolvedValue({
-      id: '11111111-1111-4111-8111-111111111111',
+      id: recordingId,
       upload_status: 'accepted',
       upload_targets: ['acce', 'broken-target'],
     })
+    mockRecordingAuthorization(recordingId)
 
     await expect(
-      completeUpload({
-        recordingId: '11111111-1111-4111-8111-111111111111',
+      completeUpload(serviceClientActor, {
+        recordingId,
       })
     ).resolves.toEqual({
       ok: false,
@@ -152,6 +182,51 @@ describe('completeUpload', () => {
         type: 'RECORDING_UPLOAD_TARGETS_INVALID',
         recordingId: '11111111-1111-4111-8111-111111111111',
         invalidTargets: ['broken-target'],
+      },
+    })
+
+    expect(listRecordingRawObjectKeysMock).not.toHaveBeenCalled()
+    expect(markRecordingUploadReadyMock).not.toHaveBeenCalled()
+  })
+
+  it('member が別 user の pedestrian recording を完了しようとすると AUTH_ORGANIZATION_FORBIDDEN を返す', async () => {
+    const recordingId = '11111111-1111-4111-8111-111111111111'
+    const organizationId = '99999999-9999-4999-8999-999999999999'
+
+    findRecordingByIdMock.mockResolvedValue({
+      id: recordingId,
+      upload_status: 'accepted',
+      upload_targets: ['acce', 'gyro'],
+    })
+    findRecordingAuthorizationByIdMock.mockResolvedValue({
+      id: recordingId,
+      organization_id: organizationId,
+      pedestrian_id: '22222222-2222-4222-8222-222222222222',
+      pedestrian_user_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    })
+
+    await expect(
+      completeUpload(
+        {
+          type: 'user',
+          user_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          email: 'member@example.test',
+          global_role: 'none',
+          password_must_change: false,
+          memberships: [
+            {
+              organization_id: organizationId,
+              organization_name: 'Test Organization',
+              role: 'member',
+            },
+          ],
+        },
+        { recordingId }
+      )
+    ).resolves.toEqual({
+      ok: false,
+      error: {
+        type: 'AUTH_ORGANIZATION_FORBIDDEN',
       },
     })
 

@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { resetRuntimeConfigForTests } from '../../../src/config/runtime.js'
 import { refreshUploadUrlsResponseSchema } from '../../../src/schemas/recordings.js'
 import { createApp } from '../../../src/server.js'
 import { createDb } from '../../../src/services/db/client.js'
@@ -6,15 +7,24 @@ import { resetDatabase } from '../../db/helpers.js'
 import { createRecordingFixture } from '../../fixtures/recordings.js'
 
 const db = createDb()
-const app = createApp()
+let app: ReturnType<typeof createApp>
+
+const authHeaders = {
+  authorization: 'Bearer shared-token',
+}
 
 describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
   beforeEach(async () => {
+    process.env.KAEDE_API_SHARED_TOKEN = 'shared-token'
+    resetRuntimeConfigForTests()
+    app = createApp()
     await resetDatabase(db)
   })
 
   afterAll(async () => {
     await db.destroy()
+    Reflect.deleteProperty(process.env, 'KAEDE_API_SHARED_TOKEN')
+    resetRuntimeConfigForTests()
   })
 
   it('accepted な recording に対して upload URL を再発行する', async () => {
@@ -26,6 +36,7 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
     const response = await app.request(`/api/recordings/${recordingId}/refresh-upload-urls`, {
       method: 'POST',
       headers: {
+        ...authHeaders,
         'content-type': 'application/json',
       },
       body: JSON.stringify({
@@ -54,6 +65,7 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
       {
         method: 'POST',
         headers: {
+          ...authHeaders,
           'content-type': 'application/json',
         },
         body: JSON.stringify({
@@ -81,6 +93,7 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
     const response = await app.request(`/api/recordings/${recordingId}/refresh-upload-urls`, {
       method: 'POST',
       headers: {
+        ...authHeaders,
         'content-type': 'application/json',
       },
       body: JSON.stringify({
@@ -108,6 +121,7 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
     const response = await app.request(`/api/recordings/${recordingId}/refresh-upload-urls`, {
       method: 'POST',
       headers: {
+        ...authHeaders,
         'content-type': 'application/json',
       },
       body: JSON.stringify({
@@ -135,6 +149,7 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
     const response = await app.request(`/api/recordings/${recordingId}/refresh-upload-urls`, {
       method: 'POST',
       headers: {
+        ...authHeaders,
         'content-type': 'application/json',
       },
       body: JSON.stringify({
@@ -162,6 +177,7 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
     const response = await app.request(`/api/recordings/${recordingId}/refresh-upload-urls`, {
       method: 'POST',
       headers: {
+        ...authHeaders,
         'content-type': 'application/json',
       },
       body: JSON.stringify({

@@ -1,5 +1,6 @@
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
+import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
 import { notImplementedResponseSchema } from '../../schemas/common.js'
 import {
   recordingGroundTruthCompleteResponseSchema,
@@ -8,7 +9,7 @@ import {
 } from '../../schemas/recordings.js'
 import { notImplemented } from '../../utils/not-implemented.js'
 
-export const registerCompleteGroundTruthUploadRoute = (app: OpenAPIHono) => {
+export const registerCompleteGroundTruthUploadRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
   const route = createRoute({
     method: 'post',
     path: '/{recordingId}/ground-truth/complete',

@@ -1,5 +1,7 @@
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
+import { requireRequestActor } from '../../middleware/request-actor-context.js'
+import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
 import { errorResponseSchema } from '../../schemas/common.js'
 import { recordingIdParamsSchema } from '../../schemas/recordings.js'
 import {
@@ -7,8 +9,9 @@ import {
   createTrajectoryResponseSchema,
 } from '../../schemas/trajectories.js'
 import { createTrajectory } from '../../usecases/create-trajectory.js'
+import { toAuthorizationErrorResponse } from '../authorization-error.js'
 
-export const registerCreateTrajectoryRoute = (app: OpenAPIHono) => {
+export const registerCreateTrajectoryRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
   const route = createRoute({
     method: 'post',
     path: '/{recordingId}/trajectories',
@@ -57,6 +60,14 @@ export const registerCreateTrajectoryRoute = (app: OpenAPIHono) => {
           },
         },
       },
+      403: {
+        description: 'permission denied',
+        content: {
+          'application/json': {
+            schema: errorResponseSchema,
+          },
+        },
+      },
       500: {
         description:
           'recording の内部データ不整合または解析依頼準備失敗により trajectory を作成できない',
@@ -80,10 +91,17 @@ export const registerCreateTrajectoryRoute = (app: OpenAPIHono) => {
   app.openapi(route, async (c) => {
     const params = c.req.valid('param')
     const body = c.req.valid('json')
-    const result = await createTrajectory(params, body)
+    const actor = requireRequestActor(c)
+    const result = await createTrajectory(actor, params, body)
 
     if (!result.ok) {
       switch (result.error.type) {
+        case 'AUTH_DASHBOARD_FORBIDDEN':
+        case 'AUTH_ORGANIZATION_FORBIDDEN': {
+          const error = toAuthorizationErrorResponse(result.error)
+          return c.json(error.body, error.status)
+        }
+
         case 'RECORDING_NOT_FOUND':
           return c.json(
             {

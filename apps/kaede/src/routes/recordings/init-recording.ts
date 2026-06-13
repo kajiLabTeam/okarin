@@ -1,13 +1,16 @@
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
+import { requireRequestActor } from '../../middleware/request-actor-context.js'
+import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
 import { errorResponseSchema } from '../../schemas/common.js'
 import {
   initRecordingRequestSchema,
   initRecordingResponseSchema,
 } from '../../schemas/recordings.js'
 import { initRecording } from '../../usecases/init-recording.js'
+import { toAuthorizationErrorResponse } from '../authorization-error.js'
 
-export const registerInitRecordingRoute = (app: OpenAPIHono) => {
+export const registerInitRecordingRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
   const route = createRoute({
     method: 'post',
     path: '/init',
@@ -47,55 +50,72 @@ export const registerInitRecordingRoute = (app: OpenAPIHono) => {
           },
         },
       },
+      403: {
+        description: 'permission denied',
+        content: {
+          'application/json': {
+            schema: errorResponseSchema,
+          },
+        },
+      },
     },
   })
 
   app.openapi(route, async (c) => {
     const payload = c.req.valid('json')
-    const result = await initRecording(payload)
+    const actor = requireRequestActor(c)
+    const result = await initRecording(actor, payload)
 
-    if (!result.ok && result.error.type === 'PEDESTRIAN_NOT_FOUND') {
-      return c.json(
-        {
-          error_code: result.error.type,
-          error_message: 'pedestrian_id does not exist',
-          details: {
-            pedestrian_id: result.error.pedestrianId,
-          },
-        },
-        404
-      )
+    if (result.ok) {
+      return c.json(result.value, 201)
     }
 
-    if (!result.ok && result.error.type === 'FLOOR_NOT_FOUND') {
-      return c.json(
-        {
-          error_code: result.error.type,
-          error_message: 'floor_id does not exist',
-          details: {
-            floor_id: result.error.floorId,
+    switch (result.error.type) {
+      case 'AUTH_DASHBOARD_FORBIDDEN':
+      case 'AUTH_ORGANIZATION_FORBIDDEN': {
+        const error = toAuthorizationErrorResponse(result.error)
+        return c.json(error.body, error.status)
+      }
+      case 'PEDESTRIAN_NOT_FOUND':
+        return c.json(
+          {
+            error_code: result.error.type,
+            error_message: 'pedestrian_id does not exist',
+            details: {
+              pedestrian_id: result.error.pedestrianId,
+            },
           },
-        },
-        404
-      )
-    }
-
-    if (!result.ok && result.error.type === 'RESOURCE_ORGANIZATION_MISMATCH') {
-      return c.json(
-        {
-          error_code: result.error.type,
-          error_message: 'pedestrian and floor belong to different organizations',
-          details: {
-            pedestrian_id: result.error.pedestrianId,
-            pedestrian_organization_id: result.error.pedestrianOrganizationId,
-            floor_id: result.error.floorId,
-            floor_organization_id: result.error.floorOrganizationId,
+          404
+        )
+      case 'FLOOR_NOT_FOUND':
+        return c.json(
+          {
+            error_code: result.error.type,
+            error_message: 'floor_id does not exist',
+            details: {
+              floor_id: result.error.floorId,
+            },
           },
-        },
-        409
-      )
+          404
+        )
+      case 'RESOURCE_ORGANIZATION_MISMATCH':
+        return c.json(
+          {
+            error_code: result.error.type,
+            error_message: 'pedestrian and floor belong to different organizations',
+            details: {
+              pedestrian_id: result.error.pedestrianId,
+              pedestrian_organization_id: result.error.pedestrianOrganizationId,
+              floor_id: result.error.floorId,
+              floor_organization_id: result.error.floorOrganizationId,
+            },
+          },
+          409
+        )
+      default: {
+        const exhaustiveCheck: never = result.error
+        throw new Error(`unhandled init-recording error: ${JSON.stringify(exhaustiveCheck)}`)
+      }
     }
-
-    return c.json(result.value, 201)
   })
 }

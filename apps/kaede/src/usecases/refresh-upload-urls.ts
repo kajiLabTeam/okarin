@@ -1,10 +1,14 @@
+import type { RequestActor } from '../middleware/request-actor-context.js'
 import type { UploadTarget } from '../schemas/common.js'
 import { recordingUploadStatusSchema } from '../schemas/common.js'
 import type { RefreshUploadUrlsRequest, RecordingIdParams } from '../schemas/recordings.js'
-import { findRecordingById } from '../services/recordings/index.js'
+import { findRecordingAuthorizationById, findRecordingById } from '../services/recordings/index.js'
 import { issueRecordingUploadUrls } from '../services/storage/index.js'
+import type { AuthorizationError } from './authorization.js'
+import { requireRecordingAccess } from './authorization.js'
 
 export type RefreshUploadUrlsError =
+  | AuthorizationError
   | {
       type: 'RECORDING_NOT_FOUND'
       recordingId: string
@@ -41,6 +45,7 @@ export type RefreshUploadUrlsResult =
     }
 
 export const refreshUploadUrls = async (
+  actor: RequestActor,
   params: RecordingIdParams,
   payload: RefreshUploadUrlsRequest
 ) => {
@@ -54,6 +59,24 @@ export const refreshUploadUrls = async (
         recordingId: params.recordingId,
       },
     } satisfies RefreshUploadUrlsResult
+  }
+
+  const recordingAuthorization = await findRecordingAuthorizationById(recording.id)
+
+  if (!recordingAuthorization) {
+    return {
+      ok: false,
+      error: {
+        type: 'RECORDING_NOT_FOUND',
+        recordingId: recording.id,
+      },
+    } satisfies RefreshUploadUrlsResult
+  }
+
+  const authorization = requireRecordingAccess(actor, recordingAuthorization)
+
+  if (!authorization.ok) {
+    return authorization satisfies RefreshUploadUrlsResult
   }
 
   const uploadStatus = recordingUploadStatusSchema.parse(recording.upload_status)
