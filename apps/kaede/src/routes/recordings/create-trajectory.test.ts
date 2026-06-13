@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRouteTestApp } from '../create-route-test-app.js'
 import { registerCreateTrajectoryRoute } from './create-trajectory.js'
 
+const serviceClientActor = {
+  type: 'service_client',
+  name: 'shared_token',
+} as const
+
 const { createTrajectoryMock } = vi.hoisted(() => ({
   createTrajectoryMock: vi.fn(),
 }))
@@ -30,7 +35,9 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
       },
     })
 
-    const app = createRouteTestApp('/recordings', registerCreateTrajectoryRoute)
+    const app = createRouteTestApp('/recordings', registerCreateTrajectoryRoute, {
+      actor: serviceClientActor,
+    })
     const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
       method: 'POST',
       headers: {
@@ -49,6 +56,7 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
       status: 'processing',
     })
     expect(createTrajectoryMock).toHaveBeenCalledWith(
+      serviceClientActor,
       {
         recordingId,
       },
@@ -69,7 +77,9 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
       },
     })
 
-    const app = createRouteTestApp('/recordings', registerCreateTrajectoryRoute)
+    const app = createRouteTestApp('/recordings', registerCreateTrajectoryRoute, {
+      actor: serviceClientActor,
+    })
     const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
       method: 'POST',
       headers: {
@@ -102,7 +112,9 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
       },
     })
 
-    const app = createRouteTestApp('/recordings', registerCreateTrajectoryRoute)
+    const app = createRouteTestApp('/recordings', registerCreateTrajectoryRoute, {
+      actor: serviceClientActor,
+    })
     const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
       method: 'POST',
       headers: {
@@ -137,7 +149,9 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
       },
     })
 
-    const app = createRouteTestApp('/recordings', registerCreateTrajectoryRoute)
+    const app = createRouteTestApp('/recordings', registerCreateTrajectoryRoute, {
+      actor: serviceClientActor,
+    })
     const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
       method: 'POST',
       headers: {
@@ -174,7 +188,9 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
       },
     })
 
-    const app = createRouteTestApp('/recordings', registerCreateTrajectoryRoute)
+    const app = createRouteTestApp('/recordings', registerCreateTrajectoryRoute, {
+      actor: serviceClientActor,
+    })
     const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
       method: 'POST',
       headers: {
@@ -211,7 +227,9 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
       },
     })
 
-    const app = createRouteTestApp('/recordings', registerCreateTrajectoryRoute)
+    const app = createRouteTestApp('/recordings', registerCreateTrajectoryRoute, {
+      actor: serviceClientActor,
+    })
     const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
       method: 'POST',
       headers: {
@@ -246,7 +264,9 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
       },
     })
 
-    const app = createRouteTestApp('/recordings', registerCreateTrajectoryRoute)
+    const app = createRouteTestApp('/recordings', registerCreateTrajectoryRoute, {
+      actor: serviceClientActor,
+    })
     const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
       method: 'POST',
       headers: {
@@ -271,7 +291,9 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
   it('不正な constraints は 400 を返し usecase を呼ばない', async () => {
     const recordingId = '11111111-1111-4111-8111-111111111111'
 
-    const app = createRouteTestApp('/recordings', registerCreateTrajectoryRoute)
+    const app = createRouteTestApp('/recordings', registerCreateTrajectoryRoute, {
+      actor: serviceClientActor,
+    })
     const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
       method: 'POST',
       headers: {
@@ -291,5 +313,35 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
 
     expect(response.status).toBe(400)
     expect(createTrajectoryMock).not.toHaveBeenCalled()
+  })
+
+  it('organization 権限がない場合は 403 を返す', async () => {
+    const recordingId = '11111111-1111-4111-8111-111111111111'
+
+    createTrajectoryMock.mockResolvedValue({
+      ok: false,
+      error: {
+        type: 'AUTH_ORGANIZATION_FORBIDDEN',
+      },
+    })
+
+    const app = createRouteTestApp('/recordings', registerCreateTrajectoryRoute, {
+      actor: serviceClientActor,
+    })
+    const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        constraints: [],
+      }),
+    })
+
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'AUTH_ORGANIZATION_FORBIDDEN',
+      error_message: 'organization access forbidden',
+    })
   })
 })

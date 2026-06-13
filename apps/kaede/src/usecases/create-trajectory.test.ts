@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CallbackRuntimeConfig } from '../config/runtime.js'
+import type { RequestActor } from '../middleware/request-actor-context.js'
 
 const {
   findFloorByIdMock,
+  findRecordingAuthorizationByIdMock,
   findRecordingByIdMock,
   insertTrajectoryWithConstraintsMock,
   markTrajectoryFailedMock,
@@ -14,6 +16,7 @@ const {
   getCallbackRuntimeConfigMock,
 } = vi.hoisted(() => ({
   findFloorByIdMock: vi.fn(),
+  findRecordingAuthorizationByIdMock: vi.fn(),
   findRecordingByIdMock: vi.fn(),
   insertTrajectoryWithConstraintsMock: vi.fn(),
   markTrajectoryFailedMock: vi.fn(),
@@ -30,6 +33,7 @@ vi.mock('@sentry/node', () => ({
 }))
 
 vi.mock('../services/recordings/index.js', () => ({
+  findRecordingAuthorizationById: findRecordingAuthorizationByIdMock,
   findRecordingById: findRecordingByIdMock,
 }))
 
@@ -62,6 +66,8 @@ vi.mock('../config/runtime.js', () => ({
 
 import { createTrajectory } from './create-trajectory.js'
 
+const serviceClientActor: RequestActor = { type: 'service_client', name: 'shared_token' }
+
 describe('createTrajectory', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -88,6 +94,12 @@ describe('createTrajectory', () => {
     findFloorByIdMock.mockResolvedValue({
       id: floorId,
       organization_id: organizationId,
+    })
+    findRecordingAuthorizationByIdMock.mockResolvedValue({
+      id: recordingId,
+      organization_id: organizationId,
+      pedestrian_id: '44444444-4444-4444-8444-444444444444',
+      pedestrian_user_id: null,
     })
     insertTrajectoryWithConstraintsMock.mockResolvedValue({
       id: trajectoryId,
@@ -121,6 +133,7 @@ describe('createTrajectory', () => {
     })
 
     const result = await createTrajectory(
+      serviceClientActor,
       { recordingId },
       {
         constraints: [],
@@ -161,10 +174,63 @@ describe('createTrajectory', () => {
     })
   })
 
+  it('member が他 user の recording から trajectory を作成しようとすると AUTH_ORGANIZATION_FORBIDDEN を返す', async () => {
+    const recordingId = '11111111-1111-4111-8111-111111111111'
+    const floorId = '33333333-3333-4333-8333-333333333333'
+    const organizationId = '99999999-9999-4999-8999-999999999999'
+
+    findRecordingByIdMock.mockResolvedValue({
+      id: recordingId,
+      floor_id: floorId,
+      organization_id: organizationId,
+      upload_status: 'ready',
+      upload_targets: ['acce', 'gyro'],
+    })
+    findRecordingAuthorizationByIdMock.mockResolvedValue({
+      id: recordingId,
+      organization_id: organizationId,
+      pedestrian_id: '44444444-4444-4444-8444-444444444444',
+      pedestrian_user_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    })
+    findFloorByIdMock.mockResolvedValue({
+      id: floorId,
+      organization_id: organizationId,
+    })
+
+    const result = await createTrajectory(
+      {
+        type: 'user',
+        user_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        email: 'member@example.test',
+        global_role: 'none',
+        password_must_change: false,
+        memberships: [
+          {
+            organization_id: organizationId,
+            organization_name: 'Test Organization',
+            role: 'member',
+          },
+        ],
+      },
+      { recordingId },
+      { constraints: [] }
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'AUTH_ORGANIZATION_FORBIDDEN',
+      },
+    })
+    expect(insertTrajectoryWithConstraintsMock).not.toHaveBeenCalled()
+    expect(submitAnalyzeRequestMock).not.toHaveBeenCalled()
+  })
+
   it('存在しない recording は 404 相当エラーを返す', async () => {
     findRecordingByIdMock.mockResolvedValue(undefined)
 
     const result = await createTrajectory(
+      serviceClientActor,
       { recordingId: '11111111-1111-4111-8111-111111111111' },
       { constraints: [] }
     )
@@ -188,6 +254,7 @@ describe('createTrajectory', () => {
     })
 
     const result = await createTrajectory(
+      serviceClientActor,
       { recordingId: '11111111-1111-4111-8111-111111111111' },
       { constraints: [] }
     )
@@ -212,6 +279,7 @@ describe('createTrajectory', () => {
     })
 
     const result = await createTrajectory(
+      serviceClientActor,
       { recordingId: '11111111-1111-4111-8111-111111111111' },
       { constraints: [] }
     )
@@ -239,7 +307,14 @@ describe('createTrajectory', () => {
     })
     findFloorByIdMock.mockResolvedValue(undefined)
 
-    const result = await createTrajectory({ recordingId }, { constraints: [] })
+    findRecordingAuthorizationByIdMock.mockResolvedValue({
+      id: recordingId,
+      organization_id: '99999999-9999-4999-8999-999999999999',
+      pedestrian_id: '44444444-4444-4444-8444-444444444444',
+      pedestrian_user_id: null,
+    })
+
+    const result = await createTrajectory(serviceClientActor, { recordingId }, { constraints: [] })
 
     expect(result).toEqual({
       ok: false,
@@ -270,7 +345,14 @@ describe('createTrajectory', () => {
       organization_id: floorOrganizationId,
     })
 
-    const result = await createTrajectory({ recordingId }, { constraints: [] })
+    findRecordingAuthorizationByIdMock.mockResolvedValue({
+      id: recordingId,
+      organization_id: recordingOrganizationId,
+      pedestrian_id: '44444444-4444-4444-8444-444444444444',
+      pedestrian_user_id: null,
+    })
+
+    const result = await createTrajectory(serviceClientActor, { recordingId }, { constraints: [] })
 
     expect(result).toEqual({
       ok: false,
@@ -334,7 +416,14 @@ describe('createTrajectory', () => {
       status: 'failed',
     })
 
-    const result = await createTrajectory({ recordingId }, { constraints: [] })
+    findRecordingAuthorizationByIdMock.mockResolvedValue({
+      id: recordingId,
+      organization_id: organizationId,
+      pedestrian_id: '44444444-4444-4444-8444-444444444444',
+      pedestrian_user_id: null,
+    })
+
+    const result = await createTrajectory(serviceClientActor, { recordingId }, { constraints: [] })
 
     expect(markTrajectoryFailedMock).toHaveBeenCalledWith(
       trajectoryId,
@@ -387,7 +476,7 @@ describe('createTrajectory', () => {
       status: 'failed',
     })
 
-    const result = await createTrajectory({ recordingId }, { constraints: [] })
+    const result = await createTrajectory(serviceClientActor, { recordingId }, { constraints: [] })
 
     expect(markTrajectoryFailedMock).toHaveBeenCalledWith(
       trajectoryId,

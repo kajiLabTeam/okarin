@@ -1,11 +1,12 @@
 import * as Sentry from '@sentry/node'
 import { getCallbackRuntimeConfig } from '../config/runtime.js'
+import type { RequestActor } from '../middleware/request-actor-context.js'
 import { uploadTargetsSchema } from '../schemas/common.js'
 import type { RecordingIdParams } from '../schemas/recordings.js'
 import type { CreateTrajectoryRequest } from '../schemas/trajectories.js'
 import { findFloorById } from '../services/floors/index.js'
 import { submitAnalyzeRequest } from '../services/nozomi/index.js'
-import { findRecordingById } from '../services/recordings/index.js'
+import { findRecordingAuthorizationById, findRecordingById } from '../services/recordings/index.js'
 import {
   issueInternalRecordingRawDownloadUrls,
   issueInternalTrajectoryResultUploadUrl,
@@ -16,8 +17,11 @@ import {
   markTrajectoryFailed,
   markTrajectoryProcessing,
 } from '../services/trajectories/index.js'
+import type { AuthorizationError } from './authorization.js'
+import { requireRecordingAccess } from './authorization.js'
 
 export type CreateTrajectoryError =
+  | AuthorizationError
   | {
       type: 'RECORDING_NOT_FOUND'
       recordingId: string
@@ -79,6 +83,7 @@ const throwOrganizationInvariantError = (message: string): never => {
 }
 
 export const createTrajectory = async (
+  actor: RequestActor,
   params: RecordingIdParams,
   payload: CreateTrajectoryRequest
 ): Promise<CreateTrajectoryResult> => {
@@ -119,6 +124,24 @@ export const createTrajectory = async (
 
   if (!recording.organization_id) {
     throwOrganizationInvariantError(`recording ${recording.id} does not have organization_id`)
+  }
+
+  const recordingAuthorization = await findRecordingAuthorizationById(recording.id)
+
+  if (!recordingAuthorization) {
+    return {
+      ok: false,
+      error: {
+        type: 'RECORDING_NOT_FOUND',
+        recordingId: recording.id,
+      },
+    }
+  }
+
+  const authorization = requireRecordingAccess(actor, recordingAuthorization)
+
+  if (!authorization.ok) {
+    return authorization
   }
 
   const floor = await findFloorById(recording.floor_id)
