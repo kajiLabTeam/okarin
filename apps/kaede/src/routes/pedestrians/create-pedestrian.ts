@@ -1,26 +1,35 @@
 import { createRoute } from '@hono/zod-openapi'
 import type { OpenAPIHono } from '@hono/zod-openapi'
+import { requireRequestActor } from '../../middleware/request-actor-context.js'
+import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
 import { errorResponseSchema } from '../../schemas/common.js'
 import { createPedestrianRequestSchema, pedestrianSchema } from '../../schemas/pedestrians.js'
 import { createPedestrian } from '../../usecases/create-pedestrian.js'
 import type { CreatePedestrianResult } from '../../usecases/create-pedestrian.js'
+import { toAuthorizationErrorResponse } from '../authorization-error.js'
 
 type CreatePedestrianError = Extract<CreatePedestrianResult, { ok: false }>['error']
 
 const toCreatePedestrianErrorResponse = (error: CreatePedestrianError) => {
-  return {
-    body: {
-      error_code: error.type,
-      error_message: 'organization not found',
-      details: {
-        organization_id: error.organizationId,
-      },
-    },
-    status: 404 as const,
+  switch (error.type) {
+    case 'AUTH_DASHBOARD_FORBIDDEN':
+    case 'AUTH_ORGANIZATION_FORBIDDEN':
+      return toAuthorizationErrorResponse(error)
+    case 'ORGANIZATION_NOT_FOUND':
+      return {
+        body: {
+          error_code: error.type,
+          error_message: 'organization not found',
+          details: {
+            organization_id: error.organizationId,
+          },
+        },
+        status: 404 as const,
+      }
   }
 }
 
-export const registerCreatePedestrianRoute = (app: OpenAPIHono) => {
+export const registerCreatePedestrianRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
   const route = createRoute({
     method: 'post',
     path: '/',
@@ -52,12 +61,21 @@ export const registerCreatePedestrianRoute = (app: OpenAPIHono) => {
           },
         },
       },
+      403: {
+        description: 'permission denied',
+        content: {
+          'application/json': {
+            schema: errorResponseSchema,
+          },
+        },
+      },
     },
   })
 
   app.openapi(route, async (c) => {
     const payload = c.req.valid('json')
-    const result = await createPedestrian(payload)
+    const actor = requireRequestActor(c)
+    const result = await createPedestrian(actor, payload)
 
     if (!result.ok) {
       const error = toCreatePedestrianErrorResponse(result.error)

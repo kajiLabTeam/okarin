@@ -5,14 +5,27 @@ import type { DbExecutor } from '../executor.js'
 
 type Pedestrian = Selectable<Pedestrians>
 type NewPedestrian = Insertable<Pedestrians>
+export type { Pedestrian }
 
-export const listPedestrians = async (executor: DbExecutor = db): Promise<Pedestrian[]> => {
-  return executor
-    .selectFrom('pedestrians')
-    .selectAll()
-    .orderBy('created_at', 'asc')
-    .orderBy('id', 'asc')
-    .execute()
+export interface ListPedestriansOptions {
+  organizationIds?: string[]
+}
+
+export const listPedestrians = async (
+  { organizationIds }: ListPedestriansOptions = {},
+  executor: DbExecutor = db
+): Promise<Pedestrian[]> => {
+  if (organizationIds?.length === 0) {
+    return []
+  }
+
+  let query = executor.selectFrom('pedestrians').selectAll()
+
+  if (organizationIds) {
+    query = query.where('organization_id', 'in', organizationIds)
+  }
+
+  return query.orderBy('created_at', 'asc').orderBy('id', 'asc').execute()
 }
 
 export const insertPedestrian = async (
@@ -34,5 +47,16 @@ export const findPedestrianById = async (
     .selectFrom('pedestrians')
     .select(['id', 'organization_id'])
     .where('id', '=', pedestrianId)
+    .executeTakeFirst()
+}
+
+export const findPedestrianByUserId = async (
+  userId: string,
+  executor: DbExecutor = db
+): Promise<Pedestrian | undefined> => {
+  return executor
+    .selectFrom('pedestrians')
+    .selectAll()
+    .where('user_id', '=', userId)
     .executeTakeFirst()
 }

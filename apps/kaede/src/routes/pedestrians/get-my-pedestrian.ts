@@ -3,33 +3,41 @@ import type { OpenAPIHono } from '@hono/zod-openapi'
 import { requireRequestActor } from '../../middleware/request-actor-context.js'
 import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
 import { errorResponseSchema } from '../../schemas/common.js'
-import { pedestriansListResponseSchema } from '../../schemas/pedestrians.js'
-import { listPedestrians } from '../../usecases/list-pedestrians.js'
-import type { ListPedestriansResult } from '../../usecases/list-pedestrians.js'
+import { pedestrianSchema } from '../../schemas/pedestrians.js'
+import { getMyPedestrian } from '../../usecases/get-my-pedestrian.js'
+import type { GetMyPedestrianResult } from '../../usecases/get-my-pedestrian.js'
 import { toAuthorizationErrorResponse } from '../authorization-error.js'
 
-type ListPedestriansError = Extract<ListPedestriansResult, { ok: false }>['error']
+type GetMyPedestrianError = Extract<GetMyPedestrianResult, { ok: false }>['error']
 
-const toListPedestriansErrorResponse = (error: ListPedestriansError) => {
+const toGetMyPedestrianErrorResponse = (error: GetMyPedestrianError) => {
   switch (error.type) {
     case 'AUTH_DASHBOARD_FORBIDDEN':
     case 'AUTH_ORGANIZATION_FORBIDDEN':
       return toAuthorizationErrorResponse(error)
+    case 'PEDESTRIAN_NOT_FOUND':
+      return {
+        body: {
+          error_code: error.type,
+          error_message: 'pedestrian not found',
+        },
+        status: 404 as const,
+      }
   }
 }
 
-export const registerListPedestriansRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
+export const registerGetMyPedestrianRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
   const route = createRoute({
     method: 'get',
-    path: '/',
+    path: '/me',
     tags: ['Pedestrians'],
-    description: '計測対象として選択可能な pedestrian 一覧を返す',
+    description: 'ログイン user に紐づく pedestrian を返す',
     responses: {
       200: {
-        description: 'pedestrian list',
+        description: 'linked pedestrian',
         content: {
           'application/json': {
-            schema: pedestriansListResponseSchema,
+            schema: pedestrianSchema,
           },
         },
       },
@@ -41,15 +49,23 @@ export const registerListPedestriansRoute = (app: OpenAPIHono<RequestActorHonoEn
           },
         },
       },
+      404: {
+        description: 'pedestrian not found',
+        content: {
+          'application/json': {
+            schema: errorResponseSchema,
+          },
+        },
+      },
     },
   })
 
   app.openapi(route, async (c) => {
     const actor = requireRequestActor(c)
-    const result = await listPedestrians(actor)
+    const result = await getMyPedestrian(actor)
 
     if (!result.ok) {
-      const error = toListPedestriansErrorResponse(result.error)
+      const error = toGetMyPedestrianErrorResponse(result.error)
       return c.json(error.body, error.status)
     }
 
