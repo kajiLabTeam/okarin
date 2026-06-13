@@ -40,3 +40,27 @@ export const requireDashboardWriteAccess = (
 
   return { ok: true }
 }
+
+export const requireDashboardReadAccess = (
+  actor: RequestActor
+): { ok: true; organizationIds?: string[] } | { ok: false; error: AuthorizationError } => {
+  if (actor.type === 'service_client' || actor.global_role === 'admin') {
+    return { ok: true }
+  }
+
+  const managerOrganizationIds = actor.memberships
+    .filter((membership) => membership.role === 'manager')
+    .map((membership) => membership.organization_id)
+
+  if (managerOrganizationIds.length === 0) {
+    return {
+      ok: false,
+      error: { type: 'AUTH_DASHBOARD_FORBIDDEN' },
+    }
+  }
+
+  return {
+    ok: true,
+    organizationIds: managerOrganizationIds,
+  }
+}

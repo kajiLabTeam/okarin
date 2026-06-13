@@ -1,18 +1,13 @@
+import type { RequestActor } from '../middleware/request-actor-context.js'
 import type { CreatePedestrianRequest, PedestrianResponse } from '../schemas/pedestrians.js'
 import { findOrganizationById } from '../services/organizations/index.js'
 import { insertPedestrian } from '../services/pedestrians/index.js'
-
-type PedestrianAttributes = PedestrianResponse['attributes']
-
-const normalizeAttributes = (attributes: unknown): PedestrianAttributes => {
-  if (attributes && typeof attributes === 'object' && !Array.isArray(attributes)) {
-    return attributes as PedestrianAttributes
-  }
-
-  return {}
-}
+import type { AuthorizationError } from './authorization.js'
+import { requireDashboardWriteAccess } from './authorization.js'
+import { toPedestrianResponse } from './pedestrian-response.js'
 
 export const createPedestrian = async (
+  actor: RequestActor,
   payload: CreatePedestrianRequest
 ): Promise<CreatePedestrianResult> => {
   const organization = await findOrganizationById(payload.organization_id)
@@ -27,6 +22,12 @@ export const createPedestrian = async (
     }
   }
 
+  const authorization = requireDashboardWriteAccess(actor, organization.id)
+
+  if (!authorization.ok) {
+    return authorization
+  }
+
   const pedestrian = await insertPedestrian({
     organization_id: organization.id,
     display_name: payload.display_name,
@@ -38,16 +39,7 @@ export const createPedestrian = async (
 
   return {
     ok: true,
-    value: {
-      pedestrian_id: pedestrian.id,
-      organization_id: organization.id,
-      display_name: pedestrian.display_name,
-      height: pedestrian.height,
-      stride_length: pedestrian.stride_length,
-      attributes: normalizeAttributes(pedestrian.attributes),
-      created_at: pedestrian.created_at.toISOString(),
-      updated_at: pedestrian.updated_at.toISOString(),
-    },
+    value: toPedestrianResponse(pedestrian),
   }
 }
 
@@ -62,4 +54,8 @@ export type CreatePedestrianResult =
         type: 'ORGANIZATION_NOT_FOUND'
         organizationId: string
       }
+    }
+  | {
+      ok: false
+      error: AuthorizationError
     }

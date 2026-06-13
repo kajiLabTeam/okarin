@@ -1,37 +1,35 @@
+import type { RequestActor } from '../middleware/request-actor-context.js'
 import type { PedestriansListResponse } from '../schemas/pedestrians.js'
 import { listPedestrians as listPedestrianRows } from '../services/pedestrians/index.js'
+import type { AuthorizationError } from './authorization.js'
+import { requireDashboardReadAccess } from './authorization.js'
+import { toPedestrianResponse } from './pedestrian-response.js'
 
-type PedestrianAttributes = PedestriansListResponse['pedestrians'][number]['attributes']
+export type ListPedestriansResult =
+  | {
+      ok: true
+      value: PedestriansListResponse
+    }
+  | {
+      ok: false
+      error: AuthorizationError
+    }
 
-const normalizeAttributes = (attributes: unknown): PedestrianAttributes => {
-  if (attributes && typeof attributes === 'object' && !Array.isArray(attributes)) {
-    return attributes as PedestrianAttributes
+export const listPedestrians = async (actor: RequestActor): Promise<ListPedestriansResult> => {
+  const authorization = requireDashboardReadAccess(actor)
+
+  if (!authorization.ok) {
+    return authorization
   }
 
-  return {}
-}
-
-const requireOrganizationId = (pedestrianId: string, organizationId: string | null): string => {
-  if (!organizationId) {
-    throw new Error(`pedestrian ${pedestrianId} does not have organization_id`)
-  }
-
-  return organizationId
-}
-
-export const listPedestrians = async (): Promise<PedestriansListResponse> => {
-  const pedestrians = await listPedestrianRows()
+  const pedestrians = await listPedestrianRows({
+    organizationIds: authorization.organizationIds,
+  })
 
   return {
-    pedestrians: pedestrians.map((pedestrian) => ({
-      pedestrian_id: pedestrian.id,
-      organization_id: requireOrganizationId(pedestrian.id, pedestrian.organization_id),
-      display_name: pedestrian.display_name,
-      height: pedestrian.height,
-      stride_length: pedestrian.stride_length,
-      attributes: normalizeAttributes(pedestrian.attributes),
-      created_at: pedestrian.created_at.toISOString(),
-      updated_at: pedestrian.updated_at.toISOString(),
-    })),
+    ok: true,
+    value: {
+      pedestrians: pedestrians.map(toPedestrianResponse),
+    },
   }
 }
