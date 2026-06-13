@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { resetRuntimeConfigForTests } from '../../../src/config/runtime.js'
 import { createTrajectoryResponseSchema } from '../../../src/schemas/trajectories.js'
 import { createApp } from '../../../src/server.js'
 import { createDb } from '../../../src/services/db/client.js'
@@ -33,10 +34,17 @@ vi.mock('../../../src/services/nozomi/index.js', () => ({
 }))
 
 const db = createDb()
-const app = createApp()
+let app: ReturnType<typeof createApp>
+
+const authHeaders = {
+  authorization: 'Bearer shared-token',
+}
 
 describe('POST /api/recordings/:recordingId/trajectories', () => {
   beforeEach(async () => {
+    process.env.KAEDE_API_SHARED_TOKEN = 'shared-token'
+    resetRuntimeConfigForTests()
+    app = createApp()
     await resetDatabase(db)
     vi.clearAllMocks()
     issueInternalRecordingRawDownloadUrlsMock.mockResolvedValue({
@@ -55,6 +63,8 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
 
   afterAll(async () => {
     await db.destroy()
+    Reflect.deleteProperty(process.env, 'KAEDE_API_SHARED_TOKEN')
+    resetRuntimeConfigForTests()
   })
 
   it('trajectory と constraints を作成し processing を返す', async () => {
@@ -71,6 +81,7 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
     const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
       method: 'POST',
       headers: {
+        ...authHeaders,
         'content-type': 'application/json',
       },
       body: JSON.stringify({
@@ -148,6 +159,7 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
     const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
       method: 'POST',
       headers: {
+        ...authHeaders,
         'content-type': 'application/json',
       },
       body: JSON.stringify({
@@ -178,6 +190,7 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
     const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
       method: 'POST',
       headers: {
+        ...authHeaders,
         'content-type': 'application/json',
       },
       body: JSON.stringify({
