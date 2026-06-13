@@ -1,5 +1,7 @@
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
+import { requireRequestActor } from '../../middleware/request-actor-context.js'
+import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
 import { errorResponseSchema } from '../../schemas/common.js'
 import {
   recordingIdParamsSchema,
@@ -7,8 +9,9 @@ import {
   refreshUploadUrlsResponseSchema,
 } from '../../schemas/recordings.js'
 import { refreshUploadUrls } from '../../usecases/refresh-upload-urls.js'
+import { toAuthorizationErrorResponse } from '../authorization-error.js'
 
-export const registerRefreshUploadUrlsRoute = (app: OpenAPIHono) => {
+export const registerRefreshUploadUrlsRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
   const route = createRoute({
     method: 'post',
     path: '/{recordingId}/refresh-upload-urls',
@@ -50,16 +53,31 @@ export const registerRefreshUploadUrlsRoute = (app: OpenAPIHono) => {
           },
         },
       },
+      403: {
+        description: 'permission denied',
+        content: {
+          'application/json': {
+            schema: errorResponseSchema,
+          },
+        },
+      },
     },
   })
 
   app.openapi(route, async (c) => {
     const params = c.req.valid('param')
     const payload = c.req.valid('json')
-    const result = await refreshUploadUrls(params, payload)
+    const actor = requireRequestActor(c)
+    const result = await refreshUploadUrls(actor, params, payload)
 
     if (!result.ok) {
       switch (result.error.type) {
+        case 'AUTH_DASHBOARD_FORBIDDEN':
+        case 'AUTH_ORGANIZATION_FORBIDDEN': {
+          const error = toAuthorizationErrorResponse(result.error)
+          return c.json(error.body, error.status)
+        }
+
         case 'RECORDING_NOT_FOUND':
           return c.json(
             {

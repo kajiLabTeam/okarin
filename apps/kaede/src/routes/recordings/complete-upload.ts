@@ -1,10 +1,13 @@
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
+import { requireRequestActor } from '../../middleware/request-actor-context.js'
+import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
 import { errorResponseSchema } from '../../schemas/common.js'
 import { completeUploadResponseSchema, recordingIdParamsSchema } from '../../schemas/recordings.js'
 import { completeUpload } from '../../usecases/complete-upload.js'
+import { toAuthorizationErrorResponse } from '../authorization-error.js'
 
-export const registerCompleteUploadRoute = (app: OpenAPIHono) => {
+export const registerCompleteUploadRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
   const route = createRoute({
     method: 'post',
     path: '/{recordingId}/complete-upload',
@@ -38,6 +41,14 @@ export const registerCompleteUploadRoute = (app: OpenAPIHono) => {
           },
         },
       },
+      403: {
+        description: 'permission denied',
+        content: {
+          'application/json': {
+            schema: errorResponseSchema,
+          },
+        },
+      },
       500: {
         description: 'recording の内部データ不整合により upload 完了を確定できない',
         content: {
@@ -51,10 +62,17 @@ export const registerCompleteUploadRoute = (app: OpenAPIHono) => {
 
   app.openapi(route, async (c) => {
     const params = c.req.valid('param')
-    const result = await completeUpload(params)
+    const actor = requireRequestActor(c)
+    const result = await completeUpload(actor, params)
 
     if (!result.ok) {
       switch (result.error.type) {
+        case 'AUTH_DASHBOARD_FORBIDDEN':
+        case 'AUTH_ORGANIZATION_FORBIDDEN': {
+          const error = toAuthorizationErrorResponse(result.error)
+          return c.json(error.body, error.status)
+        }
+
         case 'RECORDING_NOT_FOUND':
           return c.json(
             {

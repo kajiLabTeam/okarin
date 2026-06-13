@@ -1,4 +1,5 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
+import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
 import { registerCompleteGroundTruthUploadRoute } from './complete-ground-truth-upload.js'
 import { registerCompleteUploadRoute } from './complete-upload.js'
 import { registerCreateTrajectoryRoute } from './create-trajectory.js'
@@ -8,7 +9,7 @@ import { registerIssueGroundTruthUploadUrlRoute } from './issue-ground-truth-upl
 import { registerListRecordingTrajectoriesRoute } from './list-recording-trajectories.js'
 import { registerRefreshUploadUrlsRoute } from './refresh-upload-urls.js'
 
-export const recordingsRoutes = new OpenAPIHono()
+export const recordingsRoutes = new OpenAPIHono<RequestActorHonoEnv>()
 
 registerInitRecordingRoute(recordingsRoutes)
 registerCompleteUploadRoute(recordingsRoutes)

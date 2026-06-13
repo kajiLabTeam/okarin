@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { RequestActor } from '../middleware/request-actor-context.js'
 
 const {
   findFloorByIdMock,
@@ -30,11 +31,13 @@ vi.mock('../services/storage/index.js', () => ({
 
 import { initRecording } from './init-recording.js'
 
+const serviceClientActor: RequestActor = { type: 'service_client', name: 'shared_token' }
+
 const mockEntityLookups = ({
   pedestrian,
   floor,
 }: {
-  pedestrian?: { id: string; organization_id: string }
+  pedestrian?: { id: string; organization_id: string; user_id?: string | null }
   floor?: { id: string; organization_id: string }
 }) => {
   findPedestrianByIdMock.mockResolvedValue(pedestrian)
@@ -70,7 +73,7 @@ describe('initRecording', () => {
       },
     })
 
-    const result = await initRecording({
+    const result = await initRecording(serviceClientActor, {
       pedestrian_id: pedestrianId,
       floor_id: floorId,
       upload_targets: ['acce', 'gyro'],
@@ -112,7 +115,7 @@ describe('initRecording', () => {
       floor: { id: floorId, organization_id: '99999999-9999-4999-8999-999999999999' },
     })
 
-    const result = await initRecording({
+    const result = await initRecording(serviceClientActor, {
       pedestrian_id: pedestrianId,
       floor_id: floorId,
       upload_targets: ['acce', 'gyro'],
@@ -138,7 +141,7 @@ describe('initRecording', () => {
       floor: undefined,
     })
 
-    const result = await initRecording({
+    const result = await initRecording(serviceClientActor, {
       pedestrian_id: pedestrianId,
       floor_id: floorId,
       upload_targets: ['acce', 'gyro'],
@@ -166,7 +169,7 @@ describe('initRecording', () => {
       floor: { id: floorId, organization_id: floorOrganizationId },
     })
 
-    const result = await initRecording({
+    const result = await initRecording(serviceClientActor, {
       pedestrian_id: pedestrianId,
       floor_id: floorId,
       upload_targets: ['acce', 'gyro'],
@@ -196,7 +199,7 @@ describe('initRecording', () => {
       organization_id: '99999999-9999-4999-8999-999999999999',
     })
 
-    await initRecording({
+    await initRecording(serviceClientActor, {
       pedestrian_id: '11111111-1111-4111-8111-111111111111',
       floor_id: '22222222-2222-4222-8222-222222222222',
       upload_targets: ['acce', 'gyro'],
@@ -204,5 +207,51 @@ describe('initRecording', () => {
 
     expect(findPedestrianByIdMock).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111')
     expect(findFloorByIdMock).toHaveBeenCalledWith('22222222-2222-4222-8222-222222222222')
+  })
+
+  it('member が別 user の pedestrian で作成しようとすると AUTH_ORGANIZATION_FORBIDDEN を返す', async () => {
+    const pedestrianId = '11111111-1111-4111-8111-111111111111'
+    const floorId = '22222222-2222-4222-8222-222222222222'
+    const organizationId = '99999999-9999-4999-8999-999999999999'
+
+    mockEntityLookups({
+      pedestrian: {
+        id: pedestrianId,
+        organization_id: organizationId,
+        user_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      },
+      floor: { id: floorId, organization_id: organizationId },
+    })
+
+    const result = await initRecording(
+      {
+        type: 'user',
+        user_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        email: 'member@example.test',
+        global_role: 'none',
+        password_must_change: false,
+        memberships: [
+          {
+            organization_id: organizationId,
+            organization_name: 'Test Organization',
+            role: 'member',
+          },
+        ],
+      },
+      {
+        pedestrian_id: pedestrianId,
+        floor_id: floorId,
+        upload_targets: ['acce', 'gyro'],
+      }
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'AUTH_ORGANIZATION_FORBIDDEN',
+      },
+    })
+    expect(insertRecordingMock).not.toHaveBeenCalled()
+    expect(issueRecordingUploadUrlsMock).not.toHaveBeenCalled()
   })
 })

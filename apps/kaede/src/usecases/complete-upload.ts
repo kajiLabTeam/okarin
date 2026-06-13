@@ -1,13 +1,21 @@
+import type { RequestActor } from '../middleware/request-actor-context.js'
 import { uploadTargetSchema, recordingUploadStatusSchema } from '../schemas/common.js'
 import type { UploadTarget } from '../schemas/common.js'
 import type { RecordingIdParams } from '../schemas/recordings.js'
-import { findRecordingById, markRecordingUploadReady } from '../services/recordings/index.js'
+import {
+  findRecordingAuthorizationById,
+  findRecordingById,
+  markRecordingUploadReady,
+} from '../services/recordings/index.js'
 import {
   buildRecordingRawObjectKey,
   listRecordingRawObjectKeys,
 } from '../services/storage/index.js'
+import type { AuthorizationError } from './authorization.js'
+import { requireRecordingAccess } from './authorization.js'
 
 export type CompleteUploadError =
+  | AuthorizationError
   | {
       type: 'RECORDING_NOT_FOUND'
       recordingId: string
@@ -41,7 +49,10 @@ export type CompleteUploadResult =
       error: CompleteUploadError
     }
 
-export const completeUpload = async (params: RecordingIdParams): Promise<CompleteUploadResult> => {
+export const completeUpload = async (
+  actor: RequestActor,
+  params: RecordingIdParams
+): Promise<CompleteUploadResult> => {
   const recording = await findRecordingById(params.recordingId)
 
   if (!recording) {
@@ -52,6 +63,24 @@ export const completeUpload = async (params: RecordingIdParams): Promise<Complet
         recordingId: params.recordingId,
       },
     }
+  }
+
+  const recordingAuthorization = await findRecordingAuthorizationById(recording.id)
+
+  if (!recordingAuthorization) {
+    return {
+      ok: false,
+      error: {
+        type: 'RECORDING_NOT_FOUND',
+        recordingId: recording.id,
+      },
+    }
+  }
+
+  const authorization = requireRecordingAccess(actor, recordingAuthorization)
+
+  if (!authorization.ok) {
+    return authorization
   }
 
   if (recording.upload_status === 'ready' || recording.upload_status === 'failed') {

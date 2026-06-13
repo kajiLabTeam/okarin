@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { resetRuntimeConfigForTests } from '../../src/config/runtime.js'
 import { createApp } from '../../src/server.js'
 import { createDb } from '../../src/services/db/client.js'
 import {
@@ -10,11 +11,18 @@ import { createRecordingFixture } from '../fixtures/recordings.js'
 import { createStorageClient, putObjectText } from './support/helpers.js'
 
 const db = createDb()
-const app = createApp()
+let app: ReturnType<typeof createApp>
 const s3 = createStorageClient()
+
+const authHeaders = {
+  authorization: 'Bearer shared-token',
+}
 
 describe('POST /api/recordings/:recordingId/complete-upload', () => {
   beforeEach(async () => {
+    process.env.KAEDE_API_SHARED_TOKEN = 'shared-token'
+    resetRuntimeConfigForTests()
+    app = createApp()
     await resetDatabase(db)
     resetS3ClientForTests()
   })
@@ -22,6 +30,8 @@ describe('POST /api/recordings/:recordingId/complete-upload', () => {
   afterAll(async () => {
     s3.destroy()
     await db.destroy()
+    Reflect.deleteProperty(process.env, 'KAEDE_API_SHARED_TOKEN')
+    resetRuntimeConfigForTests()
   })
 
   it('必要な raw が揃っていれば ready に更新する', async () => {
@@ -36,6 +46,7 @@ describe('POST /api/recordings/:recordingId/complete-upload', () => {
 
     const response = await app.request(`/api/recordings/${recordingId}/complete-upload`, {
       method: 'POST',
+      headers: authHeaders,
     })
 
     expect(response.status).toBe(200)
@@ -64,6 +75,7 @@ describe('POST /api/recordings/:recordingId/complete-upload', () => {
 
     const response = await app.request(`/api/recordings/${recordingId}/complete-upload`, {
       method: 'POST',
+      headers: authHeaders,
     })
 
     expect(response.status).toBe(409)

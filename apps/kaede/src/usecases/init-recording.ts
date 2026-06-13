@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/node'
+import type { RequestActor } from '../middleware/request-actor-context.js'
 import { recordingUploadStatusSchema } from '../schemas/common.js'
 import type { UploadTarget } from '../schemas/common.js'
 import type { InitRecordingRequest } from '../schemas/recordings.js'
@@ -6,8 +7,11 @@ import { findFloorById } from '../services/floors/index.js'
 import { findPedestrianById } from '../services/pedestrians/index.js'
 import { insertRecording } from '../services/recordings/index.js'
 import { issueRecordingUploadUrls } from '../services/storage/index.js'
+import type { AuthorizationError } from './authorization.js'
+import { requireRecordingAccess } from './authorization.js'
 
 export type InitRecordingError =
+  | AuthorizationError
   | {
       type: 'PEDESTRIAN_NOT_FOUND'
       pedestrianId: string
@@ -59,7 +63,7 @@ const throwOrganizationInvariantError = (message: string): never => {
   throw error
 }
 
-export const initRecording = async (payload: InitRecordingRequest) => {
+export const initRecording = async (actor: RequestActor, payload: InitRecordingRequest) => {
   const [pedestrian, floor] = await Promise.all([
     findPedestrianById(payload.pedestrian_id),
     findFloorById(payload.floor_id),
@@ -104,6 +108,15 @@ export const initRecording = async (payload: InitRecordingRequest) => {
         floorOrganizationId: floor.organization_id,
       },
     } satisfies InitRecordingResult
+  }
+
+  const authorization = requireRecordingAccess(actor, {
+    organization_id: pedestrian.organization_id,
+    pedestrian_user_id: pedestrian.user_id,
+  })
+
+  if (!authorization.ok) {
+    return authorization satisfies InitRecordingResult
   }
 
   const uploadTargets = withRequiredMetadataTarget(payload.upload_targets)

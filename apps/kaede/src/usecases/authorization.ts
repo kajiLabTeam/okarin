@@ -64,3 +64,37 @@ export const requireDashboardReadAccess = (
     organizationIds: managerOrganizationIds,
   }
 }
+
+export interface RecordingAccessResource {
+  organization_id: string
+  pedestrian_user_id: string | null
+}
+
+export const requireRecordingAccess = (
+  actor: RequestActor,
+  resource: RecordingAccessResource
+): { ok: true } | { ok: false; error: AuthorizationError } => {
+  if (actor.type === 'service_client' || actor.global_role === 'admin') {
+    return { ok: true }
+  }
+
+  const membership = actor.memberships.find(
+    (candidate) => candidate.organization_id === resource.organization_id
+  )
+
+  if (!membership) {
+    return {
+      ok: false,
+      error: { type: 'AUTH_ORGANIZATION_FORBIDDEN' },
+    }
+  }
+
+  if (membership.role === 'manager' || resource.pedestrian_user_id === actor.user_id) {
+    return { ok: true }
+  }
+
+  return {
+    ok: false,
+    error: { type: 'AUTH_ORGANIZATION_FORBIDDEN' },
+  }
+}

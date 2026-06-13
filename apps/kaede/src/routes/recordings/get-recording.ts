@@ -1,10 +1,11 @@
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
+import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
 import { notImplementedResponseSchema } from '../../schemas/common.js'
 import { recordingDetailResponseSchema, recordingIdParamsSchema } from '../../schemas/recordings.js'
 import { notImplemented } from '../../utils/not-implemented.js'
 
-export const registerGetRecordingRoute = (app: OpenAPIHono) => {
+export const registerGetRecordingRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
   const route = createRoute({
     method: 'get',
     path: '/{recordingId}',

@@ -1,5 +1,6 @@
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
+import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
 import { errorResponseSchema } from '../../schemas/common.js'
 import { recordingIdParamsSchema } from '../../schemas/recordings.js'
 import {
@@ -8,7 +9,7 @@ import {
 } from '../../schemas/trajectories.js'
 import { createTrajectory } from '../../usecases/create-trajectory.js'
 
-export const registerCreateTrajectoryRoute = (app: OpenAPIHono) => {
+export const registerCreateTrajectoryRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
   const route = createRoute({
     method: 'post',
     path: '/{recordingId}/trajectories',

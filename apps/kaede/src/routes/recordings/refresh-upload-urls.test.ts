@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRouteTestApp } from '../create-route-test-app.js'
 import { registerRefreshUploadUrlsRoute } from './refresh-upload-urls.js'
 
+const serviceClientActor = {
+  type: 'service_client',
+  name: 'shared_token',
+} as const
+
 const { refreshUploadUrlsMock } = vi.hoisted(() => ({
   refreshUploadUrlsMock: vi.fn(),
 }))
@@ -31,7 +36,9 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
       },
     })
 
-    const app = createRouteTestApp('/recordings', registerRefreshUploadUrlsRoute)
+    const app = createRouteTestApp('/recordings', registerRefreshUploadUrlsRoute, {
+      actor: serviceClientActor,
+    })
     const response = await app.request(`/api/recordings/${recordingId}/refresh-upload-urls`, {
       method: 'POST',
       headers: {
@@ -54,6 +61,7 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
     })
 
     expect(refreshUploadUrlsMock).toHaveBeenCalledWith(
+      serviceClientActor,
       {
         recordingId,
       },
@@ -74,7 +82,9 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
       },
     })
 
-    const app = createRouteTestApp('/recordings', registerRefreshUploadUrlsRoute)
+    const app = createRouteTestApp('/recordings', registerRefreshUploadUrlsRoute, {
+      actor: serviceClientActor,
+    })
     const response = await app.request(`/api/recordings/${recordingId}/refresh-upload-urls`, {
       method: 'POST',
       headers: {
@@ -107,7 +117,9 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
       },
     })
 
-    const app = createRouteTestApp('/recordings', registerRefreshUploadUrlsRoute)
+    const app = createRouteTestApp('/recordings', registerRefreshUploadUrlsRoute, {
+      actor: serviceClientActor,
+    })
     const response = await app.request(`/api/recordings/${recordingId}/refresh-upload-urls`, {
       method: 'POST',
       headers: {
@@ -141,7 +153,9 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
       },
     })
 
-    const app = createRouteTestApp('/recordings', registerRefreshUploadUrlsRoute)
+    const app = createRouteTestApp('/recordings', registerRefreshUploadUrlsRoute, {
+      actor: serviceClientActor,
+    })
     const response = await app.request(`/api/recordings/${recordingId}/refresh-upload-urls`, {
       method: 'POST',
       headers: {
@@ -177,5 +191,35 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
 
     expect(response.status).toBe(400)
     expect(refreshUploadUrlsMock).not.toHaveBeenCalled()
+  })
+
+  it('organization 権限がない場合は 403 を返す', async () => {
+    const recordingId = '11111111-1111-4111-8111-111111111111'
+
+    refreshUploadUrlsMock.mockResolvedValue({
+      ok: false,
+      error: {
+        type: 'AUTH_ORGANIZATION_FORBIDDEN',
+      },
+    })
+
+    const app = createRouteTestApp('/recordings', registerRefreshUploadUrlsRoute, {
+      actor: serviceClientActor,
+    })
+    const response = await app.request(`/api/recordings/${recordingId}/refresh-upload-urls`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        targets: ['acce', 'gyro'],
+      }),
+    })
+
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'AUTH_ORGANIZATION_FORBIDDEN',
+      error_message: 'organization access forbidden',
+    })
   })
 })
