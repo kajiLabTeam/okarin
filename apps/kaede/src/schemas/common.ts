@@ -90,6 +90,63 @@ export const errorResponseSchema = z.object({
   }),
 })
 
+export const authErrorCodes = [
+  'AUTH_UNAUTHENTICATED',
+  'AUTH_INVALID_CREDENTIALS',
+  'AUTH_SESSION_EXPIRED',
+  'AUTH_SESSION_REVOKED',
+  'AUTH_USER_DISABLED',
+  'AUTH_USER_LOCKED',
+  'AUTH_TEMPORARY_PASSWORD_EXPIRED',
+  'AUTH_PASSWORD_CHANGE_REQUIRED',
+  'AUTH_DASHBOARD_FORBIDDEN',
+  'AUTH_ORGANIZATION_FORBIDDEN',
+] as const
+
+export const authErrorCodeSchema = z.enum(authErrorCodes).openapi({
+  description: 'auth / authorization の機械可読エラーコード',
+})
+
+export const authErrorResponseSchema = errorResponseSchema.extend({
+  error_code: authErrorCodeSchema,
+})
+
+export const authErrorMessages: Record<AuthErrorCode, string> = {
+  AUTH_DASHBOARD_FORBIDDEN: 'dashboard access forbidden',
+  AUTH_INVALID_CREDENTIALS: 'invalid email or password',
+  AUTH_ORGANIZATION_FORBIDDEN: 'organization access forbidden',
+  AUTH_PASSWORD_CHANGE_REQUIRED: 'password change required',
+  AUTH_SESSION_EXPIRED: 'session expired',
+  AUTH_SESSION_REVOKED: 'session revoked',
+  AUTH_TEMPORARY_PASSWORD_EXPIRED: 'temporary password expired',
+  AUTH_UNAUTHENTICATED: 'login required',
+  AUTH_USER_DISABLED: 'user is disabled',
+  AUTH_USER_LOCKED: 'account is locked due to too many failed attempts',
+}
+
+export const authErrorStatuses: Record<AuthErrorCode, 401 | 403> = {
+  AUTH_DASHBOARD_FORBIDDEN: 403,
+  AUTH_INVALID_CREDENTIALS: 401,
+  AUTH_ORGANIZATION_FORBIDDEN: 403,
+  AUTH_PASSWORD_CHANGE_REQUIRED: 403,
+  AUTH_SESSION_EXPIRED: 401,
+  AUTH_SESSION_REVOKED: 401,
+  AUTH_TEMPORARY_PASSWORD_EXPIRED: 403,
+  AUTH_UNAUTHENTICATED: 401,
+  AUTH_USER_DISABLED: 403,
+  AUTH_USER_LOCKED: 403,
+}
+
+export const toAuthErrorResponse = (errorCode: AuthErrorCode) => {
+  return {
+    body: {
+      error_code: errorCode,
+      error_message: authErrorMessages[errorCode],
+    },
+    status: authErrorStatuses[errorCode],
+  }
+}
+
 export const nozomiPingResponseSchema = z.object({
   ok: z.literal(true).openapi({
     description: 'nozomi 側の ping が正常に完了したことを表す',
@@ -114,3 +171,4 @@ export const nozomiPingResponseSchema = z.object({
 export type RecordingUploadStatus = z.infer<typeof recordingUploadStatusSchema>
 export type TrajectoryStatus = z.infer<typeof trajectoryStatusSchema>
 export type UploadTarget = z.infer<typeof uploadTargetSchema>
+export type AuthErrorCode = z.infer<typeof authErrorCodeSchema>
