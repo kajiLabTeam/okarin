@@ -5,29 +5,7 @@ import type { RequestActorHonoEnv } from '../../middleware/request-actor-context
 import { errorResponseSchema } from '../../schemas/common.js'
 import { createPedestrianRequestSchema, pedestrianSchema } from '../../schemas/pedestrians.js'
 import { createPedestrian } from '../../usecases/pedestrians/create-pedestrian.js'
-import type { CreatePedestrianResult } from '../../usecases/pedestrians/create-pedestrian.js'
-import { toAuthorizationErrorResponse } from '../authorization-error.js'
-
-type CreatePedestrianError = Extract<CreatePedestrianResult, { ok: false }>['error']
-
-const toCreatePedestrianErrorResponse = (error: CreatePedestrianError) => {
-  switch (error.type) {
-    case 'AUTH_DASHBOARD_FORBIDDEN':
-    case 'AUTH_ORGANIZATION_FORBIDDEN':
-      return toAuthorizationErrorResponse(error)
-    case 'ORGANIZATION_NOT_FOUND':
-      return {
-        body: {
-          error_code: error.type,
-          error_message: 'organization not found',
-          details: {
-            organization_id: error.organizationId,
-          },
-        },
-        status: 404 as const,
-      }
-  }
-}
+import { toCreatePedestrianErrorResponse } from './error.js'
 
 export const registerCreatePedestrianRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
   const route = createRoute({
