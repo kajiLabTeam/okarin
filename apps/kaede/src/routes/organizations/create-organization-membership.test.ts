@@ -6,7 +6,7 @@ const { createOrUpdateOrganizationMembershipForSessionMock } = vi.hoisted(() => 
   createOrUpdateOrganizationMembershipForSessionMock: vi.fn(),
 }))
 
-vi.mock('../../usecases/organizations.js', () => ({
+vi.mock('../../usecases/organizations/index.js', () => ({
   createOrUpdateOrganizationMembershipForSession:
     createOrUpdateOrganizationMembershipForSessionMock,
 }))

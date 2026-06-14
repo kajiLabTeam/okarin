@@ -1,5 +1,5 @@
 import { authErrorMessages, authErrorStatuses } from '../../schemas/common.js'
-import type { OrganizationError } from '../../usecases/organizations.js'
+import type { OrganizationError } from '../../usecases/organizations/index.js'
 
 const errorStatuses: Record<OrganizationError['type'], 401 | 403 | 404 | 409> = {
   AUTH_FORBIDDEN: 403,
