@@ -2,6 +2,7 @@ import type { Context, MiddlewareHandler } from 'hono'
 import { getCookie } from 'hono/cookie'
 import { timingSafeEqual } from 'node:crypto'
 import { sessionCookieName } from '../routes/auth/cookie.js'
+import { toAuthErrorResponse } from '../schemas/common.js'
 import { findValidSessionByToken } from '../services/auth/index.js'
 import { findUserById, listUserOrganizationMemberships } from '../services/users/index.js'
 import type { RequestActorHonoEnv } from './request-actor-context.js'
@@ -51,22 +52,9 @@ const authError = (
     | 'AUTH_UNAUTHENTICATED'
     | 'AUTH_USER_DISABLED'
 ) => {
-  const messages: Record<typeof errorCode, string> = {
-    AUTH_PASSWORD_CHANGE_REQUIRED: 'password change required',
-    AUTH_SESSION_EXPIRED: 'session expired',
-    AUTH_SESSION_REVOKED: 'session revoked',
-    AUTH_UNAUTHENTICATED: 'login required',
-    AUTH_USER_DISABLED: 'user is disabled',
-  }
-  const status = errorCode === 'AUTH_UNAUTHENTICATED' ? 401 : 403
+  const error = toAuthErrorResponse(errorCode)
 
-  return c.json(
-    {
-      error_code: errorCode,
-      error_message: messages[errorCode],
-    },
-    status
-  )
+  return c.json(error.body, error.status)
 }
 
 const sharedTokenAuthError = (c: RequestActorContext) => {
