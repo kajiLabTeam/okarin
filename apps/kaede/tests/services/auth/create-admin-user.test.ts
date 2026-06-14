@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { verifyPassword } from '../../../src/services/auth/index.js'
 import { createDb } from '../../../src/services/db/client.js'
-import { createAdminUser } from '../../../src/usecases/create-admin-user.js'
+import { createAdminUser } from '../../../src/usecases/auth/create-admin-user.js'
 import { resetDatabase } from '../../db/helpers.js'
 
 const db = createDb()

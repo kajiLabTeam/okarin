@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { createSession, hashPassword, verifyPassword } from '../../../src/services/auth/index.js'
 import { createDb } from '../../../src/services/db/client.js'
-import { changePassword, getMe, login, logout } from '../../../src/usecases/auth.js'
+import { changePassword, getMe, login, logout } from '../../../src/usecases/auth/index.js'
 import { resetDatabase } from '../../db/helpers.js'
 
 const db = createDb()

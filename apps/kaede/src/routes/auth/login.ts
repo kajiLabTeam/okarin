@@ -2,7 +2,7 @@ import { createRoute } from '@hono/zod-openapi'
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { authUserResponseSchema, loginRequestSchema } from '../../schemas/auth.js'
 import { errorResponseSchema } from '../../schemas/common.js'
-import { login } from '../../usecases/auth.js'
+import { login } from '../../usecases/auth/index.js'
 import { setSessionCookie } from './cookie.js'
 import { toAuthErrorResponse } from './error.js'
 

@@ -1,8 +1,8 @@
 import { createInterface } from 'node:readline/promises'
 import { pathToFileURL } from 'node:url'
 import { db } from '../services/db/index.js'
-import { createAdminUser } from '../usecases/create-admin-user.js'
-import type { CreateAdminUserError } from '../usecases/create-admin-user.js'
+import { createAdminUser } from '../usecases/auth/create-admin-user.js'
+import type { CreateAdminUserError } from '../usecases/auth/create-admin-user.js'
 import { parseAdminCreateUserCliArgs } from './admin-create-user-options.js'
 
 const formatError = (error: CreateAdminUserError) => {

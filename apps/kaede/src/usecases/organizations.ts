@@ -26,7 +26,7 @@ import {
   upsertOrganizationMembership,
 } from '../services/users/index.js'
 import type { OrganizationUserRow } from '../services/users/index.js'
-import { requireActiveSessionUser } from './auth.js'
+import { requireActiveSessionUser } from './auth/index.js'
 
 export type OrganizationError =
   | { type: 'AUTH_UNAUTHENTICATED' }
