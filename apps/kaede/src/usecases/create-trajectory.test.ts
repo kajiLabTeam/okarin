@@ -174,7 +174,7 @@ describe('createTrajectory', () => {
     })
   })
 
-  it('member が他 user の recording から trajectory を作成しようとすると AUTH_ORGANIZATION_FORBIDDEN を返す', async () => {
+  it('member が自分の recording から trajectory を作成しようとすると AUTH_DASHBOARD_FORBIDDEN を返す', async () => {
     const recordingId = '11111111-1111-4111-8111-111111111111'
     const floorId = '33333333-3333-4333-8333-333333333333'
     const organizationId = '99999999-9999-4999-8999-999999999999'
@@ -190,7 +190,7 @@ describe('createTrajectory', () => {
       id: recordingId,
       organization_id: organizationId,
       pedestrian_id: '44444444-4444-4444-8444-444444444444',
-      pedestrian_user_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      pedestrian_user_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
     })
     findFloorByIdMock.mockResolvedValue({
       id: floorId,
@@ -208,6 +208,52 @@ describe('createTrajectory', () => {
           {
             organization_id: organizationId,
             organization_name: 'Test Organization',
+            role: 'member',
+          },
+        ],
+      },
+      { recordingId },
+      { constraints: [] }
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'AUTH_DASHBOARD_FORBIDDEN',
+      },
+    })
+    expect(insertTrajectoryWithConstraintsMock).not.toHaveBeenCalled()
+    expect(submitAnalyzeRequestMock).not.toHaveBeenCalled()
+  })
+
+  it('member が所属外 organization の recording から trajectory を作成しようとすると AUTH_ORGANIZATION_FORBIDDEN を返す', async () => {
+    const recordingId = '11111111-1111-4111-8111-111111111111'
+    const floorId = '33333333-3333-4333-8333-333333333333'
+    const organizationId = '99999999-9999-4999-8999-999999999999'
+
+    findRecordingByIdMock.mockResolvedValue({
+      id: recordingId,
+      floor_id: floorId,
+      organization_id: organizationId,
+      upload_status: 'ready',
+      upload_targets: ['acce', 'gyro'],
+    })
+    findFloorByIdMock.mockResolvedValue({
+      id: floorId,
+      organization_id: organizationId,
+    })
+
+    const result = await createTrajectory(
+      {
+        type: 'user',
+        user_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        email: 'member@example.test',
+        global_role: 'none',
+        password_must_change: false,
+        memberships: [
+          {
+            organization_id: '88888888-8888-4888-8888-888888888888',
+            organization_name: 'Other Organization',
             role: 'member',
           },
         ],
