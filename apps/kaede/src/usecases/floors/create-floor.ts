@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import type { RequestActor } from '../middleware/request-actor-context.js'
-import type { CreateFloorRequest, FloorResponse } from '../schemas/floors.js'
-import { findBuildingById } from '../services/buildings/index.js'
-import { insertFloor } from '../services/floors/index.js'
-import type { AuthorizationError } from './authorization.js'
-import { requireDashboardWriteAccess } from './authorization.js'
+import type { RequestActor } from '../../middleware/request-actor-context.js'
+import type { CreateFloorRequest, FloorResponse } from '../../schemas/floors.js'
+import { findBuildingById } from '../../services/buildings/index.js'
+import { insertFloor } from '../../services/floors/index.js'
+import type { AuthorizationError } from '../authorization.js'
+import { requireDashboardWriteAccess } from '../authorization.js'
 
 export type CreateFloorResult =
   | {
