@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import type { RequestActor } from '../../../src/middleware/request-actor-context.js'
 import { createDb } from '../../../src/services/db/client.js'
-import { createPedestrian } from '../../../src/usecases/create-pedestrian.js'
+import { createPedestrian } from '../../../src/usecases/pedestrians/create-pedestrian.js'
 import { resetDatabase } from '../../db/helpers.js'
 
 const db = createDb()

@@ -4,8 +4,8 @@ import { requireRequestActor } from '../../middleware/request-actor-context.js'
 import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
 import { errorResponseSchema } from '../../schemas/common.js'
 import { createPedestrianRequestSchema, pedestrianSchema } from '../../schemas/pedestrians.js'
-import { createPedestrian } from '../../usecases/create-pedestrian.js'
-import type { CreatePedestrianResult } from '../../usecases/create-pedestrian.js'
+import { createPedestrian } from '../../usecases/pedestrians/create-pedestrian.js'
+import type { CreatePedestrianResult } from '../../usecases/pedestrians/create-pedestrian.js'
 import { toAuthorizationErrorResponse } from '../authorization-error.js'
 
 type CreatePedestrianError = Extract<CreatePedestrianResult, { ok: false }>['error']
