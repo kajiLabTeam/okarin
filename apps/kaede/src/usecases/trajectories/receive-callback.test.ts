@@ -14,13 +14,13 @@ const {
   verifyCallbackTokenMock: vi.fn(),
 }))
 
-vi.mock('../services/storage/index.js', () => ({
+vi.mock('../../services/storage/index.js', () => ({
   buildTrajectoryAnalyzedResultObjectKey: (trajectoryId: string) =>
     `trajectories/${trajectoryId}/analyzed/result.csv`,
   doesTrajectoryAnalyzedResultObjectExist: doesTrajectoryAnalyzedResultObjectExistMock,
 }))
 
-vi.mock('../services/trajectories/index.js', () => ({
+vi.mock('../../services/trajectories/index.js', () => ({
   findTrajectoryById: findTrajectoryByIdMock,
   markTrajectoryCompleted: markTrajectoryCompletedMock,
   markTrajectoryFailed: markTrajectoryFailedMock,

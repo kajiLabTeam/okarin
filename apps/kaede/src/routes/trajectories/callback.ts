@@ -5,7 +5,7 @@ import {
   callbackRequestSchema,
   callbackResponseSchema,
 } from '../../schemas/trajectories.js'
-import { receiveCallback } from '../../usecases/receive-callback.js'
+import { receiveCallback } from '../../usecases/trajectories/receive-callback.js'
 
 export const registerCallbackRoute = (app: OpenAPIHono) => {
   const route = createRoute({

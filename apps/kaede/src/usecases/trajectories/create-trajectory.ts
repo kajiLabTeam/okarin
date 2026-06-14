@@ -1,24 +1,24 @@
 import * as Sentry from '@sentry/node'
-import { getCallbackRuntimeConfig } from '../config/runtime.js'
-import type { RequestActor } from '../middleware/request-actor-context.js'
-import { uploadTargetsSchema } from '../schemas/common.js'
-import type { RecordingIdParams } from '../schemas/recordings.js'
-import type { CreateTrajectoryRequest } from '../schemas/trajectories.js'
-import { findFloorById } from '../services/floors/index.js'
-import { submitAnalyzeRequest } from '../services/nozomi/index.js'
-import { findRecordingById } from '../services/recordings/index.js'
+import { getCallbackRuntimeConfig } from '../../config/runtime.js'
+import type { RequestActor } from '../../middleware/request-actor-context.js'
+import { uploadTargetsSchema } from '../../schemas/common.js'
+import type { RecordingIdParams } from '../../schemas/recordings.js'
+import type { CreateTrajectoryRequest } from '../../schemas/trajectories.js'
+import { findFloorById } from '../../services/floors/index.js'
+import { submitAnalyzeRequest } from '../../services/nozomi/index.js'
+import { findRecordingById } from '../../services/recordings/index.js'
 import {
   issueInternalRecordingRawDownloadUrls,
   issueInternalTrajectoryResultUploadUrl,
-} from '../services/storage/index.js'
-import { generateCallbackToken } from '../services/trajectories/callback-token.js'
+} from '../../services/storage/index.js'
+import { generateCallbackToken } from '../../services/trajectories/callback-token.js'
 import {
   insertTrajectoryWithConstraints,
   markTrajectoryFailed,
   markTrajectoryProcessing,
-} from '../services/trajectories/index.js'
-import type { AuthorizationError } from './authorization.js'
-import { requireDashboardWriteAccess } from './authorization.js'
+} from '../../services/trajectories/index.js'
+import type { AuthorizationError } from '../authorization.js'
+import { requireDashboardWriteAccess } from '../authorization.js'
 
 export type CreateTrajectoryError =
   | AuthorizationError

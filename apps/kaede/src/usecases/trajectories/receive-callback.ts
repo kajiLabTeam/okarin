@@ -1,14 +1,14 @@
-import type { CallbackRequest } from '../schemas/trajectories.js'
+import type { CallbackRequest } from '../../schemas/trajectories.js'
 import {
   buildTrajectoryAnalyzedResultObjectKey,
   doesTrajectoryAnalyzedResultObjectExist,
-} from '../services/storage/index.js'
+} from '../../services/storage/index.js'
 import {
   findTrajectoryById,
   markTrajectoryCompleted,
   markTrajectoryFailed,
   verifyCallbackToken,
-} from '../services/trajectories/index.js'
+} from '../../services/trajectories/index.js'
 
 export type ReceiveCallbackError =
   | { type: 'CALLBACK_TOKEN_INVALID' }

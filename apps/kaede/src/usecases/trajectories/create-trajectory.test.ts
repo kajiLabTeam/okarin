@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { CallbackRuntimeConfig } from '../config/runtime.js'
-import type { RequestActor } from '../middleware/request-actor-context.js'
+import type { CallbackRuntimeConfig } from '../../config/runtime.js'
+import type { RequestActor } from '../../middleware/request-actor-context.js'
 
 const {
   findFloorByIdMock,
@@ -32,35 +32,35 @@ vi.mock('@sentry/node', () => ({
   captureException: vi.fn(),
 }))
 
-vi.mock('../services/recordings/index.js', () => ({
+vi.mock('../../services/recordings/index.js', () => ({
   findRecordingAuthorizationById: findRecordingAuthorizationByIdMock,
   findRecordingById: findRecordingByIdMock,
 }))
 
-vi.mock('../services/floors/index.js', () => ({
+vi.mock('../../services/floors/index.js', () => ({
   findFloorById: findFloorByIdMock,
 }))
 
-vi.mock('../services/trajectories/index.js', () => ({
+vi.mock('../../services/trajectories/index.js', () => ({
   insertTrajectoryWithConstraints: insertTrajectoryWithConstraintsMock,
   markTrajectoryFailed: markTrajectoryFailedMock,
   markTrajectoryProcessing: markTrajectoryProcessingMock,
 }))
 
-vi.mock('../services/storage/index.js', () => ({
+vi.mock('../../services/storage/index.js', () => ({
   issueInternalRecordingRawDownloadUrls: issueInternalRecordingRawDownloadUrlsMock,
   issueInternalTrajectoryResultUploadUrl: issueInternalTrajectoryResultUploadUrlMock,
 }))
 
-vi.mock('../services/nozomi/index.js', () => ({
+vi.mock('../../services/nozomi/index.js', () => ({
   submitAnalyzeRequest: submitAnalyzeRequestMock,
 }))
 
-vi.mock('../services/trajectories/callback-token.js', () => ({
+vi.mock('../../services/trajectories/callback-token.js', () => ({
   generateCallbackToken: generateCallbackTokenMock,
 }))
 
-vi.mock('../config/runtime.js', () => ({
+vi.mock('../../config/runtime.js', () => ({
   getCallbackRuntimeConfig: getCallbackRuntimeConfigMock,
 }))
 

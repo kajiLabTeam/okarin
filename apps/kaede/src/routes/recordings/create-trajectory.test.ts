@@ -11,7 +11,7 @@ const { createTrajectoryMock } = vi.hoisted(() => ({
   createTrajectoryMock: vi.fn(),
 }))
 
-vi.mock('../../usecases/create-trajectory.js', () => ({
+vi.mock('../../usecases/trajectories/create-trajectory.js', () => ({
   createTrajectory: createTrajectoryMock,
 }))
 

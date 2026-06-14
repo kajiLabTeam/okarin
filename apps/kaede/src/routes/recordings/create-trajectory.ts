@@ -8,7 +8,7 @@ import {
   createTrajectoryRequestSchema,
   createTrajectoryResponseSchema,
 } from '../../schemas/trajectories.js'
-import { createTrajectory } from '../../usecases/create-trajectory.js'
+import { createTrajectory } from '../../usecases/trajectories/create-trajectory.js'
 import { toAuthorizationErrorResponse } from '../authorization-error.js'
 
 export const registerCreateTrajectoryRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
