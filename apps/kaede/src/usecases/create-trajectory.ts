@@ -6,7 +6,7 @@ import type { RecordingIdParams } from '../schemas/recordings.js'
 import type { CreateTrajectoryRequest } from '../schemas/trajectories.js'
 import { findFloorById } from '../services/floors/index.js'
 import { submitAnalyzeRequest } from '../services/nozomi/index.js'
-import { findRecordingAuthorizationById, findRecordingById } from '../services/recordings/index.js'
+import { findRecordingById } from '../services/recordings/index.js'
 import {
   issueInternalRecordingRawDownloadUrls,
   issueInternalTrajectoryResultUploadUrl,
@@ -18,7 +18,7 @@ import {
   markTrajectoryProcessing,
 } from '../services/trajectories/index.js'
 import type { AuthorizationError } from './authorization.js'
-import { requireRecordingAccess } from './authorization.js'
+import { requireDashboardWriteAccess } from './authorization.js'
 
 export type CreateTrajectoryError =
   | AuthorizationError
@@ -126,19 +126,7 @@ export const createTrajectory = async (
     throwOrganizationInvariantError(`recording ${recording.id} does not have organization_id`)
   }
 
-  const recordingAuthorization = await findRecordingAuthorizationById(recording.id)
-
-  if (!recordingAuthorization) {
-    return {
-      ok: false,
-      error: {
-        type: 'RECORDING_NOT_FOUND',
-        recordingId: recording.id,
-      },
-    }
-  }
-
-  const authorization = requireRecordingAccess(actor, recordingAuthorization)
+  const authorization = requireDashboardWriteAccess(actor, recording.organization_id)
 
   if (!authorization.ok) {
     return authorization
