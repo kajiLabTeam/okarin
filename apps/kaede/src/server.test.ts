@@ -17,6 +17,61 @@ const envNames = [
 
 const originalEnv = new Map<string, string | undefined>()
 
+interface OpenApiOperation {
+  responses?: Record<string, unknown>
+}
+
+interface OpenApiDocument {
+  openapi: string
+  info: {
+    title: string
+    version: string
+  }
+  paths: Record<string, Record<string, OpenApiOperation> | undefined>
+}
+
+const createTestApp = async () => {
+  const { createApp } = await import('./server.js')
+  return createApp()
+}
+
+const getSpecification = async (): Promise<{
+  response: Response
+  document: OpenApiDocument
+}> => {
+  const app = await createTestApp()
+  const response = await app.request('/specification')
+
+  return {
+    response,
+    document: (await response.json()) as OpenApiDocument,
+  }
+}
+
+const expectPathMethod = (document: OpenApiDocument, path: string, method: string) => {
+  expect(document.paths[path]?.[method]).toBeDefined()
+}
+
+const expectJsonErrorResponse = (
+  document: OpenApiDocument,
+  path: string,
+  method: string,
+  status: string
+) => {
+  const operation = document.paths[path]?.[method]
+  const response = operation?.responses?.[status] as
+    | {
+        content?: {
+          'application/json'?: {
+            schema?: unknown
+          }
+        }
+      }
+    | undefined
+
+  expect(response?.content?.['application/json']?.schema).toBeDefined()
+}
+
 describe('createApp auth wiring', { timeout: 10_000 }, () => {
   beforeEach(() => {
     for (const name of envNames) {
@@ -52,8 +107,7 @@ describe('createApp auth wiring', { timeout: 10_000 }, () => {
   })
 
   it('/api/* は shared token も session cookie もなしなら 401 を返す', async () => {
-    const { createApp } = await import('./server.js')
-    const app = createApp()
+    const app = await createTestApp()
 
     const response = await app.request('/api/nozomi/ping')
 
@@ -65,8 +119,7 @@ describe('createApp auth wiring', { timeout: 10_000 }, () => {
   })
 
   it('/api/auth/* は shared token なしでも auth route まで到達する', async () => {
-    const { createApp } = await import('./server.js')
-    const app = createApp()
+    const app = await createTestApp()
 
     const response = await app.request('/api/auth/me')
 
@@ -78,8 +131,7 @@ describe('createApp auth wiring', { timeout: 10_000 }, () => {
   })
 
   it('health check は shared token なしで通す', async () => {
-    const { createApp } = await import('./server.js')
-    const app = createApp()
+    const app = await createTestApp()
 
     const response = await app.request('/')
 
@@ -87,8 +139,7 @@ describe('createApp auth wiring', { timeout: 10_000 }, () => {
   })
 
   it('/api/trajectories/callback は shared token なしでも callback route まで到達する', async () => {
-    const { createApp } = await import('./server.js')
-    const app = createApp()
+    const app = await createTestApp()
 
     const response = await app.request('/api/trajectories/callback', {
       method: 'POST',
@@ -106,5 +157,71 @@ describe('createApp auth wiring', { timeout: 10_000 }, () => {
     await expect(response.json()).resolves.toMatchObject({
       error_code: 'CALLBACK_PAYLOAD_INVALID',
     })
+  })
+
+  it('/specification は shared token なしで OpenAPI document を返す', async () => {
+    const { response, document } = await getSpecification()
+
+    expect(response.status).toBe(200)
+    expect(document.openapi).toBe('3.0.0')
+    expect(document.info).toEqual({
+      title: 'kaede API',
+      version: '0.1.0',
+    })
+  })
+
+  it('/specification に auth / organization / mobile app paths を含める', async () => {
+    const { document } = await getSpecification()
+
+    const expectedPaths = [
+      ['/api/auth/login', 'post'],
+      ['/api/auth/logout', 'post'],
+      ['/api/auth/me', 'get'],
+      ['/api/auth/change-password', 'post'],
+      ['/api/organizations', 'get'],
+      ['/api/organizations', 'post'],
+      ['/api/organizations/{organizationId}/users', 'get'],
+      ['/api/organizations/{organizationId}/users', 'post'],
+      ['/api/organizations/{organizationId}/memberships', 'post'],
+      ['/api/pedestrians/me', 'get'],
+    ] as const
+
+    for (const [path, method] of expectedPaths) {
+      expectPathMethod(document, path, method)
+    }
+  })
+
+  it('/specification に主要 route の auth / authorization error response を含める', async () => {
+    const { document } = await getSpecification()
+
+    const expectedErrorResponses = [
+      ['/api/auth/login', 'post', '401'],
+      ['/api/auth/login', 'post', '403'],
+      ['/api/auth/me', 'get', '401'],
+      ['/api/auth/me', 'get', '403'],
+      ['/api/auth/change-password', 'post', '401'],
+      ['/api/auth/change-password', 'post', '403'],
+      ['/api/organizations', 'get', '401'],
+      ['/api/organizations', 'get', '403'],
+      ['/api/organizations', 'post', '401'],
+      ['/api/organizations', 'post', '403'],
+      ['/api/organizations/{organizationId}/users', 'get', '401'],
+      ['/api/organizations/{organizationId}/users', 'get', '403'],
+      ['/api/organizations/{organizationId}/users', 'post', '401'],
+      ['/api/organizations/{organizationId}/users', 'post', '403'],
+      ['/api/organizations/{organizationId}/memberships', 'post', '401'],
+      ['/api/organizations/{organizationId}/memberships', 'post', '403'],
+      ['/api/pedestrians/me', 'get', '403'],
+      ['/api/pedestrians', 'get', '403'],
+      ['/api/pedestrians', 'post', '403'],
+      ['/api/recordings/init', 'post', '403'],
+      ['/api/recordings/{recordingId}/complete-upload', 'post', '403'],
+      ['/api/recordings/{recordingId}/refresh-upload-urls', 'post', '403'],
+      ['/api/recordings/{recordingId}/trajectories', 'post', '403'],
+    ] as const
+
+    for (const [path, method, status] of expectedErrorResponses) {
+      expectJsonErrorResponse(document, path, method, status)
+    }
   })
 })
