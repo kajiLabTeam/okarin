@@ -8,7 +8,7 @@ import {
   refreshUploadUrlsRequestSchema,
   refreshUploadUrlsResponseSchema,
 } from '../../schemas/recordings.js'
-import { refreshUploadUrls } from '../../usecases/refresh-upload-urls.js'
+import { refreshUploadUrls } from '../../usecases/recordings/refresh-upload-urls.js'
 import { toAuthorizationErrorResponse } from '../authorization-error.js'
 
 export const registerRefreshUploadUrlsRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {

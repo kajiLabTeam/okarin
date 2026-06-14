@@ -7,7 +7,7 @@ import {
   initRecordingRequestSchema,
   initRecordingResponseSchema,
 } from '../../schemas/recordings.js'
-import { initRecording } from '../../usecases/init-recording.js'
+import { initRecording } from '../../usecases/recordings/init-recording.js'
 import { toAuthorizationErrorResponse } from '../authorization-error.js'
 
 export const registerInitRecordingRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {

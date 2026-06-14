@@ -11,7 +11,7 @@ const { refreshUploadUrlsMock } = vi.hoisted(() => ({
   refreshUploadUrlsMock: vi.fn(),
 }))
 
-vi.mock('../../usecases/refresh-upload-urls.js', () => ({
+vi.mock('../../usecases/recordings/refresh-upload-urls.js', () => ({
   refreshUploadUrls: refreshUploadUrlsMock,
 }))
 

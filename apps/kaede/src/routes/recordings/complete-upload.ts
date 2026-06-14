@@ -4,7 +4,7 @@ import { requireRequestActor } from '../../middleware/request-actor-context.js'
 import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
 import { errorResponseSchema } from '../../schemas/common.js'
 import { completeUploadResponseSchema, recordingIdParamsSchema } from '../../schemas/recordings.js'
-import { completeUpload } from '../../usecases/complete-upload.js'
+import { completeUpload } from '../../usecases/recordings/complete-upload.js'
 import { toAuthorizationErrorResponse } from '../authorization-error.js'
 
 export const registerCompleteUploadRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {

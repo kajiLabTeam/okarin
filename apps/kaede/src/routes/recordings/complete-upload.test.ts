@@ -11,7 +11,7 @@ const { completeUploadMock } = vi.hoisted(() => ({
   completeUploadMock: vi.fn(),
 }))
 
-vi.mock('../../usecases/complete-upload.js', () => ({
+vi.mock('../../usecases/recordings/complete-upload.js', () => ({
   completeUpload: completeUploadMock,
 }))
 

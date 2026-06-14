@@ -1,18 +1,18 @@
-import type { RequestActor } from '../middleware/request-actor-context.js'
-import { uploadTargetSchema, recordingUploadStatusSchema } from '../schemas/common.js'
-import type { UploadTarget } from '../schemas/common.js'
-import type { RecordingIdParams } from '../schemas/recordings.js'
+import type { RequestActor } from '../../middleware/request-actor-context.js'
+import { uploadTargetSchema, recordingUploadStatusSchema } from '../../schemas/common.js'
+import type { UploadTarget } from '../../schemas/common.js'
+import type { RecordingIdParams } from '../../schemas/recordings.js'
 import {
   findRecordingAuthorizationById,
   findRecordingById,
   markRecordingUploadReady,
-} from '../services/recordings/index.js'
+} from '../../services/recordings/index.js'
 import {
   buildRecordingRawObjectKey,
   listRecordingRawObjectKeys,
-} from '../services/storage/index.js'
-import type { AuthorizationError } from './authorization.js'
-import { requireRecordingAccess } from './authorization.js'
+} from '../../services/storage/index.js'
+import type { AuthorizationError } from '../authorization.js'
+import { requireRecordingAccess } from '../authorization.js'
 
 export type CompleteUploadError =
   | AuthorizationError
