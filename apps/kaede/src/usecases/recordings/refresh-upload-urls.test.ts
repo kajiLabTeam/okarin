@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { RequestActor } from '../middleware/request-actor-context.js'
+import type { RequestActor } from '../../middleware/request-actor-context.js'
 
 const { findRecordingAuthorizationByIdMock, findRecordingByIdMock, issueRecordingUploadUrlsMock } =
   vi.hoisted(() => ({
@@ -8,12 +8,12 @@ const { findRecordingAuthorizationByIdMock, findRecordingByIdMock, issueRecordin
     issueRecordingUploadUrlsMock: vi.fn(),
   }))
 
-vi.mock('../services/recordings/index.js', () => ({
+vi.mock('../../services/recordings/index.js', () => ({
   findRecordingAuthorizationById: findRecordingAuthorizationByIdMock,
   findRecordingById: findRecordingByIdMock,
 }))
 
-vi.mock('../services/storage/index.js', () => ({
+vi.mock('../../services/storage/index.js', () => ({
   issueRecordingUploadUrls: issueRecordingUploadUrlsMock,
 }))
 

@@ -8,8 +8,8 @@ import {
   createTrajectoryRequestSchema,
   createTrajectoryResponseSchema,
 } from '../../schemas/trajectories.js'
-import { createTrajectory } from '../../usecases/create-trajectory.js'
-import { toAuthorizationErrorResponse } from '../authorization-error.js'
+import { createTrajectory } from '../../usecases/trajectories/create-trajectory.js'
+import { toCreateTrajectoryErrorResponse } from './error.js'
 
 export const registerCreateTrajectoryRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
   const route = createRoute({
@@ -95,110 +95,8 @@ export const registerCreateTrajectoryRoute = (app: OpenAPIHono<RequestActorHonoE
     const result = await createTrajectory(actor, params, body)
 
     if (!result.ok) {
-      switch (result.error.type) {
-        case 'AUTH_DASHBOARD_FORBIDDEN':
-        case 'AUTH_ORGANIZATION_FORBIDDEN': {
-          const error = toAuthorizationErrorResponse(result.error)
-          return c.json(error.body, error.status)
-        }
-
-        case 'RECORDING_NOT_FOUND':
-          return c.json(
-            {
-              error_code: result.error.type,
-              error_message: 'recording not found',
-              details: {
-                recording_id: result.error.recordingId,
-              },
-            },
-            404
-          )
-
-        case 'RECORDING_NOT_READY':
-          return c.json(
-            {
-              error_code: result.error.type,
-              error_message: 'recording is not ready for trajectory creation',
-              details: {
-                recording_id: result.error.recordingId,
-                upload_status: result.error.uploadStatus,
-              },
-            },
-            409
-          )
-
-        case 'RECORDING_UPLOAD_TARGETS_INVALID':
-          return c.json(
-            {
-              error_code: result.error.type,
-              error_message: 'recording upload_targets contains invalid values',
-              details: {
-                recording_id: result.error.recordingId,
-                invalid_targets: result.error.invalidTargets,
-              },
-            },
-            500
-          )
-
-        case 'FLOOR_NOT_FOUND':
-          return c.json(
-            {
-              error_code: result.error.type,
-              error_message: 'recording floor not found',
-              details: {
-                recording_id: result.error.recordingId,
-                floor_id: result.error.floorId,
-              },
-            },
-            404
-          )
-
-        case 'RESOURCE_ORGANIZATION_MISMATCH':
-          return c.json(
-            {
-              error_code: result.error.type,
-              error_message: 'recording and floor belong to different organizations',
-              details: {
-                recording_id: result.error.recordingId,
-                recording_organization_id: result.error.recordingOrganizationId,
-                floor_id: result.error.floorId,
-                floor_organization_id: result.error.floorOrganizationId,
-              },
-            },
-            409
-          )
-
-        case 'TRAJECTORY_ANALYZE_PREPARATION_FAILED':
-          return c.json(
-            {
-              error_code: result.error.type,
-              error_message: 'failed to prepare analyze request',
-              details: {
-                recording_id: result.error.recordingId,
-                trajectory_id: result.error.trajectoryId,
-              },
-            },
-            500
-          )
-
-        case 'NOZOMI_REQUEST_FAILED':
-          return c.json(
-            {
-              error_code: result.error.type,
-              error_message: 'failed to submit analyze request to nozomi',
-              details: {
-                recording_id: result.error.recordingId,
-                trajectory_id: result.error.trajectoryId,
-              },
-            },
-            502
-          )
-
-        default: {
-          const exhaustiveCheck: never = result.error
-          throw new Error(`unhandled create-trajectory error: ${JSON.stringify(exhaustiveCheck)}`)
-        }
-      }
+      const error = toCreateTrajectoryErrorResponse(result.error)
+      return c.json(error.body, error.status)
     }
 
     return c.json(result.value, 201)

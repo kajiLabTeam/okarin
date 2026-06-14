@@ -3,7 +3,7 @@ import { createRoute } from '@hono/zod-openapi'
 import { requireRequestActor } from '../../middleware/request-actor-context.js'
 import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
 import { floorsListResponseSchema } from '../../schemas/floors.js'
-import { listFloors } from '../../usecases/list-floors.js'
+import { listFloors } from '../../usecases/floors/list-floors.js'
 
 export const registerListFloorsRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
   const route: RouteConfig = createRoute({

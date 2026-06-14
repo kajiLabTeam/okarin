@@ -1,7 +1,7 @@
-import { authUserSchema, loginRequestSchema } from '../schemas/auth.js'
-import { hashPassword } from '../services/auth/password.js'
-import type { DbExecutor } from '../services/executor.js'
-import { findUserByEmail, insertUser, updateUser } from '../services/users/index.js'
+import { authUserSchema, loginRequestSchema } from '../../schemas/auth.js'
+import { hashPassword } from '../../services/auth/password.js'
+import type { DbExecutor } from '../../services/executor.js'
+import { findUserByEmail, insertUser, updateUser } from '../../services/users/index.js'
 
 export type CreateAdminUserError =
   | { type: 'ADMIN_USER_ALREADY_EXISTS' }

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { RequestActor } from '../middleware/request-actor-context.js'
+import type { RequestActor } from '../../middleware/request-actor-context.js'
 
 const {
   findRecordingAuthorizationByIdMock,
@@ -13,13 +13,13 @@ const {
   markRecordingUploadReadyMock: vi.fn(),
 }))
 
-vi.mock('../services/recordings/index.js', () => ({
+vi.mock('../../services/recordings/index.js', () => ({
   findRecordingAuthorizationById: findRecordingAuthorizationByIdMock,
   findRecordingById: findRecordingByIdMock,
   markRecordingUploadReady: markRecordingUploadReadyMock,
 }))
 
-vi.mock('../services/storage/index.js', () => ({
+vi.mock('../../services/storage/index.js', () => ({
   buildRecordingRawObjectKey: (recordingId: string, target: string) => {
     if (target === 'metadata') {
       return `recordings/${recordingId}/raw/metadata.json`

@@ -9,7 +9,7 @@ const { changePasswordMock, getMeMock, loginMock, logoutMock } = vi.hoisted(() =
   logoutMock: vi.fn(),
 }))
 
-vi.mock('../../usecases/auth.js', () => ({
+vi.mock('../../usecases/auth/index.js', () => ({
   authErrorStatus: (error: { type: string }) => {
     switch (error.type) {
       case 'AUTH_TEMPORARY_PASSWORD_EXPIRED':

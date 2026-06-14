@@ -1,9 +1,9 @@
-import type { RequestActor } from '../middleware/request-actor-context.js'
-import type { CreatePedestrianRequest, PedestrianResponse } from '../schemas/pedestrians.js'
-import { findOrganizationById } from '../services/organizations/index.js'
-import { insertPedestrian } from '../services/pedestrians/index.js'
-import type { AuthorizationError } from './authorization.js'
-import { requireDashboardWriteAccess } from './authorization.js'
+import type { RequestActor } from '../../middleware/request-actor-context.js'
+import type { CreatePedestrianRequest, PedestrianResponse } from '../../schemas/pedestrians.js'
+import { findOrganizationById } from '../../services/organizations/index.js'
+import { insertPedestrian } from '../../services/pedestrians/index.js'
+import type { AuthorizationError } from '../authorization.js'
+import { requireDashboardWriteAccess } from '../authorization.js'
 import { toPedestrianResponse } from './pedestrian-response.js'
 
 export const createPedestrian = async (

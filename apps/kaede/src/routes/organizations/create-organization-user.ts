@@ -6,7 +6,7 @@ import {
   organizationIdParamsSchema,
   organizationUserSchema,
 } from '../../schemas/organizations.js'
-import { createOrganizationUserForSession } from '../../usecases/organizations.js'
+import { createOrganizationUserForSession } from '../../usecases/organizations/index.js'
 import { getSessionTokenFromCookie } from '../auth/cookie.js'
 import { toOrganizationErrorResponse } from './error.js'
 

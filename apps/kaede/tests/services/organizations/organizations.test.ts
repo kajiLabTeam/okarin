@@ -8,7 +8,7 @@ import {
   createOrganizationForSession,
   listOrganizationUsersForSession,
   listOrganizationsForSession,
-} from '../../../src/usecases/organizations.js'
+} from '../../../src/usecases/organizations/index.js'
 import { resetDatabase } from '../../db/helpers.js'
 
 const db = createDb()

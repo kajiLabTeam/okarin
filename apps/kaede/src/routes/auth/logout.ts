@@ -1,7 +1,7 @@
 import { createRoute } from '@hono/zod-openapi'
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { authOkResponseSchema } from '../../schemas/auth.js'
-import { logout } from '../../usecases/auth.js'
+import { logout } from '../../usecases/auth/index.js'
 import { clearSessionCookie, getSessionTokenFromCookie } from './cookie.js'
 
 export const registerLogoutRoute = (app: OpenAPIHono) => {

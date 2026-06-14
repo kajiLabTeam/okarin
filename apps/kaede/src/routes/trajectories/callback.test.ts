@@ -6,7 +6,7 @@ const { receiveCallbackMock } = vi.hoisted(() => ({
   receiveCallbackMock: vi.fn(),
 }))
 
-vi.mock('../../usecases/receive-callback.js', () => ({
+vi.mock('../../usecases/trajectories/receive-callback.js', () => ({
   receiveCallback: receiveCallbackMock,
 }))
 

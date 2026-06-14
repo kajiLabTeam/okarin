@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { RequestActor } from '../middleware/request-actor-context.js'
+import type { RequestActor } from '../../middleware/request-actor-context.js'
 
 const {
   findFloorByIdMock,
@@ -13,19 +13,19 @@ const {
   issueRecordingUploadUrlsMock: vi.fn(),
 }))
 
-vi.mock('../services/floors/index.js', () => ({
+vi.mock('../../services/floors/index.js', () => ({
   findFloorById: findFloorByIdMock,
 }))
 
-vi.mock('../services/pedestrians/index.js', () => ({
+vi.mock('../../services/pedestrians/index.js', () => ({
   findPedestrianById: findPedestrianByIdMock,
 }))
 
-vi.mock('../services/recordings/index.js', () => ({
+vi.mock('../../services/recordings/index.js', () => ({
   insertRecording: insertRecordingMock,
 }))
 
-vi.mock('../services/storage/index.js', () => ({
+vi.mock('../../services/storage/index.js', () => ({
   issueRecordingUploadUrls: issueRecordingUploadUrlsMock,
 }))
 

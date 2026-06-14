@@ -4,8 +4,8 @@ import { requireRequestActor } from '../../middleware/request-actor-context.js'
 import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
 import { buildingSchema, createBuildingRequestSchema } from '../../schemas/buildings.js'
 import { errorResponseSchema } from '../../schemas/common.js'
-import { createBuilding } from '../../usecases/create-building.js'
-import type { CreateBuildingResult } from '../../usecases/create-building.js'
+import { createBuilding } from '../../usecases/buildings/create-building.js'
+import type { CreateBuildingResult } from '../../usecases/buildings/create-building.js'
 import { toAuthorizationErrorResponse } from '../authorization-error.js'
 
 type CreateBuildingError = Extract<CreateBuildingResult, { ok: false }>['error']

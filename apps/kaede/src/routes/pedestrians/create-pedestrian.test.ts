@@ -11,7 +11,7 @@ const { createPedestrianMock } = vi.hoisted(() => ({
   createPedestrianMock: vi.fn(),
 }))
 
-vi.mock('../../usecases/create-pedestrian.js', () => ({
+vi.mock('../../usecases/pedestrians/create-pedestrian.js', () => ({
   createPedestrian: createPedestrianMock,
 }))
 

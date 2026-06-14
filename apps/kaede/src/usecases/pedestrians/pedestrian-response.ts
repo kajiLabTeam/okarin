@@ -1,5 +1,5 @@
-import type { PedestrianResponse } from '../schemas/pedestrians.js'
-import type { Pedestrian } from '../services/pedestrians/index.js'
+import type { PedestrianResponse } from '../../schemas/pedestrians.js'
+import type { Pedestrian } from '../../services/pedestrians/index.js'
 
 type PedestrianAttributes = PedestrianResponse['attributes']
 

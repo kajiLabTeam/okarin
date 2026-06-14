@@ -8,8 +8,8 @@ import {
   refreshUploadUrlsRequestSchema,
   refreshUploadUrlsResponseSchema,
 } from '../../schemas/recordings.js'
-import { refreshUploadUrls } from '../../usecases/refresh-upload-urls.js'
-import { toAuthorizationErrorResponse } from '../authorization-error.js'
+import { refreshUploadUrls } from '../../usecases/recordings/refresh-upload-urls.js'
+import { toRefreshUploadUrlsErrorResponse } from './error.js'
 
 export const registerRefreshUploadUrlsRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
   const route = createRoute({
@@ -71,56 +71,8 @@ export const registerRefreshUploadUrlsRoute = (app: OpenAPIHono<RequestActorHono
     const result = await refreshUploadUrls(actor, params, payload)
 
     if (!result.ok) {
-      switch (result.error.type) {
-        case 'AUTH_DASHBOARD_FORBIDDEN':
-        case 'AUTH_ORGANIZATION_FORBIDDEN': {
-          const error = toAuthorizationErrorResponse(result.error)
-          return c.json(error.body, error.status)
-        }
-
-        case 'RECORDING_NOT_FOUND':
-          return c.json(
-            {
-              error_code: result.error.type,
-              error_message: 'recording not found',
-              details: {
-                recording_id: result.error.recordingId,
-              },
-            },
-            404
-          )
-
-        case 'RECORDING_UPLOAD_URL_REFRESH_FORBIDDEN':
-          return c.json(
-            {
-              error_code: result.error.type,
-              error_message: 'upload url refresh is not allowed in the current upload state',
-              details: {
-                recording_id: result.error.recordingId,
-                upload_status: result.error.uploadStatus,
-              },
-            },
-            409
-          )
-
-        case 'RECORDING_UPLOAD_TARGETS_INVALID':
-          return c.json(
-            {
-              error_code: result.error.type,
-              error_message: 'requested targets are not allowed for this recording',
-              details: {
-                recording_id: result.error.recordingId,
-                invalid_targets: result.error.invalidTargets,
-              },
-            },
-            409
-          )
-
-        default: {
-          const exhaustiveCheck: never = result.error
-          throw new Error(`unhandled refresh-upload-urls error: ${JSON.stringify(exhaustiveCheck)}`)
-        }
-      }
+      const error = toRefreshUploadUrlsErrorResponse(result.error)
+      return c.json(error.body, error.status)
     }
 
     return c.json(result.value, 200)

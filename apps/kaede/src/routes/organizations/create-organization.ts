@@ -2,7 +2,7 @@ import { createRoute } from '@hono/zod-openapi'
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { errorResponseSchema } from '../../schemas/common.js'
 import { createOrganizationRequestSchema, organizationSchema } from '../../schemas/organizations.js'
-import { createOrganizationForSession } from '../../usecases/organizations.js'
+import { createOrganizationForSession } from '../../usecases/organizations/index.js'
 import { getSessionTokenFromCookie } from '../auth/cookie.js'
 import { toOrganizationErrorResponse } from './error.js'
 

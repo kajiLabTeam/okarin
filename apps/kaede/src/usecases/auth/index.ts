@@ -1,19 +1,19 @@
-import type { AuthUserResponse, ChangePasswordRequest, LoginRequest } from '../schemas/auth.js'
+import type { AuthUserResponse, ChangePasswordRequest, LoginRequest } from '../../schemas/auth.js'
 import {
   createSession,
   findValidSessionByToken,
   revokeAllSessionsByUserId,
   revokeSessionByToken,
-} from '../services/auth/index.js'
-import { hashPassword, verifyPassword } from '../services/auth/password.js'
-import type { DbExecutor } from '../services/executor.js'
+} from '../../services/auth/index.js'
+import { hashPassword, verifyPassword } from '../../services/auth/password.js'
+import type { DbExecutor } from '../../services/executor.js'
 import {
   findUserByEmail,
   findUserById,
   listUserOrganizationMemberships,
   updateUser,
-} from '../services/users/index.js'
-import type { User } from '../services/users/index.js'
+} from '../../services/users/index.js'
+import type { User } from '../../services/users/index.js'
 
 type AuthError =
   | { type: 'AUTH_UNAUTHENTICATED' }

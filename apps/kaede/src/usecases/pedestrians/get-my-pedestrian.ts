@@ -1,7 +1,7 @@
-import type { RequestActor } from '../middleware/request-actor-context.js'
-import type { PedestrianResponse } from '../schemas/pedestrians.js'
-import { findPedestrianByUserId } from '../services/pedestrians/index.js'
-import type { AuthorizationError } from './authorization.js'
+import type { RequestActor } from '../../middleware/request-actor-context.js'
+import type { PedestrianResponse } from '../../schemas/pedestrians.js'
+import { findPedestrianByUserId } from '../../services/pedestrians/index.js'
+import type { AuthorizationError } from '../authorization.js'
 import { toPedestrianResponse } from './pedestrian-response.js'
 
 export type GetMyPedestrianResult =

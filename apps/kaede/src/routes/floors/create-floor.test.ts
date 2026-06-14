@@ -11,7 +11,7 @@ const { createFloorMock } = vi.hoisted(() => ({
   createFloorMock: vi.fn(),
 }))
 
-vi.mock('../../usecases/create-floor.js', () => ({
+vi.mock('../../usecases/floors/create-floor.js', () => ({
   createFloor: createFloorMock,
 }))
 

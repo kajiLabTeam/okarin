@@ -11,7 +11,7 @@ const { initRecordingMock } = vi.hoisted(() => ({
   initRecordingMock: vi.fn(),
 }))
 
-vi.mock('../../usecases/init-recording.js', () => ({
+vi.mock('../../usecases/recordings/init-recording.js', () => ({
   initRecording: initRecordingMock,
 }))
 

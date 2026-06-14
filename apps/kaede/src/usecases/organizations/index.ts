@@ -4,17 +4,17 @@ import type {
   CreateOrganizationUserRequest,
   OrganizationResponse,
   OrganizationUserResponse,
-} from '../schemas/organizations.js'
-import { hashPassword } from '../services/auth/password.js'
-import { db } from '../services/db/index.js'
-import type { DbExecutor } from '../services/executor.js'
+} from '../../schemas/organizations.js'
+import { hashPassword } from '../../services/auth/password.js'
+import { db } from '../../services/db/index.js'
+import type { DbExecutor } from '../../services/executor.js'
 import {
   findOrganizationById,
   insertOrganization,
   listOrganizations,
-} from '../services/organizations/index.js'
-import type { Organization } from '../services/organizations/index.js'
-import { insertPedestrian } from '../services/pedestrians/index.js'
+} from '../../services/organizations/index.js'
+import type { Organization } from '../../services/organizations/index.js'
+import { insertPedestrian } from '../../services/pedestrians/index.js'
 import {
   findOrganizationMembership,
   findOrganizationUserById,
@@ -24,9 +24,9 @@ import {
   insertUser,
   listOrganizationUsers,
   upsertOrganizationMembership,
-} from '../services/users/index.js'
-import type { OrganizationUserRow } from '../services/users/index.js'
-import { requireActiveSessionUser } from './auth.js'
+} from '../../services/users/index.js'
+import type { OrganizationUserRow } from '../../services/users/index.js'
+import { requireActiveSessionUser } from '../auth/index.js'
 
 export type OrganizationError =
   | { type: 'AUTH_UNAUTHENTICATED' }

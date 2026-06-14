@@ -4,8 +4,8 @@ import { requireRequestActor } from '../../middleware/request-actor-context.js'
 import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
 import { errorResponseSchema } from '../../schemas/common.js'
 import { createFloorRequestSchema, floorSchema } from '../../schemas/floors.js'
-import { createFloor } from '../../usecases/create-floor.js'
-import type { CreateFloorResult } from '../../usecases/create-floor.js'
+import { createFloor } from '../../usecases/floors/create-floor.js'
+import type { CreateFloorResult } from '../../usecases/floors/create-floor.js'
 import { toAuthorizationErrorResponse } from '../authorization-error.js'
 
 type CreateFloorError = Extract<CreateFloorResult, { ok: false }>['error']
