@@ -11,7 +11,7 @@ const { createBuildingMock } = vi.hoisted(() => ({
   createBuildingMock: vi.fn(),
 }))
 
-vi.mock('../../usecases/create-building.js', () => ({
+vi.mock('../../usecases/buildings/create-building.js', () => ({
   createBuilding: createBuildingMock,
 }))
 
