@@ -2,13 +2,14 @@ import { z } from '@hono/zod-openapi'
 
 import { isoDatetimeSchema, uuidSchema } from './common.js'
 
-const jsonPrimitiveSchema = z.union([z.string(), z.number(), z.boolean(), z.null()])
-type JsonPrimitive = z.infer<typeof jsonPrimitiveSchema>
-type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue | undefined }
-const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
-  z.union([jsonPrimitiveSchema, z.array(jsonValueSchema), z.record(jsonValueSchema)])
-)
-const jsonObjectSchema = z.record(jsonValueSchema)
+type JsonPrimitive = string | number | boolean | null
+type JsonValue = JsonPrimitive | JsonValue[] | JsonObject
+interface JsonObject extends Record<string, JsonValue | undefined> {}
+
+const jsonObjectSchema = z.record(z.string(), z.unknown()).openapi({
+  type: 'object',
+  additionalProperties: true,
+}) as z.ZodType<JsonObject>
 
 export const pedestrianSchema = z.object({
   pedestrian_id: uuidSchema.openapi({
