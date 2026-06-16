@@ -24,6 +24,18 @@ export type JsonValue = JsonArray | JsonObject | JsonPrimitive
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>
 
+export interface AuthIdentities {
+  created_at: Generated<Timestamp>
+  email: string
+  email_verified: Generated<boolean>
+  hosted_domain: string | null
+  id: Generated<string>
+  provider: string
+  provider_subject: string
+  updated_at: Generated<Timestamp>
+  user_id: string
+}
+
 export interface Buildings {
   created_at: Generated<Timestamp>
   id: Generated<string>
@@ -54,10 +66,49 @@ export interface OrganizationMemberships {
   user_id: string
 }
 
+export interface OrganizationCreationRequests {
+  created_at: Generated<Timestamp>
+  created_organization_id: string | null
+  id: Generated<string>
+  rejected_reason: string | null
+  requested_organization_name: string
+  requested_slug: string | null
+  requester_user_id: string
+  reviewed_at: Timestamp | null
+  reviewed_by_user_id: string | null
+  status: Generated<string>
+  updated_at: Generated<Timestamp>
+}
+
+export interface OrganizationInviteRedemptions {
+  created_at: Generated<Timestamp>
+  email: string
+  id: Generated<string>
+  invite_id: string
+  provider_subject: string
+  user_id: string
+}
+
+export interface OrganizationInvites {
+  created_at: Generated<Timestamp>
+  created_by_user_id: string
+  email: string
+  expires_at: Timestamp
+  id: Generated<string>
+  max_uses: Generated<number>
+  organization_id: string
+  revoked_at: Timestamp | null
+  role: Generated<string>
+  token_hash: string
+  updated_at: Generated<Timestamp>
+  used_count: Generated<number>
+}
+
 export interface Organizations {
   created_at: Generated<Timestamp>
   id: Generated<string>
   name: string
+  slug: Generated<string>
   updated_at: Generated<Timestamp>
 }
 
@@ -138,8 +189,12 @@ export interface Users {
 }
 
 export interface DB {
+  auth_identities: AuthIdentities
   buildings: Buildings
   floors: Floors
+  organization_creation_requests: OrganizationCreationRequests
+  organization_invite_redemptions: OrganizationInviteRedemptions
+  organization_invites: OrganizationInvites
   organization_memberships: OrganizationMemberships
   organizations: Organizations
   pedestrians: Pedestrians
