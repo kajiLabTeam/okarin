@@ -84,7 +84,7 @@ const toOrganizationUserResponse = (row: OrganizationUserRow): OrganizationUserR
   email: row.email,
   display_name: row.display_name,
   is_active: row.is_active,
-  role: row.role as 'member' | 'manager',
+  role: row.role as 'member' | 'manager' | 'owner',
   password_must_change: row.password_must_change,
   password_changed_at: row.password_changed_at?.toISOString() ?? null,
   temporary_password_expires_at: row.temporary_password_expires_at?.toISOString() ?? null,
@@ -157,7 +157,7 @@ const requireOrganizationManagerOrAdmin = async (
   OrganizationResult<{
     userId: string
     globalRole: 'none' | 'admin'
-    membershipRole: 'manager' | null
+    membershipRole: 'manager' | 'owner' | null
   }>
 > => {
   const actor = await requireActiveSessionUser(sessionToken, executor)
@@ -191,7 +191,7 @@ const requireOrganizationManagerOrAdmin = async (
 
   const membership = await findOrganizationMembership(organizationId, actor.value.id, executor)
 
-  if (membership?.role !== 'manager') {
+  if (membership?.role !== 'manager' && membership?.role !== 'owner') {
     return {
       ok: false,
       error: { type: 'AUTH_FORBIDDEN' },
@@ -203,7 +203,7 @@ const requireOrganizationManagerOrAdmin = async (
     value: {
       userId: actor.value.id,
       globalRole: 'none',
-      membershipRole: 'manager',
+      membershipRole: membership.role,
     },
   }
 }

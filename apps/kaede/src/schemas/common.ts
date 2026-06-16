@@ -90,6 +90,10 @@ export const errorResponseSchema = z.object({
   }),
 })
 
+export const membershipRoleSchema = z.enum(['member', 'manager', 'owner'])
+
+export const accountStateSchema = z.enum(['active', 'pending_membership', 'suspended'])
+
 export const authErrorCodes = [
   'AUTH_UNAUTHENTICATED',
   'AUTH_INVALID_CREDENTIALS',
@@ -172,3 +176,5 @@ export type RecordingUploadStatus = z.infer<typeof recordingUploadStatusSchema>
 export type TrajectoryStatus = z.infer<typeof trajectoryStatusSchema>
 export type UploadTarget = z.infer<typeof uploadTargetSchema>
 export type AuthErrorCode = z.infer<typeof authErrorCodeSchema>
+export type AccountState = z.infer<typeof accountStateSchema>
+export type MembershipRole = z.infer<typeof membershipRoleSchema>
