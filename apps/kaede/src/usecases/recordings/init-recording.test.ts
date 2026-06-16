@@ -99,7 +99,7 @@ describe('initRecording', () => {
       organization_id: organizationId,
       upload_targets: ['acce', 'gyro', 'metadata'],
     })
-    expect(issueRecordingUploadUrlsMock).toHaveBeenCalledWith(recordingId, [
+    expect(issueRecordingUploadUrlsMock).toHaveBeenCalledWith(organizationId, recordingId, [
       'acce',
       'gyro',
       'metadata',

@@ -17,9 +17,10 @@ describe('presigned upload integration', () => {
   })
 
   it('発行した presigned URL に PUT した CSV を取得できる', async () => {
+    const organizationId = '99999999-9999-4999-8999-999999999999'
     const recordingId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
     const csv = 'timestamp,x,y\n0,1,2\n'
-    const { uploadUrls } = await issueRecordingUploadUrls(recordingId, ['acce'])
+    const { uploadUrls } = await issueRecordingUploadUrls(organizationId, recordingId, ['acce'])
     const uploadUrl = uploadUrls.acce
 
     expect(uploadUrl).toBeDefined()
@@ -36,13 +37,16 @@ describe('presigned upload integration', () => {
     })
 
     expect(uploadResponse.ok).toBe(true)
-    await expect(readObjectText(s3, `recordings/${recordingId}/raw/acce.csv`)).resolves.toBe(csv)
+    await expect(
+      readObjectText(s3, `organizations/${organizationId}/recordings/${recordingId}/raw/acce.csv`)
+    ).resolves.toBe(csv)
   })
 
   it('発行した presigned URL に PUT した metadata.json を取得できる', async () => {
+    const organizationId = '88888888-8888-4888-8888-888888888888'
     const recordingId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
     const metadata = '{"schema_version":1,"selected_sampling_rate":"100Hz"}\n'
-    const { uploadUrls } = await issueRecordingUploadUrls(recordingId, ['metadata'])
+    const { uploadUrls } = await issueRecordingUploadUrls(organizationId, recordingId, ['metadata'])
     const uploadUrl = uploadUrls.metadata
 
     expect(uploadUrl).toBeDefined()
@@ -59,8 +63,11 @@ describe('presigned upload integration', () => {
     })
 
     expect(uploadResponse.ok).toBe(true)
-    await expect(readObjectText(s3, `recordings/${recordingId}/raw/metadata.json`)).resolves.toBe(
-      metadata
-    )
+    await expect(
+      readObjectText(
+        s3,
+        `organizations/${organizationId}/recordings/${recordingId}/raw/metadata.json`
+      )
+    ).resolves.toBe(metadata)
   })
 })

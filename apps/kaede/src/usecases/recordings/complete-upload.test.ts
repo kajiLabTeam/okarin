@@ -20,12 +20,12 @@ vi.mock('../../services/recordings/index.js', () => ({
 }))
 
 vi.mock('../../services/storage/index.js', () => ({
-  buildRecordingRawObjectKey: (recordingId: string, target: string) => {
+  buildRecordingRawObjectKey: (organizationId: string, recordingId: string, target: string) => {
     if (target === 'metadata') {
-      return `recordings/${recordingId}/raw/metadata.json`
+      return `organizations/${organizationId}/recordings/${recordingId}/raw/metadata.json`
     }
 
-    return `recordings/${recordingId}/raw/${target}.csv`
+    return `organizations/${organizationId}/recordings/${recordingId}/raw/${target}.csv`
   },
   listRecordingRawObjectKeys: listRecordingRawObjectKeysMock,
 }))
@@ -33,11 +33,12 @@ vi.mock('../../services/storage/index.js', () => ({
 import { completeUpload } from './complete-upload.js'
 
 const serviceClientActor: RequestActor = { type: 'service_client', name: 'shared_token' }
+const organizationId = '99999999-9999-4999-8999-999999999999'
 
 const mockRecordingAuthorization = (recordingId: string) => {
   findRecordingAuthorizationByIdMock.mockResolvedValue({
     id: recordingId,
-    organization_id: '99999999-9999-4999-8999-999999999999',
+    organization_id: organizationId,
     pedestrian_id: '22222222-2222-4222-8222-222222222222',
     pedestrian_user_id: null,
   })
@@ -77,9 +78,9 @@ describe('completeUpload', () => {
     })
     mockRecordingAuthorization(recordingId)
     listRecordingRawObjectKeysMock.mockResolvedValue([
-      'recordings/11111111-1111-4111-8111-111111111111/raw/acce.csv',
-      'recordings/11111111-1111-4111-8111-111111111111/raw/gyro.csv',
-      'recordings/11111111-1111-4111-8111-111111111111/raw/metadata.json',
+      'organizations/99999999-9999-4999-8999-999999999999/recordings/11111111-1111-4111-8111-111111111111/raw/acce.csv',
+      'organizations/99999999-9999-4999-8999-999999999999/recordings/11111111-1111-4111-8111-111111111111/raw/gyro.csv',
+      'organizations/99999999-9999-4999-8999-999999999999/recordings/11111111-1111-4111-8111-111111111111/raw/metadata.json',
     ])
     markRecordingUploadReadyMock.mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',
@@ -99,6 +100,7 @@ describe('completeUpload', () => {
     })
 
     expect(listRecordingRawObjectKeysMock).toHaveBeenCalledWith(
+      '99999999-9999-4999-8999-999999999999',
       '11111111-1111-4111-8111-111111111111'
     )
     expect(markRecordingUploadReadyMock).toHaveBeenCalledWith(
@@ -116,7 +118,7 @@ describe('completeUpload', () => {
     })
     mockRecordingAuthorization(recordingId)
     listRecordingRawObjectKeysMock.mockResolvedValue([
-      'recordings/11111111-1111-4111-8111-111111111111/raw/acce.csv',
+      'organizations/99999999-9999-4999-8999-999999999999/recordings/11111111-1111-4111-8111-111111111111/raw/acce.csv',
     ])
 
     await expect(

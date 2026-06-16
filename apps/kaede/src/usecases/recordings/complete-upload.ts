@@ -115,10 +115,16 @@ export const completeUpload = async (
   const uploadTargets: UploadTarget[] = uploadTargetResults.flatMap((result) =>
     result.success ? [result.data] : []
   )
-  const uploadedKeysList: string[] = await listRecordingRawObjectKeys(recording.id)
+  const uploadedKeysList: string[] = await listRecordingRawObjectKeys(
+    recordingAuthorization.organization_id,
+    recording.id
+  )
   const uploadedKeys = new Set<string>(uploadedKeysList)
   const missingTargets = uploadTargets.filter(
-    (target) => !uploadedKeys.has(buildRecordingRawObjectKey(recording.id, target))
+    (target) =>
+      !uploadedKeys.has(
+        buildRecordingRawObjectKey(recordingAuthorization.organization_id, recording.id, target)
+      )
   )
 
   if (missingTargets.length > 0) {

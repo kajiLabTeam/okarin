@@ -5,9 +5,9 @@ import {
 } from './presigned-url.js'
 import { getS3Context } from './s3-client.js'
 
-export const listRecordingRawObjectKeys = async (recordingId: string) => {
+export const listRecordingRawObjectKeys = async (organizationId: string, recordingId: string) => {
   const { config, internalClient } = getS3Context()
-  const prefix = buildRecordingRawObjectPrefix(recordingId)
+  const prefix = buildRecordingRawObjectPrefix(organizationId, recordingId)
   const keys: string[] = []
   let continuationToken: string | undefined
 

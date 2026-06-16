@@ -22,11 +22,23 @@ afterEach(() => {
 
 describe('storage presigned url service', () => {
   it('recording raw object key を保存規約どおりに組み立てる', () => {
-    expect(buildRecordingRawObjectKey('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'gyro')).toBe(
-      'recordings/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/raw/gyro.csv'
+    expect(
+      buildRecordingRawObjectKey(
+        '99999999-9999-4999-8999-999999999999',
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'gyro'
+      )
+    ).toBe(
+      'organizations/99999999-9999-4999-8999-999999999999/recordings/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/raw/gyro.csv'
     )
-    expect(buildRecordingRawObjectKey('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'metadata')).toBe(
-      'recordings/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/raw/metadata.json'
+    expect(
+      buildRecordingRawObjectKey(
+        '99999999-9999-4999-8999-999999999999',
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'metadata'
+      )
+    ).toBe(
+      'organizations/99999999-9999-4999-8999-999999999999/recordings/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/raw/metadata.json'
     )
   })
 
@@ -43,10 +55,16 @@ describe('storage presigned url service', () => {
       trajectoryResultUploadUrlTtlSeconds: 86400,
     })
 
+    const organizationId = '99999999-9999-4999-8999-999999999999'
     const recordingId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
     const now = new Date('2026-05-13T00:00:00.000Z')
 
-    const result = await issueRecordingUploadUrls(recordingId, ['acce', 'gyro', 'metadata'], now)
+    const result = await issueRecordingUploadUrls(
+      organizationId,
+      recordingId,
+      ['acce', 'gyro', 'metadata'],
+      now
+    )
 
     expect(result.expiresAt).toBe('2026-05-13T00:15:00.000Z')
     expect(result.uploadUrls.pressure).toBeUndefined()
@@ -62,14 +80,20 @@ describe('storage presigned url service', () => {
     const metadataUrl = new URL(result.uploadUrls.metadata)
 
     expect(acceUrl.origin).toBe('http://127.0.0.1:8333')
-    expect(acceUrl.pathname).toBe(`/okarin-local/recordings/${recordingId}/raw/acce.csv`)
+    expect(acceUrl.pathname).toBe(
+      `/okarin-local/organizations/${organizationId}/recordings/${recordingId}/raw/acce.csv`
+    )
     expect(acceUrl.searchParams.get('X-Amz-Algorithm')).toBe('AWS4-HMAC-SHA256')
     expect(acceUrl.searchParams.get('X-Amz-Credential')).toContain('kaede-test')
     expect(acceUrl.searchParams.get('X-Amz-Expires')).toBe('900')
     expect(acceUrl.searchParams.get('X-Amz-SignedHeaders')).toBe('host')
     expect(acceUrl.searchParams.get('X-Amz-Signature')).toMatch(/^[0-9a-f]+$/)
 
-    expect(gyroUrl.pathname).toBe(`/okarin-local/recordings/${recordingId}/raw/gyro.csv`)
-    expect(metadataUrl.pathname).toBe(`/okarin-local/recordings/${recordingId}/raw/metadata.json`)
+    expect(gyroUrl.pathname).toBe(
+      `/okarin-local/organizations/${organizationId}/recordings/${recordingId}/raw/gyro.csv`
+    )
+    expect(metadataUrl.pathname).toBe(
+      `/okarin-local/organizations/${organizationId}/recordings/${recordingId}/raw/metadata.json`
+    )
   })
 })
