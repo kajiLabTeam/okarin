@@ -91,6 +91,7 @@ describe('auth usecase', () => {
       email: 'user@example.com',
       display_name: 'User',
       global_role: 'none',
+      account_state: 'active',
       password_must_change: true,
       password_changed_at: null,
       temporary_password_expires_at: '2026-06-11T00:00:00.000Z',
@@ -265,6 +266,7 @@ describe('auth usecase', () => {
     }
 
     expect(result.value.user.user_id).toBe(user.id)
+    expect(result.value.user.account_state).toBe('pending_membership')
     expect(result.value.user.password_must_change).toBe(false)
   })
 

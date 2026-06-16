@@ -11,6 +11,7 @@ const userActor = (userId: string): RequestActor => ({
   user_id: userId,
   email: 'user@example.com',
   global_role: 'none',
+  account_state: 'active',
   password_must_change: false,
   memberships: [],
 })

@@ -14,6 +14,7 @@ import {
   updateUser,
 } from '../../services/users/index.js'
 import type { User } from '../../services/users/index.js'
+import { deriveAccountState } from '../authorization.js'
 
 type AuthError =
   | { type: 'AUTH_UNAUTHENTICATED' }
@@ -94,13 +95,18 @@ const buildAuthUserResponse = async (
       email: user.email,
       display_name: user.display_name,
       global_role: user.global_role as 'none' | 'admin',
+      account_state: deriveAccountState({
+        globalRole: user.global_role as 'none' | 'admin',
+        isActive: user.is_active,
+        membershipCount: memberships.length,
+      }),
       password_must_change: user.password_must_change,
       password_changed_at: toIsoOrNull(user.password_changed_at),
       temporary_password_expires_at: toIsoOrNull(user.temporary_password_expires_at),
       memberships: memberships.map((membership) => ({
         organization_id: membership.organization_id,
         organization_name: membership.organization_name,
-        role: membership.role as 'member' | 'manager',
+        role: membership.role as 'member' | 'manager' | 'owner',
       })),
     },
   }

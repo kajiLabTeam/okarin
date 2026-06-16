@@ -1,10 +1,15 @@
 import { z } from '@hono/zod-openapi'
-import { isoDatetimeSchema, uuidSchema } from './common.js'
+import {
+  accountStateSchema,
+  isoDatetimeSchema,
+  membershipRoleSchema,
+  uuidSchema,
+} from './common.js'
 
 export const authMembershipSchema = z.object({
   organization_id: uuidSchema,
   organization_name: z.string().min(1).max(255),
-  role: z.enum(['member', 'manager']),
+  role: membershipRoleSchema,
 })
 
 export const authUserSchema = z.object({
@@ -12,6 +17,7 @@ export const authUserSchema = z.object({
   email: z.string().email().max(255),
   display_name: z.string().min(1).max(255),
   global_role: z.enum(['none', 'admin']),
+  account_state: accountStateSchema,
   password_must_change: z.boolean(),
   password_changed_at: isoDatetimeSchema.nullable(),
   temporary_password_expires_at: isoDatetimeSchema.nullable(),

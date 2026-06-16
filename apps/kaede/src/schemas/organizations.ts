@@ -1,12 +1,10 @@
 import { z } from '@hono/zod-openapi'
 import { authUserSchema, loginRequestSchema } from './auth.js'
-import { isoDatetimeSchema, uuidSchema } from './common.js'
+import { isoDatetimeSchema, membershipRoleSchema, uuidSchema } from './common.js'
 import {
   createPedestrianWithoutOrganizationRequestSchema,
   pedestrianSchema,
 } from './pedestrians.js'
-
-export const membershipRoleSchema = z.enum(['member', 'manager'])
 
 export const organizationSchema = z.object({
   organization_id: uuidSchema,
@@ -27,18 +25,19 @@ export const createOrganizationRequestSchema = z.object({
   name: z.string().min(1).max(255),
 })
 
-export const organizationUserSchema = authUserSchema
-  .omit({
-    global_role: true,
-    memberships: true,
-  })
-  .extend({
-    is_active: z.boolean(),
-    role: membershipRoleSchema,
-    created_at: isoDatetimeSchema,
-    updated_at: isoDatetimeSchema,
-    pedestrian: pedestrianSchema.nullable(),
-  })
+export const organizationUserSchema = z.object({
+  user_id: authUserSchema.shape.user_id,
+  email: authUserSchema.shape.email,
+  display_name: authUserSchema.shape.display_name,
+  is_active: z.boolean(),
+  role: membershipRoleSchema,
+  password_must_change: authUserSchema.shape.password_must_change,
+  password_changed_at: authUserSchema.shape.password_changed_at,
+  temporary_password_expires_at: authUserSchema.shape.temporary_password_expires_at,
+  created_at: isoDatetimeSchema,
+  updated_at: isoDatetimeSchema,
+  pedestrian: pedestrianSchema.nullable(),
+})
 
 export const organizationUsersResponseSchema = z.object({
   users: z.array(organizationUserSchema),

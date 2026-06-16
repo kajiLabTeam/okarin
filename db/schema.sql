@@ -76,7 +76,7 @@ CREATE TABLE public.organization_memberships (
     role text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT organization_memberships_role_chk CHECK ((role = ANY (ARRAY['member'::text, 'manager'::text])))
+    CONSTRAINT organization_memberships_role_chk CHECK ((role = ANY (ARRAY['member'::text, 'manager'::text, 'owner'::text])))
 );
 
 

@@ -1,9 +1,10 @@
 import type { Context } from 'hono'
+import type { AccountState, MembershipRole } from '../schemas/common.js'
 
 export interface UserActorMembership {
   organization_id: string
   organization_name: string
-  role: 'member' | 'manager'
+  role: MembershipRole
 }
 
 export interface UserRequestActor {
@@ -11,6 +12,7 @@ export interface UserRequestActor {
   user_id: string
   email: string
   global_role: 'none' | 'admin'
+  account_state: AccountState
   password_must_change: boolean
   memberships: UserActorMembership[]
 }
