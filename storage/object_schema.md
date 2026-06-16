@@ -22,12 +22,12 @@
 ## prefix 構成
 
 - `maps/`
-- `recordings/`
+- `organizations/`
 - `trajectories/`
 
 ```text
 maps/
-recordings/
+organizations/
 trajectories/
 ```
 
@@ -65,26 +65,30 @@ maps/11111111-1111-1111-1111-111111111111/33333333-3333-3333-3333-333333333333.p
 キー規約:
 
 ```text
-recordings/{recording_id}/raw/acce.csv
-recordings/{recording_id}/raw/gyro.csv
-recordings/{recording_id}/raw/pressure.csv
-recordings/{recording_id}/raw/wifi.csv
+organizations/{organization_id}/recordings/{recording_id}/raw/acce.csv
+organizations/{organization_id}/recordings/{recording_id}/raw/gyro.csv
+organizations/{organization_id}/recordings/{recording_id}/raw/metadata.json
+organizations/{organization_id}/recordings/{recording_id}/raw/pressure.csv
+organizations/{organization_id}/recordings/{recording_id}/raw/wifi.csv
 ```
 
 例:
 
 ```text
-recordings/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/raw/acce.csv
-recordings/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/raw/gyro.csv
+organizations/99999999-9999-9999-9999-999999999999/recordings/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/raw/acce.csv
+organizations/99999999-9999-9999-9999-999999999999/recordings/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/raw/gyro.csv
 ```
 
 ルール:
 
+- `{organization_id}` は `recordings.organization_id`
 - `{recording_id}` は `recordings.id`
 - `acce.csv` と `gyro.csv` は必須対象
+- `metadata.json` は `kaede` がアップロード対象に必ず追加する
 - `pressure.csv` と `wifi.csv` は任意
 - 必須 / 任意の判定はアプリ側スキーマで持つ
 - `complete-upload` では `upload_targets` に応じて存在確認する
+- 認可判断は object key ではなく DB の `recordings.organization_id` を正とする
 
 ### ground truth
 
@@ -140,10 +144,11 @@ trajectories/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/ground_truth/result.csv
 
 判定対象:
 
-- `recordings/{recording_id}/raw/acce.csv`
-- `recordings/{recording_id}/raw/gyro.csv`
-- `recordings/{recording_id}/raw/pressure.csv`
-- `recordings/{recording_id}/raw/wifi.csv`
+- `organizations/{organization_id}/recordings/{recording_id}/raw/acce.csv`
+- `organizations/{organization_id}/recordings/{recording_id}/raw/gyro.csv`
+- `organizations/{organization_id}/recordings/{recording_id}/raw/metadata.json`
+- `organizations/{organization_id}/recordings/{recording_id}/raw/pressure.csv`
+- `organizations/{organization_id}/recordings/{recording_id}/raw/wifi.csv`
 
 当面の判定粒度:
 
@@ -154,7 +159,7 @@ trajectories/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/ground_truth/result.csv
 
 非公開:
 
-- `recordings/` 配下の raw データ
+- `organizations/` 配下の recording raw データ
 - `recordings/` 配下の ground truth
 - `trajectories/` 配下の解析結果
 - `trajectories/` 配下の ground truth 解析結果
@@ -174,7 +179,7 @@ trajectories/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/ground_truth/result.csv
 ## 保持期間
 
 - `maps/` は手動削除まで保持
-- `recordings/raw` は当面削除しない
+- `organizations/*/recordings/*/raw` は当面削除しない
 - `recordings/ground_truth` は当面削除しない
 - `trajectories/analyzed/result.csv` は当面削除しない
 - `trajectories/ground_truth/result.csv` は当面削除しない
