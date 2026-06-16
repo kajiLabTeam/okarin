@@ -54,10 +54,18 @@ describe('POST /api/recordings/init', () => {
     expect(body.organization_id).toBe(organizationId)
     expect(body.upload_status).toBe('accepted')
     expect(body.upload_urls).toEqual({
-      acce: expect.stringContaining(`/recordings/${body.recording_id}/raw/acce.csv`),
-      gyro: expect.stringContaining(`/recordings/${body.recording_id}/raw/gyro.csv`),
-      metadata: expect.stringContaining(`/recordings/${body.recording_id}/raw/metadata.json`),
-      wifi: expect.stringContaining(`/recordings/${body.recording_id}/raw/wifi.csv`),
+      acce: expect.stringContaining(
+        `/organizations/${organizationId}/recordings/${body.recording_id}/raw/acce.csv`
+      ),
+      gyro: expect.stringContaining(
+        `/organizations/${organizationId}/recordings/${body.recording_id}/raw/gyro.csv`
+      ),
+      metadata: expect.stringContaining(
+        `/organizations/${organizationId}/recordings/${body.recording_id}/raw/metadata.json`
+      ),
+      wifi: expect.stringContaining(
+        `/organizations/${organizationId}/recordings/${body.recording_id}/raw/wifi.csv`
+      ),
     })
     expect(body.upload_urls.pressure).toBeUndefined()
     expect(Date.parse(body.expires_at)).not.toBeNaN()

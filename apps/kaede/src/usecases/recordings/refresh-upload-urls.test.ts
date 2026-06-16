@@ -20,11 +20,12 @@ vi.mock('../../services/storage/index.js', () => ({
 import { refreshUploadUrls } from './refresh-upload-urls.js'
 
 const serviceClientActor: RequestActor = { type: 'service_client', name: 'shared_token' }
+const organizationId = '99999999-9999-4999-8999-999999999999'
 
 const mockRecordingAuthorization = (recordingId: string) => {
   findRecordingAuthorizationByIdMock.mockResolvedValue({
     id: recordingId,
-    organization_id: '99999999-9999-4999-8999-999999999999',
+    organization_id: organizationId,
     pedestrian_id: '22222222-2222-4222-8222-222222222222',
     pedestrian_user_id: null,
   })
@@ -70,7 +71,7 @@ describe('refreshUploadUrls', () => {
         expires_at: '2026-05-13T00:15:00.000Z',
       },
     })
-    expect(issueRecordingUploadUrlsMock).toHaveBeenCalledWith(recordingId, ['gyro'])
+    expect(issueRecordingUploadUrlsMock).toHaveBeenCalledWith(organizationId, recordingId, ['gyro'])
   })
 
   it('存在しない recording は RECORDING_NOT_FOUND を返す', async () => {

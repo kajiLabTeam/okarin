@@ -28,7 +28,7 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
   })
 
   it('accepted な recording に対して upload URL を再発行する', async () => {
-    const { recordingId } = await createRecordingFixture(db, {
+    const { organizationId, recordingId } = await createRecordingFixture(db, {
       uploadStatus: 'accepted',
       uploadTargets: ['acce', 'gyro', 'wifi'],
     })
@@ -52,8 +52,12 @@ describe('POST /api/recordings/:recordingId/refresh-upload-urls', () => {
     expect(body.recording_id).toBe(recordingId)
     expect(body.upload_status).toBe('accepted')
     expect(body.upload_urls).toEqual({
-      acce: expect.stringContaining(`/recordings/${recordingId}/raw/acce.csv`),
-      wifi: expect.stringContaining(`/recordings/${recordingId}/raw/wifi.csv`),
+      acce: expect.stringContaining(
+        `/organizations/${organizationId}/recordings/${recordingId}/raw/acce.csv`
+      ),
+      wifi: expect.stringContaining(
+        `/organizations/${organizationId}/recordings/${recordingId}/raw/wifi.csv`
+      ),
     })
     expect(body.upload_urls.gyro).toBeUndefined()
     expect(Date.parse(body.expires_at)).not.toBeNaN()

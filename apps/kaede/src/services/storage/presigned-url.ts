@@ -18,16 +18,20 @@ export interface RecordingRawDownloadUrls {
   wifi?: string
 }
 
-export const buildRecordingRawObjectKey = (recordingId: string, target: UploadTarget) => {
+export const buildRecordingRawObjectKey = (
+  organizationId: string,
+  recordingId: string,
+  target: UploadTarget
+) => {
   if (target === 'metadata') {
-    return `recordings/${recordingId}/raw/metadata.json`
+    return `organizations/${organizationId}/recordings/${recordingId}/raw/metadata.json`
   }
 
-  return `recordings/${recordingId}/raw/${target}.csv`
+  return `organizations/${organizationId}/recordings/${recordingId}/raw/${target}.csv`
 }
 
-export const buildRecordingRawObjectPrefix = (recordingId: string) => {
-  return `recordings/${recordingId}/raw/`
+export const buildRecordingRawObjectPrefix = (organizationId: string, recordingId: string) => {
+  return `organizations/${organizationId}/recordings/${recordingId}/raw/`
 }
 
 export const buildTrajectoryAnalyzedResultObjectKey = (trajectoryId: string) => {
@@ -35,6 +39,7 @@ export const buildTrajectoryAnalyzedResultObjectKey = (trajectoryId: string) => 
 }
 
 export const issueRecordingUploadUrls = async (
+  organizationId: string,
   recordingId: string,
   targets: UploadTarget[],
   now: Date = new Date()
@@ -48,7 +53,7 @@ export const issueRecordingUploadUrls = async (
         presignClient,
         new PutObjectCommand({
           Bucket: config.bucket,
-          Key: buildRecordingRawObjectKey(recordingId, target),
+          Key: buildRecordingRawObjectKey(organizationId, recordingId, target),
         }),
         { expiresIn: config.recordingUploadUrlTtlSeconds }
       )
@@ -61,6 +66,7 @@ export const issueRecordingUploadUrls = async (
   }
 }
 export const issueInternalRecordingRawDownloadUrls = async (
+  organizationId: string,
   recordingId: string,
   targets: UploadTarget[],
   now: Date = new Date()
@@ -76,7 +82,7 @@ export const issueInternalRecordingRawDownloadUrls = async (
       internalClient,
       new GetObjectCommand({
         Bucket: config.bucket,
-        Key: buildRecordingRawObjectKey(recordingId, 'acce'),
+        Key: buildRecordingRawObjectKey(organizationId, recordingId, 'acce'),
       }),
       { expiresIn: config.trajectoryRawDownloadUrlTtlSeconds }
     ),
@@ -84,7 +90,7 @@ export const issueInternalRecordingRawDownloadUrls = async (
       internalClient,
       new GetObjectCommand({
         Bucket: config.bucket,
-        Key: buildRecordingRawObjectKey(recordingId, 'gyro'),
+        Key: buildRecordingRawObjectKey(organizationId, recordingId, 'gyro'),
       }),
       { expiresIn: config.trajectoryRawDownloadUrlTtlSeconds }
     ),
@@ -100,7 +106,7 @@ export const issueInternalRecordingRawDownloadUrls = async (
       internalClient,
       new GetObjectCommand({
         Bucket: config.bucket,
-        Key: buildRecordingRawObjectKey(recordingId, 'pressure'),
+        Key: buildRecordingRawObjectKey(organizationId, recordingId, 'pressure'),
       }),
       { expiresIn: config.trajectoryRawDownloadUrlTtlSeconds }
     )
@@ -111,7 +117,7 @@ export const issueInternalRecordingRawDownloadUrls = async (
       internalClient,
       new GetObjectCommand({
         Bucket: config.bucket,
-        Key: buildRecordingRawObjectKey(recordingId, 'wifi'),
+        Key: buildRecordingRawObjectKey(organizationId, recordingId, 'wifi'),
       }),
       { expiresIn: config.trajectoryRawDownloadUrlTtlSeconds }
     )

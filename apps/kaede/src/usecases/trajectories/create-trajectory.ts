@@ -191,7 +191,11 @@ export const createTrajectory = async (
 
   try {
     const [rawDataUrlResult, resultUploadUrlResult, callbackTokenResult] = await Promise.all([
-      issueInternalRecordingRawDownloadUrls(recording.id, uploadTargets.data),
+      issueInternalRecordingRawDownloadUrls(
+        recording.organization_id,
+        recording.id,
+        uploadTargets.data
+      ),
       issueInternalTrajectoryResultUploadUrl(processing.id),
       Promise.resolve(generateCallbackToken(processing.id)),
     ])

@@ -108,7 +108,11 @@ export const refreshUploadUrls = async (
     } satisfies RefreshUploadUrlsResult
   }
 
-  const { expiresAt, uploadUrls } = await issueRecordingUploadUrls(recording.id, payload.targets)
+  const { expiresAt, uploadUrls } = await issueRecordingUploadUrls(
+    recordingAuthorization.organization_id,
+    recording.id,
+    payload.targets
+  )
 
   return {
     ok: true,
