@@ -5,6 +5,7 @@ import { sessionCookieName } from '../routes/auth/cookie.js'
 import { toAuthErrorResponse } from '../schemas/common.js'
 import { findValidSessionByToken } from '../services/auth/index.js'
 import { findUserById, listUserOrganizationMemberships } from '../services/users/index.js'
+import { deriveAccountState } from '../usecases/authorization.js'
 import type { RequestActorHonoEnv } from './request-actor-context.js'
 import { setRequestActor } from './request-actor-context.js'
 export type {
@@ -139,11 +140,16 @@ export const requestActorMiddleware = ({
       user_id: user.id,
       email: user.email,
       global_role: user.global_role as 'none' | 'admin',
+      account_state: deriveAccountState({
+        globalRole: user.global_role as 'none' | 'admin',
+        isActive: user.is_active,
+        membershipCount: memberships.length,
+      }),
       password_must_change: user.password_must_change,
       memberships: memberships.map((membership) => ({
         organization_id: membership.organization_id,
         organization_name: membership.organization_name,
-        role: membership.role as 'member' | 'manager',
+        role: membership.role as 'member' | 'manager' | 'owner',
       })),
     })
 

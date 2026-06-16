@@ -24,7 +24,7 @@ const createUserWithSession = async (params: {
   globalRole: 'admin' | 'none'
   membership?: {
     organizationId: string
-    role: 'member' | 'manager'
+    role: 'member' | 'manager' | 'owner'
   }
 }) => {
   const user = await db
@@ -192,6 +192,22 @@ describe('organizations usecase', () => {
     })
 
     const result = await listOrganizationUsersForSession(manager.sessionToken, organization.id, db)
+
+    expect(result.ok).toBe(true)
+  })
+
+  it('owner can list users in their organization', async () => {
+    const organization = await createOrganization()
+    const owner = await createUserWithSession({
+      email: 'owner@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'owner',
+      },
+    })
+
+    const result = await listOrganizationUsersForSession(owner.sessionToken, organization.id, db)
 
     expect(result.ok).toBe(true)
   })

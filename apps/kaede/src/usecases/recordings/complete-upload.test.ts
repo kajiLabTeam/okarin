@@ -214,6 +214,7 @@ describe('completeUpload', () => {
           user_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
           email: 'member@example.test',
           global_role: 'none',
+          account_state: 'active',
           password_must_change: false,
           memberships: [
             {

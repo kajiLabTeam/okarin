@@ -144,6 +144,7 @@ describe('requestActorMiddleware', () => {
         user_id: '11111111-1111-4111-8111-111111111111',
         email: 'user@example.com',
         global_role: 'none',
+        account_state: 'active',
         password_must_change: false,
         memberships: [
           {
@@ -184,6 +185,23 @@ describe('requestActorMiddleware', () => {
       error_code: 'AUTH_PASSWORD_CHANGE_REQUIRED',
       error_message: 'password change required',
     })
+  })
+
+  it('membership がない user は pending_membership actor として設定する', async () => {
+    mockActiveSessionUser()
+    listUserOrganizationMembershipsMock.mockResolvedValue([])
+    const app = createTestApp()
+
+    const response = await app.request('/api/ping', {
+      headers: {
+        cookie: 'okarin_session=session-token',
+      },
+    })
+
+    expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(body.actor.account_state).toBe('pending_membership')
+    expect(body.actor.memberships).toEqual([])
   })
 
   it('auth endpoint は actor middleware の対象外にする', async () => {
