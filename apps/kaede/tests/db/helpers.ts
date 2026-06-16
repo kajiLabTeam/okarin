@@ -6,6 +6,10 @@ export const resetDatabase = async (db: Kysely<DB>) => {
   await sql`
     TRUNCATE TABLE
       sessions,
+      organization_invite_redemptions,
+      organization_invites,
+      organization_creation_requests,
+      auth_identities,
       organization_memberships,
       trajectory_constraints,
       trajectories,
