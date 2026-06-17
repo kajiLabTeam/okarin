@@ -17,6 +17,17 @@ export const findOrganizationById = async (
     .executeTakeFirst()
 }
 
+export const findOrganizationBySlug = async (
+  slug: string,
+  executor: DbExecutor = db
+): Promise<Organization | undefined> => {
+  return executor
+    .selectFrom('organizations')
+    .selectAll()
+    .where('slug', '=', slug)
+    .executeTakeFirst()
+}
+
 export const insertOrganization = async (
   newOrganization: NewOrganization,
   executor: DbExecutor = db
