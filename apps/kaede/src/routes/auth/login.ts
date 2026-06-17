@@ -1,5 +1,6 @@
 import { createRoute } from '@hono/zod-openapi'
 import type { OpenAPIHono } from '@hono/zod-openapi'
+import { getOidcRuntimeConfig } from '../../config/runtime.js'
 import { authUserResponseSchema, loginRequestSchema } from '../../schemas/auth.js'
 import { errorResponseSchema } from '../../schemas/common.js'
 import { login } from '../../usecases/auth/index.js'
@@ -50,6 +51,16 @@ export const registerLoginRoute = (app: OpenAPIHono) => {
   })
 
   app.openapi(route, async (c) => {
+    if (!getOidcRuntimeConfig().passwordLoginEnabled) {
+      return c.json(
+        {
+          error_code: 'AUTH_PASSWORD_LOGIN_DISABLED',
+          error_message: 'password login is disabled',
+        },
+        403
+      )
+    }
+
     const payload = c.req.valid('json')
     const result = await login(payload)
 

@@ -103,6 +103,7 @@ export const authErrorCodes = [
   'AUTH_USER_LOCKED',
   'AUTH_TEMPORARY_PASSWORD_EXPIRED',
   'AUTH_PASSWORD_CHANGE_REQUIRED',
+  'AUTH_PASSWORD_LOGIN_DISABLED',
   'AUTH_DASHBOARD_FORBIDDEN',
   'AUTH_ORGANIZATION_FORBIDDEN',
 ] as const
@@ -120,6 +121,7 @@ export const authErrorMessages: Record<AuthErrorCode, string> = {
   AUTH_INVALID_CREDENTIALS: 'invalid email or password',
   AUTH_ORGANIZATION_FORBIDDEN: 'organization access forbidden',
   AUTH_PASSWORD_CHANGE_REQUIRED: 'password change required',
+  AUTH_PASSWORD_LOGIN_DISABLED: 'password login is disabled',
   AUTH_SESSION_EXPIRED: 'session expired',
   AUTH_SESSION_REVOKED: 'session revoked',
   AUTH_TEMPORARY_PASSWORD_EXPIRED: 'temporary password expired',
@@ -133,6 +135,7 @@ export const authErrorStatuses: Record<AuthErrorCode, 401 | 403> = {
   AUTH_INVALID_CREDENTIALS: 401,
   AUTH_ORGANIZATION_FORBIDDEN: 403,
   AUTH_PASSWORD_CHANGE_REQUIRED: 403,
+  AUTH_PASSWORD_LOGIN_DISABLED: 403,
   AUTH_SESSION_EXPIRED: 401,
   AUTH_SESSION_REVOKED: 401,
   AUTH_TEMPORARY_PASSWORD_EXPIRED: 403,

@@ -1,15 +1,22 @@
+import { randomUUID } from 'node:crypto'
 import type { AuthUserResponse, ChangePasswordRequest, LoginRequest } from '../../schemas/auth.js'
 import {
   createSession,
+  findGoogleIdentityBySubject,
+  findGoogleIdentityByUserId,
   findValidSessionByToken,
+  insertAuthIdentity,
   revokeAllSessionsByUserId,
   revokeSessionByToken,
 } from '../../services/auth/index.js'
+import type { GoogleIdTokenClaims, GoogleOidcClient } from '../../services/auth/index.js'
 import { hashPassword, verifyPassword } from '../../services/auth/password.js'
+import { db } from '../../services/db/index.js'
 import type { DbExecutor } from '../../services/executor.js'
 import {
   findUserByEmail,
   findUserById,
+  insertUser,
   listUserOrganizationMemberships,
   updateUser,
 } from '../../services/users/index.js'
@@ -53,6 +60,34 @@ export type ActiveSessionUserResult =
 
 export interface LoginResultValue extends AuthUserResponse {
   sessionToken: string
+}
+
+export type OidcLoginError =
+  | { type: 'OIDC_DISABLED' }
+  | { type: 'OIDC_INVALID_STATE' }
+  | { type: 'OIDC_PROVIDER_ERROR' }
+  | { type: 'OIDC_EMAIL_UNVERIFIED' }
+  | { type: 'OIDC_IDENTITY_CONFLICT' }
+  | { type: 'AUTH_USER_DISABLED' }
+
+export type OidcLoginResult =
+  | {
+      ok: true
+      value: {
+        sessionToken: string
+      }
+    }
+  | {
+      ok: false
+      error: OidcLoginError
+    }
+
+export interface CompleteGoogleOidcLoginParams {
+  code: string | undefined
+  state: string | undefined
+  expectedState: string
+  nonce: string
+  codeVerifier: string
 }
 
 const toIsoOrNull = (value: Date | null): string | null => value?.toISOString() ?? null
@@ -126,6 +161,121 @@ const assertTemporaryPasswordNotExpired = (user: User, now: Date): AuthError | u
 
 const MAX_FAILED_LOGIN_ATTEMPTS = 5
 const LOGIN_LOCK_DURATION_MS = 15 * 60 * 1000
+
+const runInTransaction = async <T>(
+  executor: DbExecutor | undefined,
+  callback: (trx: DbExecutor) => Promise<T>
+): Promise<T> => {
+  const baseExecutor = executor ?? db
+
+  if ('transaction' in baseExecutor) {
+    return baseExecutor.transaction().execute((trx) => callback(trx))
+  }
+
+  return callback(baseExecutor)
+}
+
+const createOidcPasswordHash = async () => {
+  return hashPassword(`oidc:${randomUUID()}:${randomUUID()}`)
+}
+
+const findOrCreateGoogleOidcUser = async (
+  claims: GoogleIdTokenClaims,
+  executor: DbExecutor
+): Promise<AuthResult<User>> => {
+  const identity = await findGoogleIdentityBySubject(claims.sub, executor)
+
+  if (identity) {
+    const user = await findUserById(identity.user_id, executor)
+
+    if (!user) {
+      return {
+        ok: false,
+        error: { type: 'AUTH_UNAUTHENTICATED' },
+      }
+    }
+
+    return {
+      ok: true,
+      value: user,
+    }
+  }
+
+  const existingUser = await findUserByEmail(claims.email, executor)
+
+  if (existingUser) {
+    if (!existingUser.is_active) {
+      return {
+        ok: true,
+        value: existingUser,
+      }
+    }
+
+    if (existingUser.global_role === 'admin') {
+      return {
+        ok: false,
+        error: { type: 'AUTH_INVALID_CREDENTIALS' },
+      }
+    }
+
+    const existingIdentity = await findGoogleIdentityByUserId(existingUser.id, executor)
+
+    if (existingIdentity) {
+      return {
+        ok: false,
+        error: { type: 'AUTH_INVALID_CREDENTIALS' },
+      }
+    }
+
+    await insertAuthIdentity(
+      {
+        user_id: existingUser.id,
+        provider: 'google',
+        provider_subject: claims.sub,
+        email: claims.email,
+        email_verified: claims.emailVerified,
+        hosted_domain: claims.hostedDomain,
+      },
+      executor
+    )
+
+    return {
+      ok: true,
+      value: existingUser,
+    }
+  }
+
+  const createdUser = await insertUser(
+    {
+      email: claims.email,
+      display_name: claims.name,
+      password_hash: await createOidcPasswordHash(),
+      global_role: 'none',
+      is_active: true,
+      password_must_change: false,
+      password_changed_at: null,
+      temporary_password_expires_at: null,
+    },
+    executor
+  )
+
+  await insertAuthIdentity(
+    {
+      user_id: createdUser.id,
+      provider: 'google',
+      provider_subject: claims.sub,
+      email: claims.email,
+      email_verified: claims.emailVerified,
+      hosted_domain: claims.hostedDomain,
+    },
+    executor
+  )
+
+  return {
+    ok: true,
+    value: createdUser,
+  }
+}
 
 export const login = async (
   payload: LoginRequest,
@@ -211,6 +361,75 @@ export const login = async (
     ok: true,
     value: {
       ...response,
+      sessionToken: token,
+    },
+  }
+}
+
+export const completeGoogleOidcLogin = async (
+  params: CompleteGoogleOidcLoginParams,
+  client: GoogleOidcClient,
+  now: Date = new Date(),
+  executor?: DbExecutor
+): Promise<OidcLoginResult> => {
+  if (!params.code || !params.state || params.state !== params.expectedState) {
+    return {
+      ok: false,
+      error: { type: 'OIDC_INVALID_STATE' },
+    }
+  }
+
+  let claims: GoogleIdTokenClaims
+
+  try {
+    const idToken = await client.exchangeCodeForIdToken({
+      code: params.code,
+      codeVerifier: params.codeVerifier,
+    })
+    claims = await client.verifyIdToken({
+      idToken,
+      nonce: params.nonce,
+    })
+  } catch {
+    return {
+      ok: false,
+      error: { type: 'OIDC_PROVIDER_ERROR' },
+    }
+  }
+
+  if (!claims.emailVerified) {
+    return {
+      ok: false,
+      error: { type: 'OIDC_EMAIL_UNVERIFIED' },
+    }
+  }
+
+  const userResult = await runInTransaction(executor, async (trx) => {
+    return findOrCreateGoogleOidcUser(claims, trx)
+  })
+
+  if (!userResult.ok) {
+    return {
+      ok: false,
+      error:
+        userResult.error.type === 'AUTH_INVALID_CREDENTIALS'
+          ? { type: 'OIDC_IDENTITY_CONFLICT' }
+          : { type: 'OIDC_PROVIDER_ERROR' },
+    }
+  }
+
+  if (!userResult.value.is_active) {
+    return {
+      ok: false,
+      error: { type: 'AUTH_USER_DISABLED' },
+    }
+  }
+
+  const { token } = await createSession({ userId: userResult.value.id, now }, executor)
+
+  return {
+    ok: true,
+    value: {
       sessionToken: token,
     },
   }

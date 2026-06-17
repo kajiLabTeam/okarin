@@ -1,12 +1,24 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { resetRuntimeConfigForTests } from '../../config/runtime.js'
 import { authRoutes } from './index.js'
 
-const { changePasswordMock, getMeMock, loginMock, logoutMock } = vi.hoisted(() => ({
-  changePasswordMock: vi.fn(),
-  getMeMock: vi.fn(),
-  loginMock: vi.fn(),
-  logoutMock: vi.fn(),
+const { changePasswordMock, completeGoogleOidcLoginMock, getMeMock, loginMock, logoutMock } =
+  vi.hoisted(() => ({
+    changePasswordMock: vi.fn(),
+    completeGoogleOidcLoginMock: vi.fn(),
+    getMeMock: vi.fn(),
+    loginMock: vi.fn(),
+    logoutMock: vi.fn(),
+  }))
+
+vi.mock('../../services/auth/index.js', () => ({
+  generateOidcNonce: vi.fn(() => 'nonce-value'),
+  generateOidcState: vi.fn(() => 'state-value'),
+  generatePkceCodeVerifier: vi.fn(() => 'code-verifier'),
+  GoogleOidcClient: vi.fn(() => ({
+    createAuthorizationUrl: vi.fn(() => 'https://accounts.example.test/auth'),
+  })),
 }))
 
 vi.mock('../../usecases/auth/index.js', () => ({
@@ -20,6 +32,7 @@ vi.mock('../../usecases/auth/index.js', () => ({
     }
   },
   changePassword: changePasswordMock,
+  completeGoogleOidcLogin: completeGoogleOidcLoginMock,
   getMe: getMeMock,
   login: loginMock,
   logout: logoutMock,
@@ -54,6 +67,15 @@ const userResponse = {
 describe('auth routes', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    process.env.OIDC_ENABLED = 'false'
+    Reflect.deleteProperty(process.env, 'PASSWORD_LOGIN_ENABLED')
+    resetRuntimeConfigForTests()
+  })
+
+  afterEach(() => {
+    Reflect.deleteProperty(process.env, 'OIDC_ENABLED')
+    Reflect.deleteProperty(process.env, 'PASSWORD_LOGIN_ENABLED')
+    resetRuntimeConfigForTests()
   })
 
   it('POST /api/auth/login は session cookie を発行して user を返す', async () => {
@@ -111,6 +133,38 @@ describe('auth routes', () => {
       error_code: 'AUTH_INVALID_CREDENTIALS',
       error_message: 'invalid email or password',
     })
+  })
+
+  it('POST /api/auth/login は PASSWORD_LOGIN_ENABLED=false なら 403 を返す', async () => {
+    process.env.PASSWORD_LOGIN_ENABLED = 'false'
+    resetRuntimeConfigForTests()
+
+    const app = createAuthTestApp()
+    const response = await app.request('/api/auth/login', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: 'user@example.com',
+        password: 'temporary-password',
+      }),
+    })
+
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'AUTH_PASSWORD_LOGIN_DISABLED',
+      error_message: 'password login is disabled',
+    })
+    expect(loginMock).not.toHaveBeenCalled()
+  })
+
+  it('GET /api/auth/oidc/google/login は OIDC disabled なら failure URL へ redirect する', async () => {
+    const app = createAuthTestApp()
+    const response = await app.request('/api/auth/oidc/google/login')
+
+    expect(response.status).toBe(302)
+    expect(response.headers.get('location')).toBe('/?error=oidc_disabled')
   })
 
   it('GET /api/auth/me は cookie の session token で user を返す', async () => {
