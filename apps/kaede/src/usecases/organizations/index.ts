@@ -1,19 +1,35 @@
+import { getOidcRuntimeConfig } from '../../config/runtime.js'
 import type {
+  ApproveOrganizationCreationRequestRequest,
   CreateOrganizationMembershipRequest,
+  CreateOrganizationCreationRequestRequest,
   CreateOrganizationRequest,
   CreateOrganizationUserRequest,
+  OrganizationCreationRequestResponse,
   OrganizationResponse,
   OrganizationUserResponse,
+  RejectOrganizationCreationRequestRequest,
 } from '../../schemas/organizations.js'
 import { hashPassword } from '../../services/auth/password.js'
 import { db } from '../../services/db/index.js'
 import type { DbExecutor } from '../../services/executor.js'
 import {
+  findOrganizationBySlug,
+  findOrganizationCreationRequestById,
+  findOrganizationCreationRequestByIdForUpdate,
+  findPendingOrganizationCreationRequestByRequester,
   findOrganizationById,
   insertOrganization,
+  insertOrganizationCreationRequest,
+  listOrganizationCreationRequests,
+  listOrganizationCreationRequestsByRequester,
   listOrganizations,
+  updateOrganizationCreationRequest,
 } from '../../services/organizations/index.js'
-import type { Organization } from '../../services/organizations/index.js'
+import type {
+  Organization,
+  OrganizationCreationRequest,
+} from '../../services/organizations/index.js'
 import { insertPedestrian } from '../../services/pedestrians/index.js'
 import {
   findOrganizationMembership,
@@ -23,6 +39,7 @@ import {
   insertOrganizationMembership,
   insertUser,
   listOrganizationUsers,
+  listUserOrganizationMemberships,
   upsertOrganizationMembership,
 } from '../../services/users/index.js'
 import type { OrganizationUserRow } from '../../services/users/index.js'
@@ -35,6 +52,12 @@ export type OrganizationError =
   | { type: 'AUTH_USER_DISABLED' }
   | { type: 'AUTH_FORBIDDEN' }
   | { type: 'ORGANIZATION_NOT_FOUND' }
+  | { type: 'ORGANIZATION_CREATION_REQUESTS_DISABLED' }
+  | { type: 'ORGANIZATION_CREATION_REQUEST_NOT_FOUND' }
+  | { type: 'ORGANIZATION_CREATION_REQUEST_NOT_PENDING' }
+  | { type: 'ORGANIZATION_CREATION_REQUEST_ALREADY_PENDING' }
+  | { type: 'ORGANIZATION_CREATION_REQUEST_REQUIRES_PENDING_USER' }
+  | { type: 'ORGANIZATION_SLUG_ALREADY_EXISTS' }
   | { type: 'USER_NOT_FOUND' }
   | { type: 'USER_ALREADY_EXISTS' }
 
@@ -53,6 +76,22 @@ const toOrganizationResponse = (organization: Organization): OrganizationRespons
   name: organization.name,
   created_at: organization.created_at.toISOString(),
   updated_at: organization.updated_at.toISOString(),
+})
+
+const toOrganizationCreationRequestResponse = (
+  request: OrganizationCreationRequest
+): OrganizationCreationRequestResponse => ({
+  request_id: request.id,
+  requester_user_id: request.requester_user_id,
+  requested_organization_name: request.requested_organization_name,
+  requested_slug: request.requested_slug,
+  status: request.status as 'pending' | 'approved' | 'rejected',
+  reviewed_by_user_id: request.reviewed_by_user_id,
+  reviewed_at: request.reviewed_at?.toISOString() ?? null,
+  rejected_reason: request.rejected_reason,
+  created_organization_id: request.created_organization_id,
+  created_at: request.created_at.toISOString(),
+  updated_at: request.updated_at.toISOString(),
 })
 
 const mapAuthError = (error: Exclude<OrganizationError, { type: 'AUTH_FORBIDDEN' }>) => error
@@ -145,6 +184,28 @@ const requireAdmin = async (
     ok: true,
     value: {
       userId: actor.value.id,
+    },
+  }
+}
+
+const requireSessionUser = async (
+  sessionToken: string | undefined,
+  executor?: DbExecutor
+): Promise<OrganizationResult<{ userId: string; globalRole: 'none' | 'admin' }>> => {
+  const actor = await requireActiveSessionUser(sessionToken, executor)
+
+  if (!actor.ok) {
+    return {
+      ok: false,
+      error: mapAuthError(actor.error),
+    }
+  }
+
+  return {
+    ok: true,
+    value: {
+      userId: actor.value.id,
+      globalRole: actor.value.global_role as 'none' | 'admin',
     },
   }
 }
@@ -250,6 +311,278 @@ export const createOrganizationForSession = async (
     ok: true,
     value: toOrganizationResponse(organization),
   }
+}
+
+export const createOrganizationCreationRequestForSession = async (
+  sessionToken: string | undefined,
+  payload: CreateOrganizationCreationRequestRequest,
+  executor?: DbExecutor
+): Promise<OrganizationResult<OrganizationCreationRequestResponse>> => {
+  if (!getOidcRuntimeConfig().organizationCreationRequestsEnabled) {
+    return {
+      ok: false,
+      error: { type: 'ORGANIZATION_CREATION_REQUESTS_DISABLED' },
+    }
+  }
+
+  const actor = await requireSessionUser(sessionToken, executor)
+
+  if (!actor.ok) {
+    return actor
+  }
+
+  if (actor.value.globalRole === 'admin') {
+    return {
+      ok: false,
+      error: { type: 'ORGANIZATION_CREATION_REQUEST_REQUIRES_PENDING_USER' },
+    }
+  }
+
+  const memberships = await listUserOrganizationMemberships(actor.value.userId, executor)
+
+  if (memberships.length > 0) {
+    return {
+      ok: false,
+      error: { type: 'ORGANIZATION_CREATION_REQUEST_REQUIRES_PENDING_USER' },
+    }
+  }
+
+  const pendingRequest = await findPendingOrganizationCreationRequestByRequester(
+    actor.value.userId,
+    executor
+  )
+
+  if (pendingRequest) {
+    return {
+      ok: false,
+      error: { type: 'ORGANIZATION_CREATION_REQUEST_ALREADY_PENDING' },
+    }
+  }
+
+  const request = await insertOrganizationCreationRequest(
+    {
+      requester_user_id: actor.value.userId,
+      requested_organization_name: payload.organization_name.trim(),
+      requested_slug: payload.requested_slug ?? null,
+    },
+    executor
+  )
+
+  return {
+    ok: true,
+    value: toOrganizationCreationRequestResponse(request),
+  }
+}
+
+export const listMyOrganizationCreationRequestsForSession = async (
+  sessionToken: string | undefined,
+  executor?: DbExecutor
+): Promise<OrganizationResult<{ requests: OrganizationCreationRequestResponse[] }>> => {
+  const actor = await requireSessionUser(sessionToken, executor)
+
+  if (!actor.ok) {
+    return actor
+  }
+
+  const requests = await listOrganizationCreationRequestsByRequester(actor.value.userId, executor)
+
+  return {
+    ok: true,
+    value: {
+      requests: requests.map(toOrganizationCreationRequestResponse),
+    },
+  }
+}
+
+export const listOrganizationCreationRequestsForAdminSession = async (
+  sessionToken: string | undefined,
+  executor?: DbExecutor
+): Promise<OrganizationResult<{ requests: OrganizationCreationRequestResponse[] }>> => {
+  const admin = await requireAdmin(sessionToken, executor)
+
+  if (!admin.ok) {
+    return admin
+  }
+
+  const requests = await listOrganizationCreationRequests(executor)
+
+  return {
+    ok: true,
+    value: {
+      requests: requests.map(toOrganizationCreationRequestResponse),
+    },
+  }
+}
+
+export const getOrganizationCreationRequestForAdminSession = async (
+  sessionToken: string | undefined,
+  requestId: string,
+  executor?: DbExecutor
+): Promise<OrganizationResult<OrganizationCreationRequestResponse>> => {
+  const admin = await requireAdmin(sessionToken, executor)
+
+  if (!admin.ok) {
+    return admin
+  }
+
+  const request = await findOrganizationCreationRequestById(requestId, executor)
+
+  if (!request) {
+    return {
+      ok: false,
+      error: { type: 'ORGANIZATION_CREATION_REQUEST_NOT_FOUND' },
+    }
+  }
+
+  return {
+    ok: true,
+    value: toOrganizationCreationRequestResponse(request),
+  }
+}
+
+export const approveOrganizationCreationRequestForAdminSession = async (
+  sessionToken: string | undefined,
+  requestId: string,
+  payload: ApproveOrganizationCreationRequestRequest,
+  now: Date = new Date(),
+  executor?: DbExecutor
+): Promise<OrganizationResult<OrganizationCreationRequestResponse>> => {
+  const admin = await requireAdmin(sessionToken, executor)
+
+  if (!admin.ok) {
+    return admin
+  }
+
+  const result = await runInTransaction(executor, async (trx) => {
+    const request = await findOrganizationCreationRequestByIdForUpdate(requestId, trx)
+
+    if (!request) {
+      return {
+        ok: false,
+        error: { type: 'ORGANIZATION_CREATION_REQUEST_NOT_FOUND' },
+      } satisfies OrganizationResult<OrganizationCreationRequestResponse>
+    }
+
+    if (request.status !== 'pending') {
+      return {
+        ok: false,
+        error: { type: 'ORGANIZATION_CREATION_REQUEST_NOT_PENDING' },
+      } satisfies OrganizationResult<OrganizationCreationRequestResponse>
+    }
+
+    const requester = await findUserById(request.requester_user_id, trx)
+
+    if (!requester || !requester.is_active || requester.global_role === 'admin') {
+      return {
+        ok: false,
+        error: { type: 'ORGANIZATION_CREATION_REQUEST_REQUIRES_PENDING_USER' },
+      } satisfies OrganizationResult<OrganizationCreationRequestResponse>
+    }
+
+    const memberships = await listUserOrganizationMemberships(requester.id, trx)
+
+    if (memberships.length > 0) {
+      return {
+        ok: false,
+        error: { type: 'ORGANIZATION_CREATION_REQUEST_REQUIRES_PENDING_USER' },
+      } satisfies OrganizationResult<OrganizationCreationRequestResponse>
+    }
+
+    const slug = payload.slug.trim()
+    const existingOrganization = await findOrganizationBySlug(slug, trx)
+
+    if (existingOrganization) {
+      return {
+        ok: false,
+        error: { type: 'ORGANIZATION_SLUG_ALREADY_EXISTS' },
+      } satisfies OrganizationResult<OrganizationCreationRequestResponse>
+    }
+
+    const organization = await insertOrganization(
+      {
+        name: request.requested_organization_name.trim(),
+        slug,
+      },
+      trx
+    )
+
+    await insertOrganizationMembership(
+      {
+        organization_id: organization.id,
+        user_id: requester.id,
+        role: 'owner',
+      },
+      trx
+    )
+
+    const updatedRequest = await updateOrganizationCreationRequest(
+      request.id,
+      {
+        status: 'approved',
+        reviewed_by_user_id: admin.value.userId,
+        reviewed_at: now,
+        created_organization_id: organization.id,
+      },
+      trx
+    )
+
+    return {
+      ok: true,
+      value: toOrganizationCreationRequestResponse(updatedRequest),
+    } satisfies OrganizationResult<OrganizationCreationRequestResponse>
+  })
+
+  return result
+}
+
+export const rejectOrganizationCreationRequestForAdminSession = async (
+  sessionToken: string | undefined,
+  requestId: string,
+  payload: RejectOrganizationCreationRequestRequest,
+  now: Date = new Date(),
+  executor?: DbExecutor
+): Promise<OrganizationResult<OrganizationCreationRequestResponse>> => {
+  const admin = await requireAdmin(sessionToken, executor)
+
+  if (!admin.ok) {
+    return admin
+  }
+
+  const result = await runInTransaction(executor, async (trx) => {
+    const request = await findOrganizationCreationRequestByIdForUpdate(requestId, trx)
+
+    if (!request) {
+      return {
+        ok: false,
+        error: { type: 'ORGANIZATION_CREATION_REQUEST_NOT_FOUND' },
+      } satisfies OrganizationResult<OrganizationCreationRequestResponse>
+    }
+
+    if (request.status !== 'pending') {
+      return {
+        ok: false,
+        error: { type: 'ORGANIZATION_CREATION_REQUEST_NOT_PENDING' },
+      } satisfies OrganizationResult<OrganizationCreationRequestResponse>
+    }
+
+    const updatedRequest = await updateOrganizationCreationRequest(
+      request.id,
+      {
+        status: 'rejected',
+        reviewed_by_user_id: admin.value.userId,
+        reviewed_at: now,
+        rejected_reason: payload.reason.trim(),
+      },
+      trx
+    )
+
+    return {
+      ok: true,
+      value: toOrganizationCreationRequestResponse(updatedRequest),
+    } satisfies OrganizationResult<OrganizationCreationRequestResponse>
+  })
+
+  return result
 }
 
 export const listOrganizationUsersForSession = async (

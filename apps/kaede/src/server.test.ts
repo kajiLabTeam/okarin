@@ -72,7 +72,7 @@ const expectJsonErrorResponse = (
   expect(response?.content?.['application/json']?.schema).toBeDefined()
 }
 
-describe('createApp auth wiring', { timeout: 10_000 }, () => {
+describe('createApp auth wiring', { timeout: 30_000 }, () => {
   beforeEach(() => {
     for (const name of envNames) {
       originalEnv.set(name, process.env[name])

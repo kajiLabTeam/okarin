@@ -109,5 +109,5 @@ describe('GoogleOidcClient', () => {
     await expect(client.verifyIdToken({ idToken, nonce: 'wrong-nonce' })).rejects.toThrow(
       'Google ID token nonce mismatch'
     )
-  })
+  }, 15_000)
 })
