@@ -1,4 +1,10 @@
-import { getOptionalEnv, getRequiredEnv, normalizeBaseUrl, parsePositiveIntegerEnv } from './env.js'
+import {
+  getOptionalEnv,
+  getRequiredEnv,
+  normalizeBaseUrl,
+  parseBooleanEnv,
+  parsePositiveIntegerEnv,
+} from './env.js'
 
 export interface AppRuntimeConfig {
   apiSharedToken?: string
@@ -25,6 +31,18 @@ export interface NozomiRuntimeConfig {
   requestTimeoutMs: number
 }
 
+export interface OidcRuntimeConfig {
+  enabled: boolean
+  googleClientId: string
+  googleClientSecret: string
+  googleRedirectUri: string
+  loginSuccessRedirectUrl: string
+  loginFailureRedirectUrl: string
+  stateCookieSecret: string
+  passwordLoginEnabled: boolean
+  organizationCreationRequestsEnabled: boolean
+}
+
 export interface StorageRuntimeConfig {
   accessKeyId: string
   bucket: string
@@ -42,6 +60,7 @@ export interface RuntimeConfig {
   callback: CallbackRuntimeConfig
   database: DatabaseRuntimeConfig
   nozomi: NozomiRuntimeConfig
+  oidc: OidcRuntimeConfig
   storage: StorageRuntimeConfig
 }
 
@@ -55,6 +74,7 @@ let appRuntimeConfig: AppRuntimeConfig | undefined
 let callbackRuntimeConfig: CallbackRuntimeConfig | undefined
 let databaseRuntimeConfig: DatabaseRuntimeConfig | undefined
 let nozomiRuntimeConfig: NozomiRuntimeConfig | undefined
+let oidcRuntimeConfig: OidcRuntimeConfig | undefined
 let storageRuntimeConfig: StorageRuntimeConfig | undefined
 
 const isSharedTokenOptionalEnv = (env: string) => env === 'local' || env === 'test'
@@ -117,6 +137,33 @@ export const getNozomiRuntimeConfig = (): NozomiRuntimeConfig => {
   return nozomiRuntimeConfig
 }
 
+export const getOidcRuntimeConfig = (): OidcRuntimeConfig => {
+  if (oidcRuntimeConfig) {
+    return oidcRuntimeConfig
+  }
+
+  const enabled = parseBooleanEnv('OIDC_ENABLED', false)
+  const passwordLoginEnabled = parseBooleanEnv('PASSWORD_LOGIN_ENABLED', true)
+  const organizationCreationRequestsEnabled = parseBooleanEnv(
+    'ORGANIZATION_CREATION_REQUESTS_ENABLED',
+    true
+  )
+
+  oidcRuntimeConfig = {
+    enabled,
+    googleClientId: enabled ? getRequiredEnv('OIDC_GOOGLE_CLIENT_ID') : '',
+    googleClientSecret: enabled ? getRequiredEnv('OIDC_GOOGLE_CLIENT_SECRET') : '',
+    googleRedirectUri: enabled ? getRequiredEnv('OIDC_GOOGLE_REDIRECT_URI') : '',
+    loginSuccessRedirectUrl: enabled ? getRequiredEnv('OIDC_LOGIN_SUCCESS_REDIRECT_URL') : '/',
+    loginFailureRedirectUrl: enabled ? getRequiredEnv('OIDC_LOGIN_FAILURE_REDIRECT_URL') : '/',
+    stateCookieSecret: enabled ? getRequiredEnv('OIDC_STATE_COOKIE_SECRET') : '',
+    passwordLoginEnabled,
+    organizationCreationRequestsEnabled,
+  }
+
+  return oidcRuntimeConfig
+}
+
 export const getStorageRuntimeConfig = (): StorageRuntimeConfig => {
   if (storageRuntimeConfig) {
     return storageRuntimeConfig
@@ -153,6 +200,7 @@ export const getRuntimeConfig = (): RuntimeConfig => ({
   callback: getCallbackRuntimeConfig(),
   database: getDatabaseRuntimeConfig(),
   nozomi: getNozomiRuntimeConfig(),
+  oidc: getOidcRuntimeConfig(),
   storage: getStorageRuntimeConfig(),
 })
 
@@ -163,5 +211,6 @@ export const resetRuntimeConfigForTests = () => {
   callbackRuntimeConfig = undefined
   databaseRuntimeConfig = undefined
   nozomiRuntimeConfig = undefined
+  oidcRuntimeConfig = undefined
   storageRuntimeConfig = undefined
 }
