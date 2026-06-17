@@ -13,6 +13,28 @@ export const getOptionalEnv = (name: string, fallback: string) => process.env[na
 
 export const normalizeBaseUrl = (value: string) => value.replace(trailingSlashesPattern, '')
 
+export const parseBooleanEnv = (name: string, fallback: boolean) => {
+  const raw = process.env[name]
+  if (!raw) {
+    return fallback
+  }
+
+  switch (raw.trim().toLowerCase()) {
+    case '1':
+    case 'true':
+    case 'yes':
+    case 'on':
+      return true
+    case '0':
+    case 'false':
+    case 'no':
+    case 'off':
+      return false
+    default:
+      throw new Error(`${name} must be a boolean`)
+  }
+}
+
 export const parsePositiveIntegerEnv = (name: string, fallback: number) => {
   const raw = process.env[name]
   if (!raw) {

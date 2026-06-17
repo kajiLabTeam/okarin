@@ -3,10 +3,14 @@ import { registerChangePasswordRoute } from './change-password.js'
 import { registerLoginRoute } from './login.js'
 import { registerLogoutRoute } from './logout.js'
 import { registerMeRoute } from './me.js'
+import { registerGoogleOidcCallbackRoute } from './oidc-google-callback.js'
+import { registerGoogleOidcLoginRoute } from './oidc-google-login.js'
 
 export const authRoutes = new OpenAPIHono()
 
 registerLoginRoute(authRoutes)
+registerGoogleOidcLoginRoute(authRoutes)
+registerGoogleOidcCallbackRoute(authRoutes)
 registerLogoutRoute(authRoutes)
 registerMeRoute(authRoutes)
 registerChangePasswordRoute(authRoutes)

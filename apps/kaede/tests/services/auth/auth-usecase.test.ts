@@ -1,7 +1,13 @@
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSession, hashPassword, verifyPassword } from '../../../src/services/auth/index.js'
 import { createDb } from '../../../src/services/db/client.js'
-import { changePassword, getMe, login, logout } from '../../../src/usecases/auth/index.js'
+import {
+  changePassword,
+  completeGoogleOidcLogin,
+  getMe,
+  login,
+  logout,
+} from '../../../src/usecases/auth/index.js'
 import { resetDatabase } from '../../db/helpers.js'
 
 const db = createDb()
@@ -221,6 +227,121 @@ describe('auth usecase', () => {
       .executeTakeFirstOrThrow()
     expect(updated.failed_login_attempts).toBe(0)
     expect(updated.locked_until).toBeNull()
+  })
+
+  it('Google OIDC callback は未登録 user を pending user として作成して session を発行する', async () => {
+    const client = {
+      exchangeCodeForIdToken: vi.fn().mockResolvedValue('id-token'),
+      verifyIdToken: vi.fn().mockResolvedValue({
+        sub: 'google-subject',
+        email: 'oidc-user@example.com',
+        emailVerified: true,
+        name: 'OIDC User',
+        hostedDomain: null,
+      }),
+    }
+
+    const result = await completeGoogleOidcLogin(
+      {
+        code: 'authorization-code',
+        state: 'state-value',
+        expectedState: 'state-value',
+        nonce: 'nonce-value',
+        codeVerifier: 'code-verifier',
+      },
+      client as never,
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      return
+    }
+
+    expect(result.value.sessionToken).toEqual(expect.any(String))
+
+    const user = await db
+      .selectFrom('users')
+      .selectAll()
+      .where('email', '=', 'oidc-user@example.com')
+      .executeTakeFirstOrThrow()
+    expect(user).toMatchObject({
+      display_name: 'OIDC User',
+      global_role: 'none',
+      is_active: true,
+      password_must_change: false,
+      temporary_password_expires_at: null,
+    })
+
+    const identity = await db
+      .selectFrom('auth_identities')
+      .selectAll()
+      .where('user_id', '=', user.id)
+      .executeTakeFirstOrThrow()
+    expect(identity).toMatchObject({
+      provider: 'google',
+      provider_subject: 'google-subject',
+      email: 'oidc-user@example.com',
+      email_verified: true,
+      hosted_domain: null,
+    })
+  })
+
+  it('Google OIDC callback は state mismatch を拒否する', async () => {
+    const client = {
+      exchangeCodeForIdToken: vi.fn().mockResolvedValue('id-token'),
+      verifyIdToken: vi.fn().mockRejectedValue(new Error('should not verify token')),
+    }
+
+    await expect(
+      completeGoogleOidcLogin(
+        {
+          code: 'authorization-code',
+          state: 'wrong-state',
+          expectedState: 'state-value',
+          nonce: 'nonce-value',
+          codeVerifier: 'code-verifier',
+        },
+        client as never,
+        new Date('2026-06-10T00:00:00.000Z'),
+        db
+      )
+    ).resolves.toEqual({
+      ok: false,
+      error: { type: 'OIDC_INVALID_STATE' },
+    })
+  })
+
+  it('Google OIDC callback は email_verified=false を拒否する', async () => {
+    const client = {
+      exchangeCodeForIdToken: vi.fn().mockResolvedValue('id-token'),
+      verifyIdToken: vi.fn().mockResolvedValue({
+        sub: 'google-subject',
+        email: 'oidc-user@example.com',
+        emailVerified: false,
+        name: 'OIDC User',
+        hostedDomain: null,
+      }),
+    }
+
+    await expect(
+      completeGoogleOidcLogin(
+        {
+          code: 'authorization-code',
+          state: 'state-value',
+          expectedState: 'state-value',
+          nonce: 'nonce-value',
+          codeVerifier: 'code-verifier',
+        },
+        client as never,
+        new Date('2026-06-10T00:00:00.000Z'),
+        db
+      )
+    ).resolves.toEqual({
+      ok: false,
+      error: { type: 'OIDC_EMAIL_UNVERIFIED' },
+    })
   })
 
   it('login は temporary password 期限切れなら AUTH_TEMPORARY_PASSWORD_EXPIRED を返す', async () => {
