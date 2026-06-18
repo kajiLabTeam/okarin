@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSession } from '../../../src/services/auth/index.js'
 import { verifyPassword } from '../../../src/services/auth/password.js'
 import { createDb } from '../../../src/services/db/client.js'
@@ -14,6 +14,7 @@ import { resetDatabase } from '../../db/helpers.js'
 const db = createDb()
 const passwordHash =
   '$argon2id$v=19$m=65536,t=3,p=4$ZHVtbXk$zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
+const fixedTimestamp = new Date('2026-06-11T00:00:00.000Z')
 
 const createOrganization = async (name = 'Group A') => {
   return db.insertInto('organizations').values({ name }).returningAll().executeTakeFirstOrThrow()
@@ -36,18 +37,12 @@ const createUserWithSession = async (params: {
       global_role: params.globalRole,
       is_active: true,
       password_must_change: false,
-      password_changed_at: new Date('2026-06-11T00:00:00.000Z'),
+      password_changed_at: fixedTimestamp,
       temporary_password_expires_at: null,
     })
     .returningAll()
     .executeTakeFirstOrThrow()
-  const session = await createSession(
-    {
-      userId: user.id,
-      now: new Date('2026-06-11T00:00:00.000Z'),
-    },
-    db
-  )
+  const session = await createSession({ userId: user.id, now: fixedTimestamp }, db)
 
   if (params.membership) {
     await db
@@ -68,7 +63,13 @@ const createUserWithSession = async (params: {
 
 describe('organizations usecase', () => {
   beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(fixedTimestamp)
     await resetDatabase(db)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   afterAll(async () => {

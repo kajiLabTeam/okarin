@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetRuntimeConfigForTests } from '../../../src/config/runtime.js'
 import { createSession } from '../../../src/services/auth/index.js'
 import { createDb } from '../../../src/services/db/client.js'
@@ -40,9 +40,15 @@ const createUserWithSession = async (params: { email: string; globalRole?: 'admi
 
 describe('organization creation request usecase', () => {
   beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(now)
     process.env.ORGANIZATION_CREATION_REQUESTS_ENABLED = 'true'
     resetRuntimeConfigForTests()
     await resetDatabase(db)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   afterAll(async () => {
