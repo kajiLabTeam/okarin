@@ -211,13 +211,6 @@ const findOrCreateGoogleOidcUser = async (
       }
     }
 
-    if (existingUser.global_role === 'admin') {
-      return {
-        ok: false,
-        error: { type: 'AUTH_INVALID_CREDENTIALS' },
-      }
-    }
-
     const existingIdentity = await findGoogleIdentityByUserId(existingUser.id, executor)
 
     if (existingIdentity) {
