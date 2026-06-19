@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { getAppRuntimeConfig, getOidcRuntimeConfig, resetRuntimeConfigForTests } from './runtime.js'
 
 const originalAppEnv = process.env.APP_ENV
+const originalCorsAllowedOrigins = process.env.CORS_ALLOWED_ORIGINS
 const originalSharedToken = process.env.KAEDE_API_SHARED_TOKEN
+const originalSessionCookieSameSite = process.env.SESSION_COOKIE_SAME_SITE
 const originalOidcEnabled = process.env.OIDC_ENABLED
 const originalGoogleClientId = process.env.OIDC_GOOGLE_CLIENT_ID
 const originalGoogleClientSecret = process.env.OIDC_GOOGLE_CLIENT_SECRET
@@ -35,6 +37,7 @@ const restoreEnv = () => {
     }
   }
 
+  restoreOptionalEnv('CORS_ALLOWED_ORIGINS', originalCorsAllowedOrigins)
   restoreOptionalEnv('OIDC_ENABLED', originalOidcEnabled)
   restoreOptionalEnv('OIDC_GOOGLE_CLIENT_ID', originalGoogleClientId)
   restoreOptionalEnv('OIDC_GOOGLE_CLIENT_SECRET', originalGoogleClientSecret)
@@ -43,6 +46,7 @@ const restoreEnv = () => {
   restoreOptionalEnv('OIDC_LOGIN_FAILURE_REDIRECT_URL', originalLoginFailureRedirectUrl)
   restoreOptionalEnv('OIDC_STATE_COOKIE_SECRET', originalStateCookieSecret)
   restoreOptionalEnv('PASSWORD_LOGIN_ENABLED', originalPasswordLoginEnabled)
+  restoreOptionalEnv('SESSION_COOKIE_SAME_SITE', originalSessionCookieSameSite)
   restoreOptionalEnv(
     'ORGANIZATION_CREATION_REQUESTS_ENABLED',
     originalOrganizationCreationRequestsEnabled
@@ -63,7 +67,9 @@ describe('getAppRuntimeConfig', () => {
 
     expect(getAppRuntimeConfig()).toMatchObject({
       apiSharedToken: undefined,
+      corsAllowedOrigins: [],
       env: 'local',
+      sessionCookieSameSite: 'Lax',
     })
   })
 
@@ -74,7 +80,9 @@ describe('getAppRuntimeConfig', () => {
 
     expect(getAppRuntimeConfig()).toMatchObject({
       apiSharedToken: undefined,
+      corsAllowedOrigins: [],
       env: 'test',
+      sessionCookieSameSite: 'Lax',
     })
   })
 
@@ -85,6 +93,29 @@ describe('getAppRuntimeConfig', () => {
 
     expect(() => getAppRuntimeConfig()).toThrow(
       'KAEDE_API_SHARED_TOKEN is required outside local/test environments'
+    )
+  })
+
+  it('CORS allowed origins と session cookie SameSite を読む', () => {
+    process.env.APP_ENV = 'staging'
+    process.env.KAEDE_API_SHARED_TOKEN = 'shared-token'
+    process.env.CORS_ALLOWED_ORIGINS = 'https://mio.example.test, https://admin.example.test'
+    process.env.SESSION_COOKIE_SAME_SITE = 'None'
+    resetRuntimeConfigForTests()
+
+    expect(getAppRuntimeConfig()).toMatchObject({
+      corsAllowedOrigins: ['https://mio.example.test', 'https://admin.example.test'],
+      sessionCookieSameSite: 'None',
+    })
+  })
+
+  it('local では session cookie SameSite=None を拒否する', () => {
+    process.env.APP_ENV = 'local'
+    process.env.SESSION_COOKIE_SAME_SITE = 'None'
+    resetRuntimeConfigForTests()
+
+    expect(() => getAppRuntimeConfig()).toThrow(
+      'SESSION_COOKIE_SAME_SITE=None requires Secure cookies outside local environment'
     )
   })
 })

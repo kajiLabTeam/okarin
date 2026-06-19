@@ -4,6 +4,7 @@ import { resetRuntimeConfigForTests } from './config/runtime.js'
 const envNames = [
   'APP_ENV',
   'CALLBACK_TOKEN_SECRET',
+  'CORS_ALLOWED_ORIGINS',
   'DATABASE_URL',
   'KAEDE_API_SHARED_TOKEN',
   'KAEDE_INTERNAL_BASE_URL',
@@ -13,6 +14,7 @@ const envNames = [
   'S3_INTERNAL_ENDPOINT',
   'S3_REGION',
   'S3_SECRET_ACCESS_KEY',
+  'SESSION_COOKIE_SAME_SITE',
 ] as const
 
 const originalEnv = new Map<string, string | undefined>()
@@ -80,6 +82,7 @@ describe('createApp auth wiring', { timeout: 30_000 }, () => {
 
     process.env.APP_ENV = 'test'
     process.env.CALLBACK_TOKEN_SECRET = 'callback-secret'
+    Reflect.deleteProperty(process.env, 'CORS_ALLOWED_ORIGINS')
     process.env.DATABASE_URL = 'postgres://user:password@localhost:5432/okarin'
     process.env.KAEDE_API_SHARED_TOKEN = 'shared-token'
     process.env.KAEDE_INTERNAL_BASE_URL = 'http://kaede:8080'
@@ -89,6 +92,7 @@ describe('createApp auth wiring', { timeout: 30_000 }, () => {
     process.env.S3_INTERNAL_ENDPOINT = 'http://seaweedfs:8333'
     process.env.S3_REGION = 'ap-northeast-1'
     process.env.S3_SECRET_ACCESS_KEY = 'secret'
+    Reflect.deleteProperty(process.env, 'SESSION_COOKIE_SAME_SITE')
     resetRuntimeConfigForTests()
   })
 
@@ -128,6 +132,24 @@ describe('createApp auth wiring', { timeout: 30_000 }, () => {
       error_code: 'AUTH_UNAUTHENTICATED',
       error_message: 'login required',
     })
+  })
+
+  it('CORS_ALLOWED_ORIGINS があれば credential 付き CORS preflight を許可する', async () => {
+    process.env.CORS_ALLOWED_ORIGINS = 'https://mio.example.test'
+    resetRuntimeConfigForTests()
+    const app = await createTestApp()
+
+    const response = await app.request('/api/auth/me', {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'https://mio.example.test',
+        'access-control-request-method': 'GET',
+      },
+    })
+
+    expect(response.status).toBe(204)
+    expect(response.headers.get('access-control-allow-origin')).toBe('https://mio.example.test')
+    expect(response.headers.get('access-control-allow-credentials')).toBe('true')
   })
 
   it('health check は shared token なしで通す', async () => {

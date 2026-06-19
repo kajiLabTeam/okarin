@@ -8,12 +8,14 @@ import {
 
 export interface AppRuntimeConfig {
   apiSharedToken?: string
+  corsAllowedOrigins: string[]
   env: string
   deployRef: string
   deployedAt: string
   host: string
   port: number
   revision: string
+  sessionCookieSameSite: 'Strict' | 'Lax' | 'None'
 }
 
 export interface CallbackRuntimeConfig {
@@ -79,6 +81,36 @@ let storageRuntimeConfig: StorageRuntimeConfig | undefined
 
 const isSharedTokenOptionalEnv = (env: string) => env === 'local' || env === 'test'
 
+const parseCommaSeparatedEnv = (name: string) => {
+  const raw = process.env[name]
+  if (!raw) {
+    return []
+  }
+
+  return raw
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+}
+
+const parseSessionCookieSameSiteEnv = (): AppRuntimeConfig['sessionCookieSameSite'] => {
+  const raw = process.env.SESSION_COOKIE_SAME_SITE
+  if (!raw) {
+    return 'Lax'
+  }
+
+  switch (raw.trim().toLowerCase()) {
+    case 'strict':
+      return 'Strict'
+    case 'lax':
+      return 'Lax'
+    case 'none':
+      return 'None'
+    default:
+      throw new Error('SESSION_COOKIE_SAME_SITE must be one of Strict, Lax, None')
+  }
+}
+
 export const getAppRuntimeConfig = (): AppRuntimeConfig => {
   if (appRuntimeConfig) {
     return appRuntimeConfig
@@ -86,19 +118,28 @@ export const getAppRuntimeConfig = (): AppRuntimeConfig => {
 
   const env = getOptionalEnv('APP_ENV', 'local')
   const apiSharedToken = process.env.KAEDE_API_SHARED_TOKEN
+  const sessionCookieSameSite = parseSessionCookieSameSiteEnv()
 
   if (!apiSharedToken && !isSharedTokenOptionalEnv(env)) {
     throw new Error('KAEDE_API_SHARED_TOKEN is required outside local/test environments')
   }
 
+  if (sessionCookieSameSite === 'None' && env === 'local') {
+    throw new Error(
+      'SESSION_COOKIE_SAME_SITE=None requires Secure cookies outside local environment'
+    )
+  }
+
   appRuntimeConfig = {
     apiSharedToken,
+    corsAllowedOrigins: parseCommaSeparatedEnv('CORS_ALLOWED_ORIGINS'),
     env,
     deployRef: getOptionalEnv('APP_DEPLOY_REF', 'unknown'),
     deployedAt: getOptionalEnv('APP_DEPLOYED_AT', 'unknown'),
     host: getOptionalEnv('HOST', '0.0.0.0'),
     port: parsePositiveIntegerEnv('PORT', defaultPort),
     revision: getOptionalEnv('APP_REVISION', 'unknown'),
+    sessionCookieSameSite,
   }
 
   return appRuntimeConfig

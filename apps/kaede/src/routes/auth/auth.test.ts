@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetRuntimeConfigForTests } from '../../config/runtime.js'
 import { authRoutes } from './index.js'
 
+const originalAppEnv = process.env.APP_ENV
+
 const { changePasswordMock, completeGoogleOidcLoginMock, getMeMock, loginMock, logoutMock } =
   vi.hoisted(() => ({
     changePasswordMock: vi.fn(),
@@ -67,14 +69,26 @@ const userResponse = {
 describe('auth routes', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    if (originalAppEnv === undefined) {
+      Reflect.deleteProperty(process.env, 'APP_ENV')
+    } else {
+      process.env.APP_ENV = originalAppEnv
+    }
     process.env.OIDC_ENABLED = 'false'
     Reflect.deleteProperty(process.env, 'PASSWORD_LOGIN_ENABLED')
+    Reflect.deleteProperty(process.env, 'SESSION_COOKIE_SAME_SITE')
     resetRuntimeConfigForTests()
   })
 
   afterEach(() => {
+    if (originalAppEnv === undefined) {
+      Reflect.deleteProperty(process.env, 'APP_ENV')
+    } else {
+      process.env.APP_ENV = originalAppEnv
+    }
     Reflect.deleteProperty(process.env, 'OIDC_ENABLED')
     Reflect.deleteProperty(process.env, 'PASSWORD_LOGIN_ENABLED')
+    Reflect.deleteProperty(process.env, 'SESSION_COOKIE_SAME_SITE')
     resetRuntimeConfigForTests()
   })
 
@@ -106,6 +120,34 @@ describe('auth routes', () => {
       email: 'user@example.com',
       password: 'temporary-password',
     })
+  })
+
+  it('POST /api/auth/login は設定された SameSite で session cookie を発行する', async () => {
+    process.env.APP_ENV = 'test'
+    process.env.SESSION_COOKIE_SAME_SITE = 'None'
+    resetRuntimeConfigForTests()
+    loginMock.mockResolvedValue({
+      ok: true,
+      value: {
+        ...userResponse,
+        sessionToken: 'session-token',
+      },
+    })
+
+    const app = createAuthTestApp()
+    const response = await app.request('/api/auth/login', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: 'user@example.com',
+        password: 'temporary-password',
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('set-cookie')).toContain('SameSite=None')
   })
 
   it('POST /api/auth/login は認証失敗時 401 を返す', async () => {
