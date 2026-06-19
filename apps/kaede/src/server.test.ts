@@ -4,8 +4,8 @@ import { resetRuntimeConfigForTests } from './config/runtime.js'
 const envNames = [
   'APP_ENV',
   'CALLBACK_TOKEN_SECRET',
-  'CORS_ALLOWED_ORIGINS',
   'DATABASE_URL',
+  'FRONTEND_ORIGIN',
   'KAEDE_API_SHARED_TOKEN',
   'KAEDE_INTERNAL_BASE_URL',
   'NOZOMI_INTERNAL_ENDPOINT',
@@ -82,8 +82,8 @@ describe('createApp auth wiring', { timeout: 30_000 }, () => {
 
     process.env.APP_ENV = 'test'
     process.env.CALLBACK_TOKEN_SECRET = 'callback-secret'
-    Reflect.deleteProperty(process.env, 'CORS_ALLOWED_ORIGINS')
     process.env.DATABASE_URL = 'postgres://user:password@localhost:5432/okarin'
+    Reflect.deleteProperty(process.env, 'FRONTEND_ORIGIN')
     process.env.KAEDE_API_SHARED_TOKEN = 'shared-token'
     process.env.KAEDE_INTERNAL_BASE_URL = 'http://kaede:8080'
     process.env.NOZOMI_INTERNAL_ENDPOINT = 'http://nozomi:8000'
@@ -134,8 +134,8 @@ describe('createApp auth wiring', { timeout: 30_000 }, () => {
     })
   })
 
-  it('CORS_ALLOWED_ORIGINS があれば credential 付き CORS preflight を許可する', async () => {
-    process.env.CORS_ALLOWED_ORIGINS = 'https://mio.example.test'
+  it('FRONTEND_ORIGIN があれば credential 付き CORS preflight を許可する', async () => {
+    process.env.FRONTEND_ORIGIN = 'https://mio.example.test'
     resetRuntimeConfigForTests()
     const app = await createTestApp()
 

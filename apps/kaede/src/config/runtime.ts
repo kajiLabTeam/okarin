@@ -10,6 +10,7 @@ export interface AppRuntimeConfig {
   apiSharedToken?: string
   corsAllowedOrigins: string[]
   env: string
+  frontendOrigin?: string
   deployRef: string
   deployedAt: string
   host: string
@@ -81,16 +82,13 @@ let storageRuntimeConfig: StorageRuntimeConfig | undefined
 
 const isSharedTokenOptionalEnv = (env: string) => env === 'local' || env === 'test'
 
-const parseCommaSeparatedEnv = (name: string) => {
-  const raw = process.env[name]
+const getFrontendOriginEnv = () => {
+  const raw = process.env.FRONTEND_ORIGIN
   if (!raw) {
-    return []
+    return undefined
   }
 
-  return raw
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean)
+  return normalizeBaseUrl(raw.trim())
 }
 
 const parseSessionCookieSameSiteEnv = (): AppRuntimeConfig['sessionCookieSameSite'] => {
@@ -118,6 +116,7 @@ export const getAppRuntimeConfig = (): AppRuntimeConfig => {
 
   const env = getOptionalEnv('APP_ENV', 'local')
   const apiSharedToken = process.env.KAEDE_API_SHARED_TOKEN
+  const frontendOrigin = getFrontendOriginEnv()
   const sessionCookieSameSite = parseSessionCookieSameSiteEnv()
 
   if (!apiSharedToken && !isSharedTokenOptionalEnv(env)) {
@@ -132,8 +131,9 @@ export const getAppRuntimeConfig = (): AppRuntimeConfig => {
 
   appRuntimeConfig = {
     apiSharedToken,
-    corsAllowedOrigins: parseCommaSeparatedEnv('CORS_ALLOWED_ORIGINS'),
+    corsAllowedOrigins: frontendOrigin ? [frontendOrigin] : [],
     env,
+    frontendOrigin,
     deployRef: getOptionalEnv('APP_DEPLOY_REF', 'unknown'),
     deployedAt: getOptionalEnv('APP_DEPLOYED_AT', 'unknown'),
     host: getOptionalEnv('HOST', '0.0.0.0'),
@@ -189,14 +189,18 @@ export const getOidcRuntimeConfig = (): OidcRuntimeConfig => {
     'ORGANIZATION_CREATION_REQUESTS_ENABLED',
     true
   )
+  const googleClientId = enabled ? getRequiredEnv('OIDC_GOOGLE_CLIENT_ID') : ''
+  const googleClientSecret = enabled ? getRequiredEnv('OIDC_GOOGLE_CLIENT_SECRET') : ''
+  const googleRedirectUri = enabled ? getRequiredEnv('OIDC_GOOGLE_REDIRECT_URI') : ''
+  const frontendOrigin = enabled ? normalizeBaseUrl(getRequiredEnv('FRONTEND_ORIGIN')) : ''
 
   oidcRuntimeConfig = {
     enabled,
-    googleClientId: enabled ? getRequiredEnv('OIDC_GOOGLE_CLIENT_ID') : '',
-    googleClientSecret: enabled ? getRequiredEnv('OIDC_GOOGLE_CLIENT_SECRET') : '',
-    googleRedirectUri: enabled ? getRequiredEnv('OIDC_GOOGLE_REDIRECT_URI') : '',
-    loginSuccessRedirectUrl: enabled ? getRequiredEnv('OIDC_LOGIN_SUCCESS_REDIRECT_URL') : '/',
-    loginFailureRedirectUrl: enabled ? getRequiredEnv('OIDC_LOGIN_FAILURE_REDIRECT_URL') : '/',
+    googleClientId,
+    googleClientSecret,
+    googleRedirectUri,
+    loginSuccessRedirectUrl: enabled ? `${frontendOrigin}/` : '/',
+    loginFailureRedirectUrl: enabled ? `${frontendOrigin}/login` : '/',
     stateCookieSecret: enabled ? getRequiredEnv('OIDC_STATE_COOKIE_SECRET') : '',
     passwordLoginEnabled,
     organizationCreationRequestsEnabled,

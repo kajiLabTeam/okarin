@@ -2,15 +2,13 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { getAppRuntimeConfig, getOidcRuntimeConfig, resetRuntimeConfigForTests } from './runtime.js'
 
 const originalAppEnv = process.env.APP_ENV
-const originalCorsAllowedOrigins = process.env.CORS_ALLOWED_ORIGINS
+const originalFrontendOrigin = process.env.FRONTEND_ORIGIN
 const originalSharedToken = process.env.KAEDE_API_SHARED_TOKEN
 const originalSessionCookieSameSite = process.env.SESSION_COOKIE_SAME_SITE
 const originalOidcEnabled = process.env.OIDC_ENABLED
 const originalGoogleClientId = process.env.OIDC_GOOGLE_CLIENT_ID
 const originalGoogleClientSecret = process.env.OIDC_GOOGLE_CLIENT_SECRET
 const originalGoogleRedirectUri = process.env.OIDC_GOOGLE_REDIRECT_URI
-const originalLoginSuccessRedirectUrl = process.env.OIDC_LOGIN_SUCCESS_REDIRECT_URL
-const originalLoginFailureRedirectUrl = process.env.OIDC_LOGIN_FAILURE_REDIRECT_URL
 const originalStateCookieSecret = process.env.OIDC_STATE_COOKIE_SECRET
 const originalPasswordLoginEnabled = process.env.PASSWORD_LOGIN_ENABLED
 const originalOrganizationCreationRequestsEnabled =
@@ -37,13 +35,11 @@ const restoreEnv = () => {
     }
   }
 
-  restoreOptionalEnv('CORS_ALLOWED_ORIGINS', originalCorsAllowedOrigins)
+  restoreOptionalEnv('FRONTEND_ORIGIN', originalFrontendOrigin)
   restoreOptionalEnv('OIDC_ENABLED', originalOidcEnabled)
   restoreOptionalEnv('OIDC_GOOGLE_CLIENT_ID', originalGoogleClientId)
   restoreOptionalEnv('OIDC_GOOGLE_CLIENT_SECRET', originalGoogleClientSecret)
   restoreOptionalEnv('OIDC_GOOGLE_REDIRECT_URI', originalGoogleRedirectUri)
-  restoreOptionalEnv('OIDC_LOGIN_SUCCESS_REDIRECT_URL', originalLoginSuccessRedirectUrl)
-  restoreOptionalEnv('OIDC_LOGIN_FAILURE_REDIRECT_URL', originalLoginFailureRedirectUrl)
   restoreOptionalEnv('OIDC_STATE_COOKIE_SECRET', originalStateCookieSecret)
   restoreOptionalEnv('PASSWORD_LOGIN_ENABLED', originalPasswordLoginEnabled)
   restoreOptionalEnv('SESSION_COOKIE_SAME_SITE', originalSessionCookieSameSite)
@@ -69,6 +65,7 @@ describe('getAppRuntimeConfig', () => {
       apiSharedToken: undefined,
       corsAllowedOrigins: [],
       env: 'local',
+      frontendOrigin: undefined,
       sessionCookieSameSite: 'Lax',
     })
   })
@@ -82,6 +79,7 @@ describe('getAppRuntimeConfig', () => {
       apiSharedToken: undefined,
       corsAllowedOrigins: [],
       env: 'test',
+      frontendOrigin: undefined,
       sessionCookieSameSite: 'Lax',
     })
   })
@@ -96,15 +94,16 @@ describe('getAppRuntimeConfig', () => {
     )
   })
 
-  it('CORS allowed origins と session cookie SameSite を読む', () => {
+  it('frontend origin から CORS allowed origin を導出し session cookie SameSite を読む', () => {
     process.env.APP_ENV = 'staging'
     process.env.KAEDE_API_SHARED_TOKEN = 'shared-token'
-    process.env.CORS_ALLOWED_ORIGINS = 'https://mio.example.test, https://admin.example.test'
+    process.env.FRONTEND_ORIGIN = 'https://mio.example.test/'
     process.env.SESSION_COOKIE_SAME_SITE = 'None'
     resetRuntimeConfigForTests()
 
     expect(getAppRuntimeConfig()).toMatchObject({
-      corsAllowedOrigins: ['https://mio.example.test', 'https://admin.example.test'],
+      corsAllowedOrigins: ['https://mio.example.test'],
+      frontendOrigin: 'https://mio.example.test',
       sessionCookieSameSite: 'None',
     })
   })
@@ -150,8 +149,7 @@ describe('getOidcRuntimeConfig', () => {
     process.env.OIDC_GOOGLE_CLIENT_ID = 'client-id'
     process.env.OIDC_GOOGLE_CLIENT_SECRET = 'client-secret'
     process.env.OIDC_GOOGLE_REDIRECT_URI = 'https://api.example.test/api/auth/oidc/google/callback'
-    process.env.OIDC_LOGIN_SUCCESS_REDIRECT_URL = 'https://app.example.test/'
-    process.env.OIDC_LOGIN_FAILURE_REDIRECT_URL = 'https://app.example.test/login'
+    process.env.FRONTEND_ORIGIN = 'https://app.example.test'
     process.env.OIDC_STATE_COOKIE_SECRET = 'state-cookie-secret'
     process.env.PASSWORD_LOGIN_ENABLED = 'false'
     process.env.ORGANIZATION_CREATION_REQUESTS_ENABLED = 'false'
