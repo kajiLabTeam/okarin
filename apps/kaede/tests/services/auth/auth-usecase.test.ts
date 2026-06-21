@@ -4,6 +4,7 @@ import { createDb } from '../../../src/services/db/client.js'
 import { createAdminUser } from '../../../src/usecases/auth/create-admin-user.js'
 import {
   changePassword,
+  completeGoogleOidcLink,
   completeGoogleOidcLogin,
   getMe,
   login,
@@ -289,67 +290,44 @@ describe('auth usecase', () => {
     })
   })
 
-  it('Google OIDC callback は既存 admin user に Google identity を紐づけて session を発行する', async () => {
-    const admin = await insertUser({
-      email: 'admin@example.com',
-      displayName: 'Admin',
-      globalRole: 'admin',
-      passwordMustChange: false,
-      temporaryPasswordExpiresAt: null,
+  it('Google OIDC callback は既存 user と email が一致しても自動紐付けしない', async () => {
+    await insertUser({
+      email: 'user@example.com',
     })
     const client = {
       exchangeCodeForIdToken: vi.fn().mockResolvedValue('id-token'),
       verifyIdToken: vi.fn().mockResolvedValue({
-        sub: 'admin-google-subject',
-        email: 'admin@example.com',
+        sub: 'google-subject',
+        email: 'user@example.com',
         emailVerified: true,
-        name: 'Admin From Google',
+        name: 'OIDC User',
         hostedDomain: null,
       }),
     }
 
-    const result = await completeGoogleOidcLogin(
-      {
-        code: 'authorization-code',
-        state: 'state-value',
-        expectedState: 'state-value',
-        nonce: 'nonce-value',
-        codeVerifier: 'code-verifier',
-      },
-      client as never,
-      new Date('2026-06-10T00:00:00.000Z'),
-      db
-    )
-
-    expect(result.ok).toBe(true)
-    if (!result.ok) {
-      return
-    }
-
-    expect(result.value.sessionToken).toEqual(expect.any(String))
-
-    const identity = await db
-      .selectFrom('auth_identities')
-      .selectAll()
-      .where('user_id', '=', admin.id)
-      .executeTakeFirstOrThrow()
-    expect(identity).toMatchObject({
-      provider: 'google',
-      provider_subject: 'admin-google-subject',
-      email: 'admin@example.com',
-      email_verified: true,
-      hosted_domain: null,
+    await expect(
+      completeGoogleOidcLogin(
+        {
+          code: 'authorization-code',
+          state: 'state-value',
+          expectedState: 'state-value',
+          nonce: 'nonce-value',
+          codeVerifier: 'code-verifier',
+        },
+        client as never,
+        new Date('2026-06-10T00:00:00.000Z'),
+        db
+      )
+    ).resolves.toEqual({
+      ok: false,
+      error: { type: 'OIDC_IDENTITY_CONFLICT' },
     })
 
-    const session = await db
-      .selectFrom('sessions')
-      .selectAll()
-      .where('user_id', '=', admin.id)
-      .executeTakeFirstOrThrow()
-    expect(session.session_hash).toEqual(expect.any(String))
+    const identities = await db.selectFrom('auth_identities').selectAll().execute()
+    expect(identities).toHaveLength(0)
   })
 
-  it('Google OIDC callback は bootstrap CLI で作成した admin user に Google identity を紐づける', async () => {
+  it('Google OIDC link は bootstrap CLI で作成した admin user に Google identity を紐づける', async () => {
     const adminResult = await createAdminUser(
       {
         email: 'admin@example.com',
@@ -386,6 +364,13 @@ describe('auth usecase', () => {
         .where('user_id', '=', adminResult.value.userId)
         .executeTakeFirst()
     ).resolves.toBeUndefined()
+    const { token } = await createSession(
+      {
+        userId: adminResult.value.userId,
+        now: new Date('2026-06-10T00:00:00.000Z'),
+      },
+      db
+    )
 
     const client = {
       exchangeCodeForIdToken: vi.fn().mockResolvedValue('id-token'),
@@ -398,7 +383,8 @@ describe('auth usecase', () => {
       }),
     }
 
-    const result = await completeGoogleOidcLogin(
+    const result = await completeGoogleOidcLink(
+      token,
       {
         code: 'authorization-code',
         state: 'state-value',
@@ -411,11 +397,10 @@ describe('auth usecase', () => {
       db
     )
 
-    expect(result.ok).toBe(true)
-    if (!result.ok) {
-      return
-    }
-    expect(result.value.sessionToken).toEqual(expect.any(String))
+    expect(result).toEqual({
+      ok: true,
+      value: { ok: true },
+    })
 
     const identity = await db
       .selectFrom('auth_identities')
@@ -447,6 +432,116 @@ describe('auth usecase', () => {
       .execute()
     expect(users).toHaveLength(1)
     expect(users[0].id).toBe(adminResult.value.userId)
+  })
+
+  it('Google OIDC link はログイン済み user に Google subject を紐付ける', async () => {
+    const user = await insertUser({
+      email: 'user@example.com',
+    })
+    const { token } = await createSession(
+      {
+        userId: user.id,
+        now: new Date('2026-06-10T00:00:00.000Z'),
+      },
+      db
+    )
+    const client = {
+      exchangeCodeForIdToken: vi.fn().mockResolvedValue('id-token'),
+      verifyIdToken: vi.fn().mockResolvedValue({
+        sub: 'google-subject',
+        email: 'changed-google-email@example.com',
+        emailVerified: true,
+        name: 'OIDC User',
+        hostedDomain: null,
+      }),
+    }
+
+    const result = await completeGoogleOidcLink(
+      token,
+      {
+        code: 'authorization-code',
+        state: 'state-value',
+        expectedState: 'state-value',
+        nonce: 'nonce-value',
+        codeVerifier: 'code-verifier',
+      },
+      client as never,
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    expect(result).toEqual({
+      ok: true,
+      value: { ok: true },
+    })
+
+    const identity = await db
+      .selectFrom('auth_identities')
+      .selectAll()
+      .where('user_id', '=', user.id)
+      .executeTakeFirstOrThrow()
+    expect(identity).toMatchObject({
+      provider: 'google',
+      provider_subject: 'google-subject',
+      email: 'changed-google-email@example.com',
+      email_verified: true,
+    })
+  })
+
+  it('Google OIDC link は他 user に紐付いた Google subject を拒否する', async () => {
+    const linkedUser = await insertUser({
+      email: 'linked@example.com',
+    })
+    const user = await insertUser({
+      email: 'user@example.com',
+    })
+    await db
+      .insertInto('auth_identities')
+      .values({
+        user_id: linkedUser.id,
+        provider: 'google',
+        provider_subject: 'google-subject',
+        email: 'linked@example.com',
+        email_verified: true,
+        hosted_domain: null,
+      })
+      .execute()
+    const { token } = await createSession(
+      {
+        userId: user.id,
+        now: new Date('2026-06-10T00:00:00.000Z'),
+      },
+      db
+    )
+    const client = {
+      exchangeCodeForIdToken: vi.fn().mockResolvedValue('id-token'),
+      verifyIdToken: vi.fn().mockResolvedValue({
+        sub: 'google-subject',
+        email: 'user@example.com',
+        emailVerified: true,
+        name: 'OIDC User',
+        hostedDomain: null,
+      }),
+    }
+
+    await expect(
+      completeGoogleOidcLink(
+        token,
+        {
+          code: 'authorization-code',
+          state: 'state-value',
+          expectedState: 'state-value',
+          nonce: 'nonce-value',
+          codeVerifier: 'code-verifier',
+        },
+        client as never,
+        new Date('2026-06-10T00:00:00.000Z'),
+        db
+      )
+    ).resolves.toEqual({
+      ok: false,
+      error: { type: 'OIDC_IDENTITY_CONFLICT' },
+    })
   })
 
   it('Google OIDC callback は state mismatch を拒否する', async () => {

@@ -6,6 +6,7 @@ const payload = {
   nonce: 'nonce-value',
   codeVerifier: 'code-verifier',
   expiresAt: '2026-06-17T00:10:00.000Z',
+  intent: 'login' as const,
 }
 
 describe('Google OIDC state cookie', () => {

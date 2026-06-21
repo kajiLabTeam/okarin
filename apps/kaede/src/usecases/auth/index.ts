@@ -70,6 +70,13 @@ export type OidcLoginError =
   | { type: 'OIDC_IDENTITY_CONFLICT' }
   | { type: 'AUTH_USER_DISABLED' }
 
+export type OidcLinkError =
+  | { type: 'OIDC_INVALID_STATE' }
+  | { type: 'OIDC_PROVIDER_ERROR' }
+  | { type: 'OIDC_EMAIL_UNVERIFIED' }
+  | { type: 'OIDC_IDENTITY_CONFLICT' }
+  | ActiveSessionUserError
+
 export type OidcLoginResult =
   | {
       ok: true
@@ -80,6 +87,18 @@ export type OidcLoginResult =
   | {
       ok: false
       error: OidcLoginError
+    }
+
+export type OidcLinkResult =
+  | {
+      ok: true
+      value: {
+        ok: true
+      }
+    }
+  | {
+      ok: false
+      error: OidcLinkError
     }
 
 export interface CompleteGoogleOidcLoginParams {
@@ -201,40 +220,10 @@ const findOrCreateGoogleOidcUser = async (
     }
   }
 
-  const existingUser = await findUserByEmail(claims.email, executor)
-
-  if (existingUser) {
-    if (!existingUser.is_active) {
-      return {
-        ok: true,
-        value: existingUser,
-      }
-    }
-
-    const existingIdentity = await findGoogleIdentityByUserId(existingUser.id, executor)
-
-    if (existingIdentity) {
-      return {
-        ok: false,
-        error: { type: 'AUTH_INVALID_CREDENTIALS' },
-      }
-    }
-
-    await insertAuthIdentity(
-      {
-        user_id: existingUser.id,
-        provider: 'google',
-        provider_subject: claims.sub,
-        email: claims.email,
-        email_verified: claims.emailVerified,
-        hosted_domain: claims.hostedDomain,
-      },
-      executor
-    )
-
+  if (await findUserByEmail(claims.email, executor)) {
     return {
-      ok: true,
-      value: existingUser,
+      ok: false,
+      error: { type: 'AUTH_INVALID_CREDENTIALS' },
     }
   }
 
@@ -267,6 +256,60 @@ const findOrCreateGoogleOidcUser = async (
   return {
     ok: true,
     value: createdUser,
+  }
+}
+
+const verifyGoogleOidcClaims = async (
+  params: CompleteGoogleOidcLoginParams,
+  client: GoogleOidcClient
+): Promise<
+  | {
+      ok: true
+      value: GoogleIdTokenClaims
+    }
+  | {
+      ok: false
+      error: Extract<
+        OidcLoginError,
+        { type: 'OIDC_INVALID_STATE' | 'OIDC_PROVIDER_ERROR' | 'OIDC_EMAIL_UNVERIFIED' }
+      >
+    }
+> => {
+  if (!params.code || !params.state || params.state !== params.expectedState) {
+    return {
+      ok: false,
+      error: { type: 'OIDC_INVALID_STATE' },
+    }
+  }
+
+  let claims: GoogleIdTokenClaims
+
+  try {
+    const idToken = await client.exchangeCodeForIdToken({
+      code: params.code,
+      codeVerifier: params.codeVerifier,
+    })
+    claims = await client.verifyIdToken({
+      idToken,
+      nonce: params.nonce,
+    })
+  } catch {
+    return {
+      ok: false,
+      error: { type: 'OIDC_PROVIDER_ERROR' },
+    }
+  }
+
+  if (!claims.emailVerified) {
+    return {
+      ok: false,
+      error: { type: 'OIDC_EMAIL_UNVERIFIED' },
+    }
+  }
+
+  return {
+    ok: true,
+    value: claims,
   }
 }
 
@@ -365,40 +408,14 @@ export const completeGoogleOidcLogin = async (
   now: Date = new Date(),
   executor?: DbExecutor
 ): Promise<OidcLoginResult> => {
-  if (!params.code || !params.state || params.state !== params.expectedState) {
-    return {
-      ok: false,
-      error: { type: 'OIDC_INVALID_STATE' },
-    }
-  }
+  const claimsResult = await verifyGoogleOidcClaims(params, client)
 
-  let claims: GoogleIdTokenClaims
-
-  try {
-    const idToken = await client.exchangeCodeForIdToken({
-      code: params.code,
-      codeVerifier: params.codeVerifier,
-    })
-    claims = await client.verifyIdToken({
-      idToken,
-      nonce: params.nonce,
-    })
-  } catch {
-    return {
-      ok: false,
-      error: { type: 'OIDC_PROVIDER_ERROR' },
-    }
-  }
-
-  if (!claims.emailVerified) {
-    return {
-      ok: false,
-      error: { type: 'OIDC_EMAIL_UNVERIFIED' },
-    }
+  if (!claimsResult.ok) {
+    return claimsResult
   }
 
   const userResult = await runInTransaction(executor, async (trx) => {
-    return findOrCreateGoogleOidcUser(claims, trx)
+    return findOrCreateGoogleOidcUser(claimsResult.value, trx)
   })
 
   if (!userResult.ok) {
@@ -426,6 +443,64 @@ export const completeGoogleOidcLogin = async (
       sessionToken: token,
     },
   }
+}
+
+export const completeGoogleOidcLink = async (
+  sessionToken: string | undefined,
+  params: CompleteGoogleOidcLoginParams,
+  client: GoogleOidcClient,
+  now: Date = new Date(),
+  executor?: DbExecutor
+): Promise<OidcLinkResult> => {
+  const activeUser = await requireActiveSessionUser(sessionToken, executor, now)
+
+  if (!activeUser.ok) {
+    return activeUser
+  }
+
+  const claimsResult = await verifyGoogleOidcClaims(params, client)
+
+  if (!claimsResult.ok) {
+    return claimsResult
+  }
+
+  const result = await runInTransaction(executor, async (trx) => {
+    const identityBySubject = await findGoogleIdentityBySubject(claimsResult.value.sub, trx)
+
+    if (identityBySubject) {
+      return identityBySubject.user_id === activeUser.value.id
+        ? ({ ok: true, value: { ok: true } } as const)
+        : ({ ok: false, error: { type: 'OIDC_IDENTITY_CONFLICT' } } as const)
+    }
+
+    const identityByUserId = await findGoogleIdentityByUserId(activeUser.value.id, trx)
+
+    if (identityByUserId) {
+      return {
+        ok: false,
+        error: { type: 'OIDC_IDENTITY_CONFLICT' },
+      } as const
+    }
+
+    await insertAuthIdentity(
+      {
+        user_id: activeUser.value.id,
+        provider: 'google',
+        provider_subject: claimsResult.value.sub,
+        email: claimsResult.value.email,
+        email_verified: claimsResult.value.emailVerified,
+        hosted_domain: claimsResult.value.hostedDomain,
+      },
+      trx
+    )
+
+    return {
+      ok: true,
+      value: { ok: true },
+    } as const
+  })
+
+  return result
 }
 
 export const getMe = async (
