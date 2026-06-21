@@ -1,6 +1,7 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 import { Scalar } from '@scalar/hono-api-reference'
 import * as Sentry from '@sentry/node'
+import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
 import { getRuntimeConfig } from './config/runtime.js'
 import { requestActorMiddleware } from './middleware/request-actor.js'
@@ -12,11 +13,24 @@ export const createApp = () => {
   const deployRef = runtimeConfig.app.deployRef
   const revision = runtimeConfig.app.revision
   const deployedAt = runtimeConfig.app.deployedAt
+  const corsAllowedOrigins = runtimeConfig.app.corsAllowedOrigins
 
   app.use(async (_c, next) => {
     Sentry.setTag('service', 'kaede')
     await next()
   })
+
+  if (corsAllowedOrigins.length > 0) {
+    app.use(
+      '/api/*',
+      cors({
+        origin: corsAllowedOrigins,
+        allowHeaders: ['authorization', 'content-type'],
+        allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+        credentials: true,
+      })
+    )
+  }
 
   app.onError((err, c) => {
     Sentry.captureException(err)

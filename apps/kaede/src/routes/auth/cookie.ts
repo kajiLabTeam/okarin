@@ -14,7 +14,7 @@ export const setSessionCookie = (c: Context, token: string) => {
   setCookie(c, sessionCookieName, token, {
     httpOnly: true,
     path: '/',
-    sameSite: 'Lax',
+    sameSite: runtimeConfig.sessionCookieSameSite,
     secure: runtimeConfig.env !== 'local',
   })
 }

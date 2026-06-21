@@ -8,12 +8,15 @@ import {
 
 export interface AppRuntimeConfig {
   apiSharedToken?: string
+  corsAllowedOrigins: string[]
   env: string
+  frontendOrigin?: string
   deployRef: string
   deployedAt: string
   host: string
   port: number
   revision: string
+  sessionCookieSameSite: 'Strict' | 'Lax' | 'None'
 }
 
 export interface CallbackRuntimeConfig {
@@ -79,6 +82,33 @@ let storageRuntimeConfig: StorageRuntimeConfig | undefined
 
 const isSharedTokenOptionalEnv = (env: string) => env === 'local' || env === 'test'
 
+const getFrontendOriginEnv = () => {
+  const raw = process.env.FRONTEND_ORIGIN
+  if (!raw) {
+    return undefined
+  }
+
+  return normalizeBaseUrl(raw.trim())
+}
+
+const parseSessionCookieSameSiteEnv = (): AppRuntimeConfig['sessionCookieSameSite'] => {
+  const raw = process.env.SESSION_COOKIE_SAME_SITE
+  if (!raw) {
+    return 'Lax'
+  }
+
+  switch (raw.trim().toLowerCase()) {
+    case 'strict':
+      return 'Strict'
+    case 'lax':
+      return 'Lax'
+    case 'none':
+      return 'None'
+    default:
+      throw new Error('SESSION_COOKIE_SAME_SITE must be one of Strict, Lax, None')
+  }
+}
+
 export const getAppRuntimeConfig = (): AppRuntimeConfig => {
   if (appRuntimeConfig) {
     return appRuntimeConfig
@@ -86,19 +116,30 @@ export const getAppRuntimeConfig = (): AppRuntimeConfig => {
 
   const env = getOptionalEnv('APP_ENV', 'local')
   const apiSharedToken = process.env.KAEDE_API_SHARED_TOKEN
+  const frontendOrigin = getFrontendOriginEnv()
+  const sessionCookieSameSite = parseSessionCookieSameSiteEnv()
 
   if (!apiSharedToken && !isSharedTokenOptionalEnv(env)) {
     throw new Error('KAEDE_API_SHARED_TOKEN is required outside local/test environments')
   }
 
+  if (sessionCookieSameSite === 'None' && env === 'local') {
+    throw new Error(
+      'SESSION_COOKIE_SAME_SITE=None requires Secure cookies outside local environment'
+    )
+  }
+
   appRuntimeConfig = {
     apiSharedToken,
+    corsAllowedOrigins: frontendOrigin ? [frontendOrigin] : [],
     env,
+    frontendOrigin,
     deployRef: getOptionalEnv('APP_DEPLOY_REF', 'unknown'),
     deployedAt: getOptionalEnv('APP_DEPLOYED_AT', 'unknown'),
     host: getOptionalEnv('HOST', '0.0.0.0'),
     port: parsePositiveIntegerEnv('PORT', defaultPort),
     revision: getOptionalEnv('APP_REVISION', 'unknown'),
+    sessionCookieSameSite,
   }
 
   return appRuntimeConfig
@@ -148,14 +189,18 @@ export const getOidcRuntimeConfig = (): OidcRuntimeConfig => {
     'ORGANIZATION_CREATION_REQUESTS_ENABLED',
     true
   )
+  const googleClientId = enabled ? getRequiredEnv('OIDC_GOOGLE_CLIENT_ID') : ''
+  const googleClientSecret = enabled ? getRequiredEnv('OIDC_GOOGLE_CLIENT_SECRET') : ''
+  const googleRedirectUri = enabled ? getRequiredEnv('OIDC_GOOGLE_REDIRECT_URI') : ''
+  const frontendOrigin = enabled ? normalizeBaseUrl(getRequiredEnv('FRONTEND_ORIGIN')) : ''
 
   oidcRuntimeConfig = {
     enabled,
-    googleClientId: enabled ? getRequiredEnv('OIDC_GOOGLE_CLIENT_ID') : '',
-    googleClientSecret: enabled ? getRequiredEnv('OIDC_GOOGLE_CLIENT_SECRET') : '',
-    googleRedirectUri: enabled ? getRequiredEnv('OIDC_GOOGLE_REDIRECT_URI') : '',
-    loginSuccessRedirectUrl: enabled ? getRequiredEnv('OIDC_LOGIN_SUCCESS_REDIRECT_URL') : '/',
-    loginFailureRedirectUrl: enabled ? getRequiredEnv('OIDC_LOGIN_FAILURE_REDIRECT_URL') : '/',
+    googleClientId,
+    googleClientSecret,
+    googleRedirectUri,
+    loginSuccessRedirectUrl: enabled ? `${frontendOrigin}/` : '/',
+    loginFailureRedirectUrl: enabled ? `${frontendOrigin}/login` : '/',
     stateCookieSecret: enabled ? getRequiredEnv('OIDC_STATE_COOKIE_SECRET') : '',
     passwordLoginEnabled,
     organizationCreationRequestsEnabled,
