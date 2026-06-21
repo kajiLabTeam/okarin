@@ -1,4 +1,4 @@
-import { createRoute, z } from '@hono/zod-openapi'
+import { createRoute } from '@hono/zod-openapi'
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { getOidcRuntimeConfig } from '../../config/runtime.js'
 import {
@@ -7,11 +7,9 @@ import {
   generatePkceCodeVerifier,
   GoogleOidcClient,
 } from '../../services/auth/index.js'
+import { requireActiveSessionUser } from '../../usecases/auth/index.js'
+import { getSessionTokenFromCookie } from './cookie.js'
 import { setGoogleOidcStateCookie } from './oidc-cookie.js'
-
-const loginQuerySchema = z.object({
-  invite_token: z.string().min(1).optional(),
-})
 
 const withError = (url: string, errorCode: string) => {
   const redirectUrl = new URL(url, 'http://localhost')
@@ -21,15 +19,12 @@ const withError = (url: string, errorCode: string) => {
     : redirectUrl.toString()
 }
 
-export const registerGoogleOidcLoginRoute = (app: OpenAPIHono) => {
+export const registerGoogleOidcLinkRoute = (app: OpenAPIHono) => {
   const route = createRoute({
     method: 'get',
-    path: '/oidc/google/login',
+    path: '/oidc/google/link',
     tags: ['Auth'],
-    description: 'Google authorization endpoint へ redirect する',
-    request: {
-      query: loginQuerySchema,
-    },
+    description: 'ログイン中 user の Google identity 連携を開始する',
     responses: {
       302: {
         description: 'redirect to Google authorization endpoint',
@@ -37,14 +32,22 @@ export const registerGoogleOidcLoginRoute = (app: OpenAPIHono) => {
     },
   })
 
-  app.openapi(route, (c) => {
+  app.openapi(route, async (c) => {
     const config = getOidcRuntimeConfig()
 
     if (!config.enabled) {
       return c.redirect(withError(config.loginFailureRedirectUrl, 'oidc_disabled'), 302)
     }
 
-    const query = c.req.valid('query')
+    const activeUser = await requireActiveSessionUser(getSessionTokenFromCookie(c))
+
+    if (!activeUser.ok) {
+      return c.redirect(
+        withError(config.loginFailureRedirectUrl, activeUser.error.type.toLowerCase()),
+        302
+      )
+    }
+
     const state = generateOidcState()
     const nonce = generateOidcNonce()
     const codeVerifier = generatePkceCodeVerifier()
@@ -62,8 +65,7 @@ export const registerGoogleOidcLoginRoute = (app: OpenAPIHono) => {
         nonce,
         codeVerifier,
         expiresAt: expiresAt.toISOString(),
-        intent: 'login',
-        inviteToken: query.invite_token,
+        intent: 'link',
       },
       config.stateCookieSecret
     )

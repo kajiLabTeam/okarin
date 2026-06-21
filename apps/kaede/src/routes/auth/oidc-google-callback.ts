@@ -2,8 +2,8 @@ import { createRoute, z } from '@hono/zod-openapi'
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { getOidcRuntimeConfig } from '../../config/runtime.js'
 import { GoogleOidcClient } from '../../services/auth/index.js'
-import { completeGoogleOidcLogin } from '../../usecases/auth/index.js'
-import { setSessionCookie } from './cookie.js'
+import { completeGoogleOidcLink, completeGoogleOidcLogin } from '../../usecases/auth/index.js'
+import { getSessionTokenFromCookie, setSessionCookie } from './cookie.js'
 import { clearGoogleOidcStateCookie, getGoogleOidcStateCookie } from './oidc-cookie.js'
 
 const callbackQuerySchema = z.object({
@@ -58,13 +58,31 @@ export const registerGoogleOidcCallbackRoute = (app: OpenAPIHono) => {
       clientSecret: config.googleClientSecret,
       redirectUri: config.googleRedirectUri,
     })
+    const params = {
+      code: query.code,
+      state: query.state,
+      expectedState: stateCookie.state,
+      nonce: stateCookie.nonce,
+      codeVerifier: stateCookie.codeVerifier,
+    }
+
+    if (stateCookie.intent === 'link') {
+      const result = await completeGoogleOidcLink(getSessionTokenFromCookie(c), params, client)
+
+      if (!result.ok) {
+        return c.redirect(withError(failureRedirectUrl, result.error.type.toLowerCase()), 302)
+      }
+
+      return c.redirect(config.loginSuccessRedirectUrl, 302)
+    }
+
     const result = await completeGoogleOidcLogin(
       {
-        code: query.code,
-        state: query.state,
-        expectedState: stateCookie.state,
-        nonce: stateCookie.nonce,
-        codeVerifier: stateCookie.codeVerifier,
+        code: params.code,
+        state: params.state,
+        expectedState: params.expectedState,
+        nonce: params.nonce,
+        codeVerifier: params.codeVerifier,
       },
       client
     )

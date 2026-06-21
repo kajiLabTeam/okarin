@@ -10,6 +10,7 @@ export interface GoogleOidcStateCookiePayload {
   nonce: string
   codeVerifier: string
   expiresAt: string
+  intent: 'login' | 'link'
   inviteToken?: string
 }
 
