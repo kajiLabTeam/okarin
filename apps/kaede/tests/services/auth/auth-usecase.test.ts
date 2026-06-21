@@ -290,14 +290,72 @@ describe('auth usecase', () => {
     })
   })
 
-  it('Google OIDC callback は既存 user と email が一致しても自動紐付けしない', async () => {
-    await insertUser({
+  it('Google OIDC callback は既存 user と email が一致すれば Google identity を紐づける', async () => {
+    const user = await insertUser({
       email: 'user@example.com',
     })
     const client = {
       exchangeCodeForIdToken: vi.fn().mockResolvedValue('id-token'),
       verifyIdToken: vi.fn().mockResolvedValue({
         sub: 'google-subject',
+        email: 'user@example.com',
+        emailVerified: true,
+        name: 'OIDC User',
+        hostedDomain: null,
+      }),
+    }
+
+    const result = await completeGoogleOidcLogin(
+      {
+        code: 'authorization-code',
+        state: 'state-value',
+        expectedState: 'state-value',
+        nonce: 'nonce-value',
+        codeVerifier: 'code-verifier',
+      },
+      client as never,
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      return
+    }
+
+    const identity = await db
+      .selectFrom('auth_identities')
+      .selectAll()
+      .where('user_id', '=', user.id)
+      .executeTakeFirstOrThrow()
+    expect(identity).toMatchObject({
+      provider: 'google',
+      provider_subject: 'google-subject',
+      email: 'user@example.com',
+      email_verified: true,
+      hosted_domain: null,
+    })
+  })
+
+  it('Google OIDC callback は既存 user に別 Google identity があれば conflict を返す', async () => {
+    const user = await insertUser({
+      email: 'user@example.com',
+    })
+    await db
+      .insertInto('auth_identities')
+      .values({
+        user_id: user.id,
+        provider: 'google',
+        provider_subject: 'existing-google-subject',
+        email: 'user@example.com',
+        email_verified: true,
+        hosted_domain: null,
+      })
+      .execute()
+    const client = {
+      exchangeCodeForIdToken: vi.fn().mockResolvedValue('id-token'),
+      verifyIdToken: vi.fn().mockResolvedValue({
+        sub: 'new-google-subject',
         email: 'user@example.com',
         emailVerified: true,
         name: 'OIDC User',
@@ -322,9 +380,6 @@ describe('auth usecase', () => {
       ok: false,
       error: { type: 'OIDC_IDENTITY_CONFLICT' },
     })
-
-    const identities = await db.selectFrom('auth_identities').selectAll().execute()
-    expect(identities).toHaveLength(0)
   })
 
   it('Google OIDC link は bootstrap CLI で作成した admin user に Google identity を紐づける', async () => {
