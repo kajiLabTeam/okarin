@@ -220,10 +220,33 @@ const findOrCreateGoogleOidcUser = async (
     }
   }
 
-  if (await findUserByEmail(claims.email, executor)) {
+  const existingUser = await findUserByEmail(claims.email, executor)
+
+  if (existingUser) {
+    const existingUserIdentity = await findGoogleIdentityByUserId(existingUser.id, executor)
+
+    if (existingUserIdentity) {
+      return {
+        ok: false,
+        error: { type: 'AUTH_INVALID_CREDENTIALS' },
+      }
+    }
+
+    await insertAuthIdentity(
+      {
+        user_id: existingUser.id,
+        provider: 'google',
+        provider_subject: claims.sub,
+        email: claims.email,
+        email_verified: claims.emailVerified,
+        hosted_domain: claims.hostedDomain,
+      },
+      executor
+    )
+
     return {
-      ok: false,
-      error: { type: 'AUTH_INVALID_CREDENTIALS' },
+      ok: true,
+      value: existingUser,
     }
   }
 
