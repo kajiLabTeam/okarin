@@ -6,10 +6,12 @@ import { generateSessionToken, hashSessionToken } from './session-token.js'
 type DbExecutor = Kysely<DB> | Transaction<DB>
 
 export type Session = Selectable<Sessions>
+export type SessionAuthMethod = 'password' | 'oidc'
 
 const defaultSessionTtlMs = 7 * 24 * 60 * 60 * 1000
 
 export interface CreateSessionParams {
+  authMethod?: SessionAuthMethod
   userId: string
   now?: Date
   ttlMs?: number
@@ -31,7 +33,12 @@ export type FindValidSessionResult =
     }
 
 export const createSession = async (
-  { userId, now = new Date(), ttlMs = defaultSessionTtlMs }: CreateSessionParams,
+  {
+    authMethod = 'password',
+    userId,
+    now = new Date(),
+    ttlMs = defaultSessionTtlMs,
+  }: CreateSessionParams,
   executor: DbExecutor = db
 ): Promise<CreateSessionResult> => {
   const token = generateSessionToken()
@@ -41,6 +48,7 @@ export const createSession = async (
   const values: Insertable<Sessions> = {
     user_id: userId,
     session_hash: sessionHash,
+    auth_method: authMethod,
     expires_at: expiresAt,
     revoked_at: null,
     last_seen_at: null,

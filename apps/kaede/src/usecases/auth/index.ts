@@ -139,11 +139,13 @@ const mapActiveSessionError = (
 
 const buildAuthUserResponse = async (
   user: User,
+  sessionAuthMethod: 'password' | 'oidc',
   executor?: DbExecutor
 ): Promise<AuthUserResponse> => {
   const memberships = await listUserOrganizationMemberships(user.id, executor)
 
   return {
+    session_auth_method: sessionAuthMethod,
     user: {
       user_id: user.id,
       email: user.email,
@@ -198,6 +200,26 @@ const createOidcPasswordHash = async () => {
   return hashPassword(`oidc:${randomUUID()}:${randomUUID()}`)
 }
 
+const attachGoogleIdentityToUser = async (
+  user: User,
+  claims: GoogleIdTokenClaims,
+  executor: DbExecutor
+): Promise<User> => {
+  await insertAuthIdentity(
+    {
+      user_id: user.id,
+      provider: 'google',
+      provider_subject: claims.sub,
+      email: claims.email,
+      email_verified: claims.emailVerified,
+      hosted_domain: claims.hostedDomain,
+    },
+    executor
+  )
+
+  return user
+}
+
 const findOrCreateGoogleOidcUser = async (
   claims: GoogleIdTokenClaims,
   executor: DbExecutor
@@ -232,17 +254,7 @@ const findOrCreateGoogleOidcUser = async (
       }
     }
 
-    await insertAuthIdentity(
-      {
-        user_id: existingUser.id,
-        provider: 'google',
-        provider_subject: claims.sub,
-        email: claims.email,
-        email_verified: claims.emailVerified,
-        hosted_domain: claims.hostedDomain,
-      },
-      executor
-    )
+    await attachGoogleIdentityToUser(existingUser, claims, executor)
 
     return {
       ok: true,
@@ -413,8 +425,8 @@ export const login = async (
     executor
   )
 
-  const { token } = await createSession({ userId: user.id, now }, executor)
-  const response = await buildAuthUserResponse(user, executor)
+  const { token } = await createSession({ authMethod: 'password', userId: user.id, now }, executor)
+  const response = await buildAuthUserResponse(user, 'password', executor)
 
   return {
     ok: true,
@@ -458,7 +470,10 @@ export const completeGoogleOidcLogin = async (
     }
   }
 
-  const { token } = await createSession({ userId: userResult.value.id, now }, executor)
+  const { token } = await createSession(
+    { authMethod: 'oidc', userId: userResult.value.id, now },
+    executor
+  )
 
   return {
     ok: true,
@@ -505,17 +520,7 @@ export const completeGoogleOidcLink = async (
       } as const
     }
 
-    await insertAuthIdentity(
-      {
-        user_id: activeUser.value.id,
-        provider: 'google',
-        provider_subject: claimsResult.value.sub,
-        email: claimsResult.value.email,
-        email_verified: claimsResult.value.emailVerified,
-        hosted_domain: claimsResult.value.hostedDomain,
-      },
-      trx
-    )
+    await attachGoogleIdentityToUser(activeUser.value, claimsResult.value, trx)
 
     return {
       ok: true,
@@ -565,7 +570,11 @@ export const getMe = async (
 
   return {
     ok: true,
-    value: await buildAuthUserResponse(user, executor),
+    value: await buildAuthUserResponse(
+      user,
+      sessionResult.session.auth_method as 'password' | 'oidc',
+      executor
+    ),
   }
 }
 

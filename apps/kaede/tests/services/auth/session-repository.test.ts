@@ -40,10 +40,19 @@ describe('session repository', () => {
     const { token, session } = await createSession({ userId: user.id, now }, db)
 
     expect(token).not.toBe(session.session_hash)
+    expect(session.auth_method).toBe('password')
     expect(session.session_hash).toBe(hashSessionToken(token))
     expect(session.expires_at).toEqual(new Date('2026-06-17T00:00:00.000Z'))
     expect(session.revoked_at).toBeNull()
     expect(session.last_seen_at).toBeNull()
+  })
+
+  it('session の auth method を保存する', async () => {
+    const user = await insertUser()
+
+    const { session } = await createSession({ authMethod: 'oidc', userId: user.id }, db)
+
+    expect(session.auth_method).toBe('oidc')
   })
 
   it('token から session を取得できる', async () => {

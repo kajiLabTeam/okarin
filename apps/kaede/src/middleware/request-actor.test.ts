@@ -39,13 +39,16 @@ const createTestApp = (sharedToken = 'shared-token') => {
 }
 
 const mockActiveSessionUser = ({
+  authMethod = 'password',
   passwordMustChange = false,
 }: {
+  authMethod?: 'password' | 'oidc'
   passwordMustChange?: boolean
 } = {}) => {
   findValidSessionByTokenMock.mockResolvedValue({
     ok: true,
     session: {
+      auth_method: authMethod,
       user_id: '11111111-1111-4111-8111-111111111111',
     },
   })
@@ -170,7 +173,7 @@ describe('requestActorMiddleware', () => {
     })
   })
 
-  it('password_must_change user は非 auth API を拒否される', async () => {
+  it('password session の password_must_change user は非 auth API を拒否される', async () => {
     mockActiveSessionUser({ passwordMustChange: true })
     const app = createTestApp()
 
@@ -185,6 +188,21 @@ describe('requestActorMiddleware', () => {
       error_code: 'AUTH_PASSWORD_CHANGE_REQUIRED',
       error_message: 'password change required',
     })
+  })
+
+  it('oidc session の password_must_change user は非 auth API を利用できる', async () => {
+    mockActiveSessionUser({ authMethod: 'oidc', passwordMustChange: true })
+    const app = createTestApp()
+
+    const response = await app.request('/api/ping', {
+      headers: {
+        cookie: 'okarin_session=session-token',
+      },
+    })
+
+    expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(body.actor.password_must_change).toBe(true)
   })
 
   it('membership がない user は pending_membership actor として設定する', async () => {

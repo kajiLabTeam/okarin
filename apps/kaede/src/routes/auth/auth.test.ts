@@ -61,6 +61,7 @@ const createAuthTestApp = () => {
 }
 
 const userResponse = {
+  session_auth_method: 'password',
   user: {
     user_id: '11111111-1111-4111-8111-111111111111',
     email: 'user@example.com',

@@ -73,6 +73,7 @@ export const registerLoginRoute = (app: OpenAPIHono) => {
 
     return c.json(
       {
+        session_auth_method: result.value.session_auth_method,
         user: result.value.user,
       },
       200
