@@ -234,10 +234,12 @@ CREATE TABLE public.sessions (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     user_id uuid NOT NULL,
     session_hash text NOT NULL,
+    auth_method text DEFAULT 'password'::text NOT NULL,
     expires_at timestamp with time zone NOT NULL,
     revoked_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     last_seen_at timestamp with time zone,
+    CONSTRAINT sessions_auth_method_chk CHECK ((auth_method = ANY (ARRAY['password'::text, 'oidc'::text]))),
     CONSTRAINT sessions_session_hash_nonempty_chk CHECK ((length(btrim(session_hash)) > 0))
 );
 
