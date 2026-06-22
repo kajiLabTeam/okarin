@@ -1,13 +1,19 @@
 import { OpenAPIHono, createRoute } from '@hono/zod-openapi'
 import { errorResponseSchema } from '../../schemas/common.js'
 import {
+  approveOrganizationCreationRequestRequestSchema,
   createOrganizationCreationRequestRequestSchema,
+  organizationCreationRequestIdParamsSchema,
   organizationCreationRequestSchema,
   organizationCreationRequestsResponseSchema,
+  rejectOrganizationCreationRequestRequestSchema,
 } from '../../schemas/organizations.js'
 import {
+  approveOrganizationCreationRequestForAdminSession,
   createOrganizationCreationRequestForSession,
+  getOrganizationCreationRequestForAdminSession,
   listMyOrganizationCreationRequestsForSession,
+  rejectOrganizationCreationRequestForAdminSession,
 } from '../../usecases/organizations/index.js'
 import { getSessionTokenFromCookie } from '../auth/cookie.js'
 import { toOrganizationErrorResponse } from '../organizations/error.js'
@@ -97,6 +103,168 @@ const listMyRequestsRoute = createRoute({
   },
 })
 
+const getRequestRoute = createRoute({
+  method: 'get',
+  path: '/{requestId}',
+  tags: ['Organization Creation Requests'],
+  description: 'admin が organization 作成申請詳細を取得する',
+  request: {
+    params: organizationCreationRequestIdParamsSchema,
+  },
+  responses: {
+    200: {
+      description: 'organization creation request',
+      content: {
+        'application/json': {
+          schema: organizationCreationRequestSchema,
+        },
+      },
+    },
+    401: {
+      description: 'login required',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    403: {
+      description: 'permission denied',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: 'organization creation request not found',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+  },
+})
+
+const approveRequestRoute = createRoute({
+  method: 'post',
+  path: '/{requestId}/approve',
+  tags: ['Organization Creation Requests'],
+  description: 'admin が organization 作成申請を承認する',
+  request: {
+    params: organizationCreationRequestIdParamsSchema,
+    body: {
+      content: {
+        'application/json': {
+          schema: approveOrganizationCreationRequestRequestSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: 'organization creation request approved',
+      content: {
+        'application/json': {
+          schema: organizationCreationRequestSchema,
+        },
+      },
+    },
+    401: {
+      description: 'login required',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    403: {
+      description: 'permission denied',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: 'organization creation request not found',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: 'conflict',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+  },
+})
+
+const rejectRequestRoute = createRoute({
+  method: 'post',
+  path: '/{requestId}/reject',
+  tags: ['Organization Creation Requests'],
+  description: 'admin が organization 作成申請を却下する',
+  request: {
+    params: organizationCreationRequestIdParamsSchema,
+    body: {
+      content: {
+        'application/json': {
+          schema: rejectOrganizationCreationRequestRequestSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: 'organization creation request rejected',
+      content: {
+        'application/json': {
+          schema: organizationCreationRequestSchema,
+        },
+      },
+    },
+    401: {
+      description: 'login required',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    403: {
+      description: 'permission denied',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: 'organization creation request not found',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: 'conflict',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+  },
+})
+
 organizationCreationRequestsRoutes.openapi(createRequestRoute, async (c) => {
   const payload = c.req.valid('json')
   const result = await createOrganizationCreationRequestForSession(
@@ -118,6 +286,55 @@ organizationCreationRequestsRoutes.openapi(listMyRequestsRoute, async (c) => {
   if (!result.ok) {
     const error = toOrganizationErrorResponse(result.error)
     return c.json(error.body, error.status as 401 | 403)
+  }
+
+  return c.json(result.value, 200)
+})
+
+organizationCreationRequestsRoutes.openapi(getRequestRoute, async (c) => {
+  const { requestId } = c.req.valid('param')
+  const result = await getOrganizationCreationRequestForAdminSession(
+    getSessionTokenFromCookie(c),
+    requestId
+  )
+
+  if (!result.ok) {
+    const error = toOrganizationErrorResponse(result.error)
+    return c.json(error.body, error.status as 401 | 403 | 404)
+  }
+
+  return c.json(result.value, 200)
+})
+
+organizationCreationRequestsRoutes.openapi(approveRequestRoute, async (c) => {
+  const { requestId } = c.req.valid('param')
+  const payload = c.req.valid('json')
+  const result = await approveOrganizationCreationRequestForAdminSession(
+    getSessionTokenFromCookie(c),
+    requestId,
+    payload
+  )
+
+  if (!result.ok) {
+    const error = toOrganizationErrorResponse(result.error)
+    return c.json(error.body, error.status)
+  }
+
+  return c.json(result.value, 200)
+})
+
+organizationCreationRequestsRoutes.openapi(rejectRequestRoute, async (c) => {
+  const { requestId } = c.req.valid('param')
+  const payload = c.req.valid('json')
+  const result = await rejectOrganizationCreationRequestForAdminSession(
+    getSessionTokenFromCookie(c),
+    requestId,
+    payload
+  )
+
+  if (!result.ok) {
+    const error = toOrganizationErrorResponse(result.error)
+    return c.json(error.body, error.status)
   }
 
   return c.json(result.value, 200)

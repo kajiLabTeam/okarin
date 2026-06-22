@@ -5,6 +5,7 @@ import { createDb } from '../../../src/services/db/client.js'
 import {
   createOrUpdateOrganizationMembershipForSession,
   createOrganizationUserForSession,
+  getOrganizationForSession,
   createOrganizationForSession,
   listOrganizationUsersForSession,
   listOrganizationsForSession,
@@ -128,6 +129,88 @@ describe('organizations usecase', () => {
     })
   })
 
+  it('admin can get an organization', async () => {
+    const organization = await createOrganization('Group A')
+    const admin = await createUserWithSession({
+      email: 'admin@example.com',
+      globalRole: 'admin',
+    })
+
+    const result = await getOrganizationForSession(admin.sessionToken, organization.id, db)
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        organization_id: organization.id,
+        name: 'Group A',
+      },
+    })
+  })
+
+  it('manager can get their organization', async () => {
+    const organization = await createOrganization('Group A')
+    const manager = await createUserWithSession({
+      email: 'manager@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'manager',
+      },
+    })
+
+    const result = await getOrganizationForSession(manager.sessionToken, organization.id, db)
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        organization_id: organization.id,
+        name: 'Group A',
+      },
+    })
+  })
+
+  it('owner can get their organization', async () => {
+    const organization = await createOrganization('Group A')
+    const owner = await createUserWithSession({
+      email: 'owner@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'owner',
+      },
+    })
+
+    const result = await getOrganizationForSession(owner.sessionToken, organization.id, db)
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        organization_id: organization.id,
+        name: 'Group A',
+      },
+    })
+  })
+
+  it('get organization returns not found when organization does not exist', async () => {
+    const admin = await createUserWithSession({
+      email: 'admin@example.com',
+      globalRole: 'admin',
+    })
+
+    const result = await getOrganizationForSession(
+      admin.sessionToken,
+      '11111111-1111-4111-8111-111111111111',
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'ORGANIZATION_NOT_FOUND',
+      },
+    })
+  })
+
   it('non-admin cannot create an organization', async () => {
     const member = await createUserWithSession({
       email: 'member@example.com',
@@ -141,6 +224,23 @@ describe('organizations usecase', () => {
       },
       db
     )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'AUTH_FORBIDDEN',
+      },
+    })
+  })
+
+  it('non-admin cannot get an organization', async () => {
+    const organization = await createOrganization()
+    const member = await createUserWithSession({
+      email: 'member@example.com',
+      globalRole: 'none',
+    })
+
+    const result = await getOrganizationForSession(member.sessionToken, organization.id, db)
 
     expect(result).toEqual({
       ok: false,

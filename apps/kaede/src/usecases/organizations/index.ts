@@ -289,6 +289,46 @@ export const listOrganizationsForSession = async (
   }
 }
 
+export const getOrganizationForSession = async (
+  sessionToken: string | undefined,
+  organizationId: string,
+  executor?: DbExecutor
+): Promise<OrganizationResult<OrganizationResponse>> => {
+  const actor = await requireActiveSessionUser(sessionToken, executor)
+
+  if (!actor.ok) {
+    return {
+      ok: false,
+      error: mapAuthError(actor.error),
+    }
+  }
+
+  const organization = await findOrganizationById(organizationId, executor)
+
+  if (!organization) {
+    return {
+      ok: false,
+      error: { type: 'ORGANIZATION_NOT_FOUND' },
+    }
+  }
+
+  if (actor.value.global_role !== 'admin') {
+    const membership = await findOrganizationMembership(organizationId, actor.value.id, executor)
+
+    if (membership?.role !== 'manager' && membership?.role !== 'owner') {
+      return {
+        ok: false,
+        error: { type: 'AUTH_FORBIDDEN' },
+      }
+    }
+  }
+
+  return {
+    ok: true,
+    value: toOrganizationResponse(organization),
+  }
+}
+
 export const createOrganizationForSession = async (
   sessionToken: string | undefined,
   payload: CreateOrganizationRequest,
