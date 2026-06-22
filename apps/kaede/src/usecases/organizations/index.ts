@@ -294,10 +294,13 @@ export const getOrganizationForSession = async (
   organizationId: string,
   executor?: DbExecutor
 ): Promise<OrganizationResult<OrganizationResponse>> => {
-  const admin = await requireAdmin(sessionToken, executor)
+  const actor = await requireActiveSessionUser(sessionToken, executor)
 
-  if (!admin.ok) {
-    return admin
+  if (!actor.ok) {
+    return {
+      ok: false,
+      error: mapAuthError(actor.error),
+    }
   }
 
   const organization = await findOrganizationById(organizationId, executor)
@@ -306,6 +309,17 @@ export const getOrganizationForSession = async (
     return {
       ok: false,
       error: { type: 'ORGANIZATION_NOT_FOUND' },
+    }
+  }
+
+  if (actor.value.global_role !== 'admin') {
+    const membership = await findOrganizationMembership(organizationId, actor.value.id, executor)
+
+    if (membership?.role !== 'manager' && membership?.role !== 'owner') {
+      return {
+        ok: false,
+        error: { type: 'AUTH_FORBIDDEN' },
+      }
     }
   }
 

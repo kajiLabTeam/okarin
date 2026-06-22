@@ -147,6 +147,50 @@ describe('organizations usecase', () => {
     })
   })
 
+  it('manager can get their organization', async () => {
+    const organization = await createOrganization('Group A')
+    const manager = await createUserWithSession({
+      email: 'manager@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'manager',
+      },
+    })
+
+    const result = await getOrganizationForSession(manager.sessionToken, organization.id, db)
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        organization_id: organization.id,
+        name: 'Group A',
+      },
+    })
+  })
+
+  it('owner can get their organization', async () => {
+    const organization = await createOrganization('Group A')
+    const owner = await createUserWithSession({
+      email: 'owner@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'owner',
+      },
+    })
+
+    const result = await getOrganizationForSession(owner.sessionToken, organization.id, db)
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        organization_id: organization.id,
+        name: 'Group A',
+      },
+    })
+  })
+
   it('get organization returns not found when organization does not exist', async () => {
     const admin = await createUserWithSession({
       email: 'admin@example.com',

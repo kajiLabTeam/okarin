@@ -4,14 +4,17 @@ import { organizationCreationRequestsRoutes } from './index.js'
 
 const {
   createOrganizationCreationRequestForSessionMock,
+  getOrganizationCreationRequestForAdminSessionMock,
   listMyOrganizationCreationRequestsForSessionMock,
 } = vi.hoisted(() => ({
   createOrganizationCreationRequestForSessionMock: vi.fn(),
+  getOrganizationCreationRequestForAdminSessionMock: vi.fn(),
   listMyOrganizationCreationRequestsForSessionMock: vi.fn(),
 }))
 
 vi.mock('../../usecases/organizations/index.js', () => ({
   createOrganizationCreationRequestForSession: createOrganizationCreationRequestForSessionMock,
+  getOrganizationCreationRequestForAdminSession: getOrganizationCreationRequestForAdminSessionMock,
   listMyOrganizationCreationRequestsForSession: listMyOrganizationCreationRequestsForSessionMock,
 }))
 
@@ -115,5 +118,58 @@ describe('organization creation request routes', () => {
       requests: [requestResponse],
     })
     expect(listMyOrganizationCreationRequestsForSessionMock).toHaveBeenCalledWith('session-token')
+  })
+
+  it('GET /api/organization-creation-requests/{requestId} returns request for admin', async () => {
+    getOrganizationCreationRequestForAdminSessionMock.mockResolvedValue({
+      ok: true,
+      value: requestResponse,
+    })
+
+    const app = createRouteTestApp('/organization-creation-requests', (resource) =>
+      resource.route('/', organizationCreationRequestsRoutes)
+    )
+    const response = await app.request(
+      '/api/organization-creation-requests/11111111-1111-4111-8111-111111111111',
+      {
+        headers: {
+          cookie: 'okarin_session=session-token',
+        },
+      }
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual(requestResponse)
+    expect(getOrganizationCreationRequestForAdminSessionMock).toHaveBeenCalledWith(
+      'session-token',
+      '11111111-1111-4111-8111-111111111111'
+    )
+  })
+
+  it('GET /api/organization-creation-requests/{requestId} returns 404 when missing', async () => {
+    getOrganizationCreationRequestForAdminSessionMock.mockResolvedValue({
+      ok: false,
+      error: {
+        type: 'ORGANIZATION_CREATION_REQUEST_NOT_FOUND',
+      },
+    })
+
+    const app = createRouteTestApp('/organization-creation-requests', (resource) =>
+      resource.route('/', organizationCreationRequestsRoutes)
+    )
+    const response = await app.request(
+      '/api/organization-creation-requests/11111111-1111-4111-8111-111111111111',
+      {
+        headers: {
+          cookie: 'okarin_session=session-token',
+        },
+      }
+    )
+
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'ORGANIZATION_CREATION_REQUEST_NOT_FOUND',
+      error_message: 'organization creation request not found',
+    })
   })
 })
