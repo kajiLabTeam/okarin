@@ -137,6 +137,7 @@ export interface Recordings {
 }
 
 export interface Sessions {
+  auth_method: Generated<string>
   created_at: Generated<Timestamp>
   expires_at: Timestamp
   id: Generated<string>

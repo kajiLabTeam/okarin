@@ -94,6 +94,7 @@ describe('auth usecase', () => {
     }
 
     expect(result.value.sessionToken).toEqual(expect.any(String))
+    expect(result.value.session_auth_method).toBe('password')
     expect(result.value.user).toEqual({
       user_id: user.id,
       email: 'user@example.com',
@@ -119,6 +120,7 @@ describe('auth usecase', () => {
       .executeTakeFirstOrThrow()
 
     expect(session.expires_at).toEqual(new Date('2026-06-17T00:00:00.000Z'))
+    expect(session.auth_method).toBe('password')
   })
 
   it('login は password 不一致なら failed_login_attempts を増やし AUTH_INVALID_CREDENTIALS を返す', async () => {
@@ -288,6 +290,13 @@ describe('auth usecase', () => {
       email_verified: true,
       hosted_domain: null,
     })
+
+    const session = await db
+      .selectFrom('sessions')
+      .selectAll()
+      .where('user_id', '=', user.id)
+      .executeTakeFirstOrThrow()
+    expect(session.auth_method).toBe('oidc')
   })
 
   it('Google OIDC callback は既存 user と email が一致すれば Google identity を紐づける', async () => {
@@ -335,6 +344,24 @@ describe('auth usecase', () => {
       email_verified: true,
       hosted_domain: null,
     })
+
+    const updatedUser = await db
+      .selectFrom('users')
+      .selectAll()
+      .where('id', '=', user.id)
+      .executeTakeFirstOrThrow()
+    expect(updatedUser).toMatchObject({
+      password_must_change: true,
+      password_changed_at: null,
+      temporary_password_expires_at: new Date('2026-06-11T00:00:00.000Z'),
+    })
+
+    const session = await db
+      .selectFrom('sessions')
+      .selectAll()
+      .where('user_id', '=', user.id)
+      .executeTakeFirstOrThrow()
+    expect(session.auth_method).toBe('oidc')
   })
 
   it('Google OIDC callback は既存 user に別 Google identity があれば conflict を返す', async () => {
@@ -478,6 +505,8 @@ describe('auth usecase', () => {
     expect(adminAfterOidc).toMatchObject({
       global_role: 'admin',
       password_must_change: true,
+      password_changed_at: null,
+      temporary_password_expires_at: new Date('2026-06-11T00:00:00.000Z'),
     })
 
     const users = await db
@@ -487,6 +516,82 @@ describe('auth usecase', () => {
       .execute()
     expect(users).toHaveLength(1)
     expect(users[0].id).toBe(adminResult.value.userId)
+  })
+
+  it('Google OIDC callback は bootstrap CLI で作成した admin user を oidc session でログインする', async () => {
+    const adminResult = await createAdminUser(
+      {
+        email: 'admin@example.com',
+        displayName: 'Bootstrap Admin',
+        password: 'temporary-password',
+        resetPassword: false,
+      },
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+    expect(adminResult.ok).toBe(true)
+    if (!adminResult.ok) {
+      return
+    }
+    const client = {
+      exchangeCodeForIdToken: vi.fn().mockResolvedValue('id-token'),
+      verifyIdToken: vi.fn().mockResolvedValue({
+        sub: 'bootstrap-admin-google-subject',
+        email: 'admin@example.com',
+        emailVerified: true,
+        name: 'Admin From Google',
+        hostedDomain: null,
+      }),
+    }
+
+    const result = await completeGoogleOidcLogin(
+      {
+        code: 'authorization-code',
+        state: 'state-value',
+        expectedState: 'state-value',
+        nonce: 'nonce-value',
+        codeVerifier: 'code-verifier',
+      },
+      client as never,
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      return
+    }
+
+    const adminAfterOidc = await db
+      .selectFrom('users')
+      .selectAll()
+      .where('id', '=', adminResult.value.userId)
+      .executeTakeFirstOrThrow()
+    expect(adminAfterOidc).toMatchObject({
+      global_role: 'admin',
+      password_must_change: true,
+      password_changed_at: null,
+      temporary_password_expires_at: new Date('2026-06-11T00:00:00.000Z'),
+    })
+
+    const identity = await db
+      .selectFrom('auth_identities')
+      .selectAll()
+      .where('user_id', '=', adminResult.value.userId)
+      .executeTakeFirstOrThrow()
+    expect(identity).toMatchObject({
+      provider: 'google',
+      provider_subject: 'bootstrap-admin-google-subject',
+      email: 'admin@example.com',
+      email_verified: true,
+    })
+
+    const session = await db
+      .selectFrom('sessions')
+      .selectAll()
+      .where('user_id', '=', adminResult.value.userId)
+      .executeTakeFirstOrThrow()
+    expect(session.auth_method).toBe('oidc')
   })
 
   it('Google OIDC link はログイン済み user に Google subject を紐付ける', async () => {
@@ -540,6 +645,17 @@ describe('auth usecase', () => {
       provider_subject: 'google-subject',
       email: 'changed-google-email@example.com',
       email_verified: true,
+    })
+
+    const updatedUser = await db
+      .selectFrom('users')
+      .selectAll()
+      .where('id', '=', user.id)
+      .executeTakeFirstOrThrow()
+    expect(updatedUser).toMatchObject({
+      password_must_change: true,
+      password_changed_at: null,
+      temporary_password_expires_at: new Date('2026-06-11T00:00:00.000Z'),
     })
   })
 
@@ -698,8 +814,31 @@ describe('auth usecase', () => {
     }
 
     expect(result.value.user.user_id).toBe(user.id)
+    expect(result.value.session_auth_method).toBe('password')
     expect(result.value.user.account_state).toBe('pending_membership')
     expect(result.value.user.password_must_change).toBe(false)
+  })
+
+  it('getMe は oidc session の auth method を返す', async () => {
+    const user = await insertUser()
+    const { token } = await createSession(
+      {
+        authMethod: 'oidc',
+        userId: user.id,
+        now: new Date('2026-06-10T00:00:00.000Z'),
+      },
+      db
+    )
+
+    const result = await getMe(token, new Date('2026-06-11T00:00:00.000Z'), db)
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      return
+    }
+
+    expect(result.value.session_auth_method).toBe('oidc')
+    expect(result.value.user.password_must_change).toBe(true)
   })
 
   it('logout は session を revoke する', async () => {

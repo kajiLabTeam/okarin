@@ -129,7 +129,7 @@ export const requestActorMiddleware = ({
       return authError(c, 'AUTH_USER_DISABLED')
     }
 
-    if (user.password_must_change) {
+    if (sessionResult.session.auth_method === 'password' && user.password_must_change) {
       return authError(c, 'AUTH_PASSWORD_CHANGE_REQUIRED')
     }
 

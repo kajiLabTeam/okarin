@@ -30,6 +30,7 @@ export const loginRequestSchema = z.object({
 })
 
 export const authUserResponseSchema = z.object({
+  session_auth_method: z.enum(['password', 'oidc']),
   user: authUserSchema,
 })
 
