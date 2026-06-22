@@ -289,6 +289,32 @@ export const listOrganizationsForSession = async (
   }
 }
 
+export const getOrganizationForSession = async (
+  sessionToken: string | undefined,
+  organizationId: string,
+  executor?: DbExecutor
+): Promise<OrganizationResult<OrganizationResponse>> => {
+  const admin = await requireAdmin(sessionToken, executor)
+
+  if (!admin.ok) {
+    return admin
+  }
+
+  const organization = await findOrganizationById(organizationId, executor)
+
+  if (!organization) {
+    return {
+      ok: false,
+      error: { type: 'ORGANIZATION_NOT_FOUND' },
+    }
+  }
+
+  return {
+    ok: true,
+    value: toOrganizationResponse(organization),
+  }
+}
+
 export const createOrganizationForSession = async (
   sessionToken: string | undefined,
   payload: CreateOrganizationRequest,
