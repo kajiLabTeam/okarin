@@ -646,6 +646,33 @@ export const listOrganizationUsersForSession = async (
   }
 }
 
+export const getOrganizationUserForSession = async (
+  sessionToken: string | undefined,
+  organizationId: string,
+  userId: string,
+  executor?: DbExecutor
+): Promise<OrganizationResult<OrganizationUserResponse>> => {
+  const actor = await requireOrganizationManagerOrAdmin(sessionToken, organizationId, executor)
+
+  if (!actor.ok) {
+    return actor
+  }
+
+  const user = await findOrganizationUserById(organizationId, userId, executor)
+
+  if (!user) {
+    return {
+      ok: false,
+      error: { type: 'USER_NOT_FOUND' },
+    }
+  }
+
+  return {
+    ok: true,
+    value: toOrganizationUserResponse(user),
+  }
+}
+
 export const createOrganizationUserForSession = async (
   sessionToken: string | undefined,
   organizationId: string,
