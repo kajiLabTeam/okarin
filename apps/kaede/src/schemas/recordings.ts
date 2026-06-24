@@ -122,6 +122,10 @@ export const recordingDetailResponseSchema = z.object({
   }),
 })
 
+export const recordingsResponseSchema = z.object({
+  recordings: z.array(recordingDetailResponseSchema),
+})
+
 export const recordingTrajectoriesResponseSchema = z.object({
   recording_id: uuidSchema.openapi({
     description: '対象 recording の ID',
@@ -184,4 +188,5 @@ export const recordingGroundTruthCompleteResponseSchema = z.object({
 
 export type InitRecordingRequest = z.infer<typeof initRecordingRequestSchema>
 export type RecordingIdParams = z.infer<typeof recordingIdParamsSchema>
+export type RecordingDetailResponse = z.infer<typeof recordingDetailResponseSchema>
 export type RefreshUploadUrlsRequest = z.infer<typeof refreshUploadUrlsRequestSchema>

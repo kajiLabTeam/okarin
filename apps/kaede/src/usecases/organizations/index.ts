@@ -10,6 +10,7 @@ import type {
   OrganizationUserResponse,
   RejectOrganizationCreationRequestRequest,
 } from '../../schemas/organizations.js'
+import type { RecordingDetailResponse } from '../../schemas/recordings.js'
 import { hashPassword } from '../../services/auth/password.js'
 import { db } from '../../services/db/index.js'
 import type { DbExecutor } from '../../services/executor.js'
@@ -31,6 +32,8 @@ import type {
   OrganizationCreationRequest,
 } from '../../services/organizations/index.js'
 import { insertPedestrian } from '../../services/pedestrians/index.js'
+import { listRecordingsByOrganizationId } from '../../services/recordings/index.js'
+import type { Recording } from '../../services/recordings/index.js'
 import {
   findOrganizationMembership,
   findOrganizationUserById,
@@ -145,6 +148,17 @@ const toOrganizationUserResponse = (row: OrganizationUserRow): OrganizationUserR
           updated_at: row.pedestrian_updated_at.toISOString(),
         }
       : null,
+})
+
+const toRecordingDetailResponse = (recording: Recording): RecordingDetailResponse => ({
+  recording_id: recording.id,
+  pedestrian_id: recording.pedestrian_id,
+  floor_id: recording.floor_id,
+  organization_id: recording.organization_id,
+  upload_status: recording.upload_status as RecordingDetailResponse['upload_status'],
+  upload_targets: recording.upload_targets as RecordingDetailResponse['upload_targets'],
+  created_at: recording.created_at.toISOString(),
+  updated_at: recording.updated_at.toISOString(),
 })
 
 const runInTransaction = async <T>(
@@ -326,6 +340,27 @@ export const getOrganizationForSession = async (
   return {
     ok: true,
     value: toOrganizationResponse(organization),
+  }
+}
+
+export const listOrganizationRecordingsForSession = async (
+  sessionToken: string | undefined,
+  organizationId: string,
+  executor?: DbExecutor
+): Promise<OrganizationResult<{ recordings: RecordingDetailResponse[] }>> => {
+  const actor = await requireOrganizationManagerOrAdmin(sessionToken, organizationId, executor)
+
+  if (!actor.ok) {
+    return actor
+  }
+
+  const recordings = await listRecordingsByOrganizationId(organizationId, executor)
+
+  return {
+    ok: true,
+    value: {
+      recordings: recordings.map(toRecordingDetailResponse),
+    },
   }
 }
 

@@ -2,6 +2,7 @@ export {
   findRecordingAuthorizationById,
   findRecordingById,
   insertRecording,
+  listRecordingsByOrganizationId,
   markRecordingUploadFailed,
   markRecordingUploadReady,
   updateRecording,
