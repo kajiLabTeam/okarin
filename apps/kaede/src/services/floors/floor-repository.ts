@@ -10,12 +10,20 @@ export interface ListFloorsOptions {
   organizationIds?: string[]
 }
 
-export const listFloors = async ({ organizationIds }: ListFloorsOptions = {}) => {
-  if (organizationIds?.length === 0) {
-    return []
-  }
+export interface FloorRow {
+  floor_id: string
+  building_id: string
+  organization_id: string | null
+  building_name: string
+  level: number
+  name: string
+  scale: number | null
+  created_at: Date
+  updated_at: Date
+}
 
-  let query = db
+const floorRowsQuery = () =>
+  db
     .selectFrom('floors')
     .innerJoin('buildings', 'buildings.id', 'floors.building_id')
     .select([
@@ -30,6 +38,13 @@ export const listFloors = async ({ organizationIds }: ListFloorsOptions = {}) =>
       'floors.updated_at',
     ])
 
+export const listFloors = async ({ organizationIds }: ListFloorsOptions = {}) => {
+  if (organizationIds?.length === 0) {
+    return []
+  }
+
+  let query = floorRowsQuery()
+
   if (organizationIds) {
     query = query.where('floors.organization_id', 'in', organizationIds)
   }
@@ -40,6 +55,23 @@ export const listFloors = async ({ organizationIds }: ListFloorsOptions = {}) =>
     .orderBy('floors.name', 'asc')
     .orderBy('floors.id', 'asc')
     .execute()
+}
+
+export const findFloorDetailById = async (
+  floorId: string,
+  { organizationIds }: ListFloorsOptions = {}
+): Promise<FloorRow | undefined> => {
+  if (organizationIds?.length === 0) {
+    return undefined
+  }
+
+  let query = floorRowsQuery().where('floors.id', '=', floorId)
+
+  if (organizationIds) {
+    query = query.where('floors.organization_id', 'in', organizationIds)
+  }
+
+  return query.executeTakeFirst()
 }
 
 export const insertFloor = async (

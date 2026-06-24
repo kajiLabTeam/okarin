@@ -32,6 +32,12 @@ export const floorSchema = z.object({
   }),
 })
 
+export const floorIdParamsSchema = z.object({
+  floorId: uuidSchema.openapi({
+    description: 'floor を一意に識別する ID',
+  }),
+})
+
 export const floorsListResponseSchema = z.object({
   floors: z.array(floorSchema).openapi({
     description: '計測場所として選択可能な floor 一覧',
@@ -61,4 +67,5 @@ export const createFloorRequestSchema = z.object({
 })
 
 export type CreateFloorRequest = z.infer<typeof createFloorRequestSchema>
+export type FloorIdParams = z.infer<typeof floorIdParamsSchema>
 export type FloorResponse = z.infer<typeof floorSchema>
