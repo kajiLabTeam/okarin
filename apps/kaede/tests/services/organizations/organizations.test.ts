@@ -5,8 +5,9 @@ import { createDb } from '../../../src/services/db/client.js'
 import {
   createOrUpdateOrganizationMembershipForSession,
   createOrganizationUserForSession,
-  getOrganizationForSession,
   createOrganizationForSession,
+  getOrganizationForSession,
+  getOrganizationUserForSession,
   listOrganizationUsersForSession,
   listOrganizationsForSession,
 } from '../../../src/usecases/organizations/index.js'
@@ -335,6 +336,129 @@ describe('organizations usecase', () => {
       ok: false,
       error: {
         type: 'AUTH_FORBIDDEN',
+      },
+    })
+  })
+
+  it('admin can get organization user detail', async () => {
+    const organization = await createOrganization()
+    const admin = await createUserWithSession({
+      email: 'admin@example.com',
+      globalRole: 'admin',
+    })
+    const member = await createUserWithSession({
+      email: 'member@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'member',
+      },
+    })
+
+    const result = await getOrganizationUserForSession(
+      admin.sessionToken,
+      organization.id,
+      member.user.id,
+      db
+    )
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        user_id: member.user.id,
+        email: 'member@example.com',
+        role: 'member',
+        pedestrian: null,
+      },
+    })
+  })
+
+  it('manager can get user detail in their organization', async () => {
+    const organization = await createOrganization()
+    const manager = await createUserWithSession({
+      email: 'manager@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'manager',
+      },
+    })
+    const member = await createUserWithSession({
+      email: 'member@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'member',
+      },
+    })
+
+    const result = await getOrganizationUserForSession(
+      manager.sessionToken,
+      organization.id,
+      member.user.id,
+      db
+    )
+
+    expect(result.ok).toBe(true)
+  })
+
+  it('manager cannot get user detail in another organization', async () => {
+    const organization = await createOrganization()
+    const otherOrganization = await createOrganization('Group B')
+    const manager = await createUserWithSession({
+      email: 'manager@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'manager',
+      },
+    })
+    const member = await createUserWithSession({
+      email: 'member@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: otherOrganization.id,
+        role: 'member',
+      },
+    })
+
+    const result = await getOrganizationUserForSession(
+      manager.sessionToken,
+      otherOrganization.id,
+      member.user.id,
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'AUTH_FORBIDDEN',
+      },
+    })
+  })
+
+  it('organization user detail returns USER_NOT_FOUND when user is not in organization', async () => {
+    const organization = await createOrganization()
+    const admin = await createUserWithSession({
+      email: 'admin@example.com',
+      globalRole: 'admin',
+    })
+    const user = await createUserWithSession({
+      email: 'member@example.com',
+      globalRole: 'none',
+    })
+
+    const result = await getOrganizationUserForSession(
+      admin.sessionToken,
+      organization.id,
+      user.user.id,
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'USER_NOT_FOUND',
       },
     })
   })

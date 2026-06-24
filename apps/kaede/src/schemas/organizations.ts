@@ -17,6 +17,11 @@ export const organizationIdParamsSchema = z.object({
   organizationId: uuidSchema,
 })
 
+export const organizationUserParamsSchema = z.object({
+  organizationId: uuidSchema,
+  userId: uuidSchema,
+})
+
 export const organizationsResponseSchema = z.object({
   organizations: z.array(organizationSchema),
 })
@@ -135,6 +140,7 @@ export type OrganizationCreationRequestsResponse = z.infer<
 >
 export type OrganizationIdParams = z.infer<typeof organizationIdParamsSchema>
 export type OrganizationResponse = z.infer<typeof organizationSchema>
+export type OrganizationUserParams = z.infer<typeof organizationUserParamsSchema>
 export type OrganizationUserResponse = z.infer<typeof organizationUserSchema>
 export type OrganizationUsersResponse = z.infer<typeof organizationUsersResponseSchema>
 export type OrganizationsResponse = z.infer<typeof organizationsResponseSchema>
