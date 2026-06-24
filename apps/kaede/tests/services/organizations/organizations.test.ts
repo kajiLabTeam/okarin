@@ -8,6 +8,7 @@ import {
   createOrganizationForSession,
   getOrganizationForSession,
   getOrganizationUserForSession,
+  listOrganizationRecordingsForSession,
   listOrganizationUsersForSession,
   listOrganizationsForSession,
 } from '../../../src/usecases/organizations/index.js'
@@ -20,6 +21,47 @@ const fixedTimestamp = new Date('2026-06-11T00:00:00.000Z')
 
 const createOrganization = async (name = 'Group A') => {
   return db.insertInto('organizations').values({ name }).returningAll().executeTakeFirstOrThrow()
+}
+
+const createRecordingForOrganization = async (organizationId: string, suffix: string) => {
+  const building = await db
+    .insertInto('buildings')
+    .values({ name: `Building ${suffix}`, organization_id: organizationId })
+    .returning(['id'])
+    .executeTakeFirstOrThrow()
+
+  const floor = await db
+    .insertInto('floors')
+    .values({
+      building_id: building.id,
+      organization_id: organizationId,
+      level: 1,
+      name: `Floor ${suffix}`,
+      image_object_path: `maps/${building.id}/11111111-1111-4111-8111-111111111111.png`,
+    })
+    .returning(['id'])
+    .executeTakeFirstOrThrow()
+
+  const pedestrian = await db
+    .insertInto('pedestrians')
+    .values({
+      display_name: `Pedestrian ${suffix}`,
+      organization_id: organizationId,
+      user_id: null,
+    })
+    .returning(['id'])
+    .executeTakeFirstOrThrow()
+
+  return db
+    .insertInto('recordings')
+    .values({
+      pedestrian_id: pedestrian.id,
+      floor_id: floor.id,
+      organization_id: organizationId,
+      upload_targets: ['acce', 'gyro'],
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow()
 }
 
 const createUserWithSession = async (params: {
@@ -336,6 +378,128 @@ describe('organizations usecase', () => {
       ok: false,
       error: {
         type: 'AUTH_FORBIDDEN',
+      },
+    })
+  })
+
+  it('admin can list organization recordings', async () => {
+    const organization = await createOrganization()
+    const otherOrganization = await createOrganization('Group B')
+    const admin = await createUserWithSession({
+      email: 'admin@example.com',
+      globalRole: 'admin',
+    })
+    const recording = await createRecordingForOrganization(organization.id, 'A')
+    await createRecordingForOrganization(otherOrganization.id, 'B')
+
+    const result = await listOrganizationRecordingsForSession(
+      admin.sessionToken,
+      organization.id,
+      db
+    )
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        recordings: [
+          {
+            recording_id: recording.id,
+            organization_id: organization.id,
+            pedestrian_id: recording.pedestrian_id,
+            floor_id: recording.floor_id,
+            upload_status: 'accepted',
+            upload_targets: ['acce', 'gyro'],
+          },
+        ],
+      },
+    })
+  })
+
+  it('manager can list recordings in their organization', async () => {
+    const organization = await createOrganization()
+    const manager = await createUserWithSession({
+      email: 'manager@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'manager',
+      },
+    })
+    await createRecordingForOrganization(organization.id, 'A')
+
+    const result = await listOrganizationRecordingsForSession(
+      manager.sessionToken,
+      organization.id,
+      db
+    )
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        recordings: [
+          {
+            organization_id: organization.id,
+          },
+        ],
+      },
+    })
+  })
+
+  it('manager cannot list recordings in another organization', async () => {
+    const organization = await createOrganization()
+    const otherOrganization = await createOrganization('Group B')
+    const manager = await createUserWithSession({
+      email: 'manager@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'manager',
+      },
+    })
+    await createRecordingForOrganization(otherOrganization.id, 'B')
+
+    const result = await listOrganizationRecordingsForSession(
+      manager.sessionToken,
+      otherOrganization.id,
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'AUTH_FORBIDDEN',
+      },
+    })
+  })
+
+  it('organization recording list excludes deleted recordings', async () => {
+    const organization = await createOrganization()
+    const admin = await createUserWithSession({
+      email: 'admin@example.com',
+      globalRole: 'admin',
+    })
+    const activeRecording = await createRecordingForOrganization(organization.id, 'A')
+    const deletedRecording = await createRecordingForOrganization(organization.id, 'B')
+    await db
+      .updateTable('recordings')
+      .set({ deleted_at: fixedTimestamp })
+      .where('id', '=', deletedRecording.id)
+      .execute()
+
+    const result = await listOrganizationRecordingsForSession(
+      admin.sessionToken,
+      organization.id,
+      db
+    )
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        recordings: [
+          {
+            recording_id: activeRecording.id,
+          },
+        ],
       },
     })
   })

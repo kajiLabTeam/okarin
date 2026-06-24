@@ -2,6 +2,8 @@ export {
   findRecordingAuthorizationById,
   findRecordingById,
   insertRecording,
+  listRecordingsByOrganizationId,
+  listRecordingsByPedestrianId,
   markRecordingUploadFailed,
   markRecordingUploadReady,
   updateRecording,

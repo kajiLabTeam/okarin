@@ -10,6 +10,7 @@ import type {
   OrganizationUserResponse,
   RejectOrganizationCreationRequestRequest,
 } from '../../schemas/organizations.js'
+import type { RecordingDetailResponse } from '../../schemas/recordings.js'
 import { hashPassword } from '../../services/auth/password.js'
 import { db } from '../../services/db/index.js'
 import type { DbExecutor } from '../../services/executor.js'
@@ -31,6 +32,7 @@ import type {
   OrganizationCreationRequest,
 } from '../../services/organizations/index.js'
 import { insertPedestrian } from '../../services/pedestrians/index.js'
+import { listRecordingsByOrganizationId } from '../../services/recordings/index.js'
 import {
   findOrganizationMembership,
   findOrganizationUserById,
@@ -44,6 +46,7 @@ import {
 } from '../../services/users/index.js'
 import type { OrganizationUserRow } from '../../services/users/index.js'
 import { requireActiveSessionUser } from '../auth/index.js'
+import { toRecordingDetailResponse } from '../recordings/recording-response.js'
 
 export type OrganizationError =
   | { type: 'AUTH_UNAUTHENTICATED' }
@@ -326,6 +329,27 @@ export const getOrganizationForSession = async (
   return {
     ok: true,
     value: toOrganizationResponse(organization),
+  }
+}
+
+export const listOrganizationRecordingsForSession = async (
+  sessionToken: string | undefined,
+  organizationId: string,
+  executor?: DbExecutor
+): Promise<OrganizationResult<{ recordings: RecordingDetailResponse[] }>> => {
+  const actor = await requireOrganizationManagerOrAdmin(sessionToken, organizationId, executor)
+
+  if (!actor.ok) {
+    return actor
+  }
+
+  const recordings = await listRecordingsByOrganizationId(organizationId, executor)
+
+  return {
+    ok: true,
+    value: {
+      recordings: recordings.map(toRecordingDetailResponse),
+    },
   }
 }
 

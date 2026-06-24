@@ -1,4 +1,5 @@
 import type { CompleteUploadResult } from '../../usecases/recordings/complete-upload.js'
+import type { GetRecordingResult } from '../../usecases/recordings/get-recording.js'
 import type { InitRecordingResult } from '../../usecases/recordings/init-recording.js'
 import type { RefreshUploadUrlsResult } from '../../usecases/recordings/refresh-upload-urls.js'
 import type { CreateTrajectoryResult } from '../../usecases/trajectories/create-trajectory.js'
@@ -6,6 +7,7 @@ import { toAuthorizationErrorResponse } from '../authorization-error.js'
 
 type InitRecordingError = Extract<InitRecordingResult, { ok: false }>['error']
 type CompleteUploadError = Extract<CompleteUploadResult, { ok: false }>['error']
+type GetRecordingError = Extract<GetRecordingResult, { ok: false }>['error']
 type RefreshUploadUrlsError = Extract<RefreshUploadUrlsResult, { ok: false }>['error']
 type CreateTrajectoryError = Extract<CreateTrajectoryResult, { ok: false }>['error']
 
@@ -104,6 +106,25 @@ export const toCompleteUploadErrorResponse = (error: CompleteUploadError) => {
           },
         },
         status: 500 as const,
+      }
+  }
+}
+
+export const toGetRecordingErrorResponse = (error: GetRecordingError) => {
+  switch (error.type) {
+    case 'AUTH_DASHBOARD_FORBIDDEN':
+    case 'AUTH_ORGANIZATION_FORBIDDEN':
+      return toAuthorizationErrorResponse(error)
+    case 'RECORDING_NOT_FOUND':
+      return {
+        body: {
+          error_code: error.type,
+          error_message: 'recording not found',
+          details: {
+            recording_id: error.recordingId,
+          },
+        },
+        status: 404 as const,
       }
   }
 }

@@ -202,10 +202,13 @@ describe('createApp auth wiring', { timeout: 30_000 }, () => {
       ['/api/auth/change-password', 'post'],
       ['/api/organizations', 'get'],
       ['/api/organizations', 'post'],
+      ['/api/organizations/{organizationId}/recordings', 'get'],
       ['/api/organizations/{organizationId}/users', 'get'],
       ['/api/organizations/{organizationId}/users', 'post'],
       ['/api/organizations/{organizationId}/memberships', 'post'],
       ['/api/pedestrians/me', 'get'],
+      ['/api/pedestrians/me/recordings', 'get'],
+      ['/api/recordings/{recordingId}', 'get'],
     ] as const
 
     for (const [path, method] of expectedPaths) {
@@ -227,6 +230,8 @@ describe('createApp auth wiring', { timeout: 30_000 }, () => {
       ['/api/organizations', 'get', '403'],
       ['/api/organizations', 'post', '401'],
       ['/api/organizations', 'post', '403'],
+      ['/api/organizations/{organizationId}/recordings', 'get', '401'],
+      ['/api/organizations/{organizationId}/recordings', 'get', '403'],
       ['/api/organizations/{organizationId}/users', 'get', '401'],
       ['/api/organizations/{organizationId}/users', 'get', '403'],
       ['/api/organizations/{organizationId}/users', 'post', '401'],
@@ -234,8 +239,10 @@ describe('createApp auth wiring', { timeout: 30_000 }, () => {
       ['/api/organizations/{organizationId}/memberships', 'post', '401'],
       ['/api/organizations/{organizationId}/memberships', 'post', '403'],
       ['/api/pedestrians/me', 'get', '403'],
+      ['/api/pedestrians/me/recordings', 'get', '403'],
       ['/api/pedestrians', 'get', '403'],
       ['/api/pedestrians', 'post', '403'],
+      ['/api/recordings/{recordingId}', 'get', '403'],
       ['/api/recordings/init', 'post', '403'],
       ['/api/recordings/{recordingId}/complete-upload', 'post', '403'],
       ['/api/recordings/{recordingId}/refresh-upload-urls', 'post', '403'],

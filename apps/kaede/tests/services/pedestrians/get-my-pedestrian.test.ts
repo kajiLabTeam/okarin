@@ -2,9 +2,14 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import type { RequestActor } from '../../../src/middleware/request-actor-context.js'
 import { createDb } from '../../../src/services/db/client.js'
 import { getMyPedestrian } from '../../../src/usecases/pedestrians/get-my-pedestrian.js'
+import { listMyRecordings } from '../../../src/usecases/pedestrians/list-my-recordings.js'
 import { resetDatabase } from '../../db/helpers.js'
 
 const db = createDb()
+
+afterAll(async () => {
+  await db.destroy()
+})
 
 const userActor = (userId: string): RequestActor => ({
   type: 'user',
@@ -24,10 +29,6 @@ const serviceClientActor: RequestActor = {
 describe('getMyPedestrian', () => {
   beforeEach(async () => {
     await resetDatabase(db)
-  })
-
-  afterAll(async () => {
-    await db.destroy()
   })
 
   it('user_id に紐づく pedestrian を返す', async () => {
@@ -103,6 +104,121 @@ describe('getMyPedestrian', () => {
       ok: false,
       error: {
         type: 'AUTH_DASHBOARD_FORBIDDEN',
+      },
+    })
+  })
+})
+
+describe('listMyRecordings', () => {
+  beforeEach(async () => {
+    await resetDatabase(db)
+  })
+
+  it('user_id に紐づく pedestrian の recording だけ返す', async () => {
+    const organization = await db
+      .insertInto('organizations')
+      .values({ name: 'My Recording Organization' })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+    const user = await db
+      .insertInto('users')
+      .values({
+        email: 'linked-user@example.com',
+        display_name: 'Linked User',
+        password_hash: 'hash',
+      })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+    const pedestrian = await db
+      .insertInto('pedestrians')
+      .values({
+        organization_id: organization.id,
+        display_name: 'Linked Pedestrian',
+        user_id: user.id,
+      })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+    const otherPedestrian = await db
+      .insertInto('pedestrians')
+      .values({
+        organization_id: organization.id,
+        display_name: 'Other Pedestrian',
+        user_id: null,
+      })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+    const building = await db
+      .insertInto('buildings')
+      .values({ name: 'Building A', organization_id: organization.id })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+    const floor = await db
+      .insertInto('floors')
+      .values({
+        building_id: building.id,
+        organization_id: organization.id,
+        level: 1,
+        name: '1F',
+        image_object_path: `maps/${building.id}/11111111-1111-4111-8111-111111111111.png`,
+      })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+    const recording = await db
+      .insertInto('recordings')
+      .values({
+        pedestrian_id: pedestrian.id,
+        floor_id: floor.id,
+        organization_id: organization.id,
+        upload_targets: ['acce', 'gyro'],
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    await db
+      .insertInto('recordings')
+      .values({
+        pedestrian_id: otherPedestrian.id,
+        floor_id: floor.id,
+        organization_id: organization.id,
+        upload_targets: ['acce', 'gyro'],
+      })
+      .execute()
+
+    const result = await listMyRecordings(userActor(user.id))
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        recordings: [
+          {
+            recording_id: recording.id,
+            pedestrian_id: pedestrian.id,
+            floor_id: floor.id,
+            organization_id: organization.id,
+            upload_status: 'accepted',
+            upload_targets: ['acce', 'gyro'],
+          },
+        ],
+      },
+    })
+  })
+
+  it('紐づく pedestrian がない user は PEDESTRIAN_NOT_FOUND を返す', async () => {
+    const user = await db
+      .insertInto('users')
+      .values({
+        email: 'unlinked-recording-user@example.com',
+        display_name: 'Unlinked User',
+        password_hash: 'hash',
+      })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+
+    const result = await listMyRecordings(userActor(user.id))
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'PEDESTRIAN_NOT_FOUND',
       },
     })
   })

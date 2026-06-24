@@ -29,6 +29,28 @@ export const findRecordingById = async (
     .executeTakeFirst()
 }
 
+export const listRecordingsByOrganizationId = async (
+  organizationId: string,
+  executor: DbExecutor = db
+): Promise<Recording[]> => {
+  return activeRecordingsQuery(executor)
+    .selectAll()
+    .where('organization_id', '=', organizationId)
+    .orderBy('created_at', 'desc')
+    .execute()
+}
+
+export const listRecordingsByPedestrianId = async (
+  pedestrianId: string,
+  executor: DbExecutor = db
+): Promise<Recording[]> => {
+  return activeRecordingsQuery(executor)
+    .selectAll()
+    .where('pedestrian_id', '=', pedestrianId)
+    .orderBy('created_at', 'desc')
+    .execute()
+}
+
 export const findRecordingAuthorizationById = async (
   recordingId: string,
   executor: DbExecutor = db
