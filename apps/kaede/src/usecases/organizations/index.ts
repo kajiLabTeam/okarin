@@ -33,7 +33,6 @@ import type {
 } from '../../services/organizations/index.js'
 import { insertPedestrian } from '../../services/pedestrians/index.js'
 import { listRecordingsByOrganizationId } from '../../services/recordings/index.js'
-import type { Recording } from '../../services/recordings/index.js'
 import {
   findOrganizationMembership,
   findOrganizationUserById,
@@ -47,6 +46,7 @@ import {
 } from '../../services/users/index.js'
 import type { OrganizationUserRow } from '../../services/users/index.js'
 import { requireActiveSessionUser } from '../auth/index.js'
+import { toRecordingDetailResponse } from '../recordings/recording-response.js'
 
 export type OrganizationError =
   | { type: 'AUTH_UNAUTHENTICATED' }
@@ -148,17 +148,6 @@ const toOrganizationUserResponse = (row: OrganizationUserRow): OrganizationUserR
           updated_at: row.pedestrian_updated_at.toISOString(),
         }
       : null,
-})
-
-const toRecordingDetailResponse = (recording: Recording): RecordingDetailResponse => ({
-  recording_id: recording.id,
-  pedestrian_id: recording.pedestrian_id,
-  floor_id: recording.floor_id,
-  organization_id: recording.organization_id,
-  upload_status: recording.upload_status as RecordingDetailResponse['upload_status'],
-  upload_targets: recording.upload_targets as RecordingDetailResponse['upload_targets'],
-  created_at: recording.created_at.toISOString(),
-  updated_at: recording.updated_at.toISOString(),
 })
 
 const runInTransaction = async <T>(

@@ -3,6 +3,7 @@ export {
   findRecordingById,
   insertRecording,
   listRecordingsByOrganizationId,
+  listRecordingsByPedestrianId,
   markRecordingUploadFailed,
   markRecordingUploadReady,
   updateRecording,

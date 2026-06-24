@@ -1,27 +1,24 @@
-import type { OpenAPIHono } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
+import type { OpenAPIHono } from '@hono/zod-openapi'
 import { requireRequestActor } from '../../middleware/request-actor-context.js'
 import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
 import { errorResponseSchema } from '../../schemas/common.js'
-import { recordingDetailResponseSchema, recordingIdParamsSchema } from '../../schemas/recordings.js'
-import { getRecording } from '../../usecases/recordings/get-recording.js'
-import { toGetRecordingErrorResponse } from './error.js'
+import { recordingsResponseSchema } from '../../schemas/recordings.js'
+import { listMyRecordings } from '../../usecases/pedestrians/list-my-recordings.js'
+import { toListMyRecordingsErrorResponse } from './error.js'
 
-export const registerGetRecordingRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
+export const registerListMyRecordingsRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
   const route = createRoute({
     method: 'get',
-    path: '/{recordingId}',
-    tags: ['Recordings'],
-    description: 'recording の基本情報とアップロード状態を返す',
-    request: {
-      params: recordingIdParamsSchema,
-    },
+    path: '/me/recordings',
+    tags: ['Pedestrians'],
+    description: 'ログイン user に紐づく pedestrian の recording 一覧を返す',
     responses: {
       200: {
-        description: 'recording detail',
+        description: 'current pedestrian recordings',
         content: {
           'application/json': {
-            schema: recordingDetailResponseSchema,
+            schema: recordingsResponseSchema,
           },
         },
       },
@@ -34,7 +31,7 @@ export const registerGetRecordingRoute = (app: OpenAPIHono<RequestActorHonoEnv>)
         },
       },
       404: {
-        description: 'recording not found',
+        description: 'pedestrian not found',
         content: {
           'application/json': {
             schema: errorResponseSchema,
@@ -45,12 +42,11 @@ export const registerGetRecordingRoute = (app: OpenAPIHono<RequestActorHonoEnv>)
   })
 
   app.openapi(route, async (c) => {
-    const params = c.req.valid('param')
     const actor = requireRequestActor(c)
-    const result = await getRecording(actor, params)
+    const result = await listMyRecordings(actor)
 
     if (!result.ok) {
-      const error = toGetRecordingErrorResponse(result.error)
+      const error = toListMyRecordingsErrorResponse(result.error)
       return c.json(error.body, error.status)
     }
 

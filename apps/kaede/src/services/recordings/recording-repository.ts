@@ -40,6 +40,17 @@ export const listRecordingsByOrganizationId = async (
     .execute()
 }
 
+export const listRecordingsByPedestrianId = async (
+  pedestrianId: string,
+  executor: DbExecutor = db
+): Promise<Recording[]> => {
+  return activeRecordingsQuery(executor)
+    .selectAll()
+    .where('pedestrian_id', '=', pedestrianId)
+    .orderBy('created_at', 'desc')
+    .execute()
+}
+
 export const findRecordingAuthorizationById = async (
   recordingId: string,
   executor: DbExecutor = db
