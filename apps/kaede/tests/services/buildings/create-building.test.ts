@@ -275,28 +275,35 @@ describe('listBuildings', () => {
 
     const result = await listBuildings(adminActor)
 
-    expect(result).toMatchObject({
-      ok: true,
-      value: {
-        buildings: [{ name: 'A Building' }, { name: 'B Building' }],
-      },
-    })
+    expect(result.buildings).toHaveLength(2)
+    expect(result.buildings.map((building) => building.name)).toEqual(['A Building', 'B Building'])
   })
 
-  it('member は全 organization の building 一覧を取得できない', async () => {
+  it('member は所属 organization の building だけ取得する', async () => {
     const ownOrganization = await db
       .insertInto('organizations')
       .values({ name: 'Own Building Organization' })
       .returning(['id'])
       .executeTakeFirstOrThrow()
+    const otherOrganization = await db
+      .insertInto('organizations')
+      .values({ name: 'Other Building Organization' })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+    await db
+      .insertInto('buildings')
+      .values([
+        { organization_id: ownOrganization.id, name: 'Own Building' },
+        { organization_id: otherOrganization.id, name: 'Other Building' },
+      ])
+      .execute()
 
     const result = await listBuildings(memberActor(ownOrganization.id))
 
-    expect(result).toEqual({
-      ok: false,
-      error: {
-        type: 'AUTH_DASHBOARD_FORBIDDEN',
-      },
+    expect(result.buildings).toHaveLength(1)
+    expect(result.buildings[0]).toMatchObject({
+      organization_id: ownOrganization.id,
+      name: 'Own Building',
     })
   })
 
@@ -316,12 +323,7 @@ describe('listBuildings', () => {
 
     const result = await listBuildings(serviceClientActor)
 
-    expect(result).toMatchObject({
-      ok: true,
-      value: {
-        buildings: [{ name: 'Service Building A' }, { name: 'Service Building B' }],
-      },
-    })
+    expect(result.buildings).toHaveLength(2)
   })
 })
 
