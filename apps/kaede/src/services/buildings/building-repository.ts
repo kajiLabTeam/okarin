@@ -7,6 +7,26 @@ type DbExecutor = Kysely<DB> | Transaction<DB>
 type Building = Selectable<Buildings>
 type NewBuilding = Insertable<Buildings>
 
+export interface ListBuildingsOptions {
+  organizationIds?: string[]
+}
+
+export const listBuildings = async ({ organizationIds }: ListBuildingsOptions = {}): Promise<
+  Building[]
+> => {
+  if (organizationIds?.length === 0) {
+    return []
+  }
+
+  let query = db.selectFrom('buildings').selectAll()
+
+  if (organizationIds) {
+    query = query.where('organization_id', 'in', organizationIds)
+  }
+
+  return query.orderBy('name', 'asc').orderBy('id', 'asc').execute()
+}
+
 export const findBuildingById = async (
   buildingId: string,
   executor: DbExecutor = db
@@ -16,6 +36,23 @@ export const findBuildingById = async (
     .selectAll()
     .where('id', '=', buildingId)
     .executeTakeFirst()
+}
+
+export const findBuildingDetailById = async (
+  buildingId: string,
+  { organizationIds }: ListBuildingsOptions = {}
+): Promise<Building | undefined> => {
+  if (organizationIds?.length === 0) {
+    return undefined
+  }
+
+  let query = db.selectFrom('buildings').selectAll().where('id', '=', buildingId)
+
+  if (organizationIds) {
+    query = query.where('organization_id', 'in', organizationIds)
+  }
+
+  return query.executeTakeFirst()
 }
 
 export const insertBuilding = async (

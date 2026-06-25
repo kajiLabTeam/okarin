@@ -4,6 +4,7 @@ import { insertBuilding } from '../../services/buildings/index.js'
 import { findOrganizationById } from '../../services/organizations/index.js'
 import type { AuthorizationError } from '../authorization.js'
 import { requireDashboardWriteAccess } from '../authorization.js'
+import { toBuildingResponse } from './building-response.js'
 
 export type CreateBuildingResult =
   | {
@@ -53,14 +54,6 @@ export const createBuilding = async (
 
   return {
     ok: true,
-    value: {
-      building_id: building.id,
-      organization_id: organization.id,
-      name: building.name,
-      latitude: building.latitude,
-      longitude: building.longitude,
-      created_at: building.created_at.toISOString(),
-      updated_at: building.updated_at.toISOString(),
-    },
+    value: toBuildingResponse(building),
   }
 }
