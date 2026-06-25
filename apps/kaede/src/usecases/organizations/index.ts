@@ -1,5 +1,6 @@
 import { getOidcRuntimeConfig } from '../../config/runtime.js'
 import type { BuildingResponse } from '../../schemas/buildings.js'
+import type { FloorResponse } from '../../schemas/floors.js'
 import type {
   ApproveOrganizationCreationRequestRequest,
   CreateOrganizationMembershipRequest,
@@ -13,9 +14,13 @@ import type {
 } from '../../schemas/organizations.js'
 import type { RecordingDetailResponse } from '../../schemas/recordings.js'
 import { hashPassword } from '../../services/auth/password.js'
-import { listBuildings as listBuildingRows } from '../../services/buildings/index.js'
+import {
+  findBuildingDetailById,
+  listBuildings as listBuildingRows,
+} from '../../services/buildings/index.js'
 import { db } from '../../services/db/index.js'
 import type { DbExecutor } from '../../services/executor.js'
+import { listFloors as listFloorRows } from '../../services/floors/index.js'
 import {
   findOrganizationBySlug,
   findOrganizationCreationRequestById,
@@ -49,6 +54,7 @@ import {
 import type { OrganizationUserRow } from '../../services/users/index.js'
 import { requireActiveSessionUser } from '../auth/index.js'
 import { toBuildingResponse } from '../buildings/building-response.js'
+import { toFloorResponse } from '../floors/floor-response.js'
 import { toRecordingDetailResponse } from '../recordings/recording-response.js'
 
 export type OrganizationError =
@@ -57,6 +63,7 @@ export type OrganizationError =
   | { type: 'AUTH_SESSION_REVOKED' }
   | { type: 'AUTH_USER_DISABLED' }
   | { type: 'AUTH_FORBIDDEN' }
+  | { type: 'BUILDING_NOT_FOUND' }
   | { type: 'ORGANIZATION_NOT_FOUND' }
   | { type: 'ORGANIZATION_CREATION_REQUESTS_DISABLED' }
   | { type: 'ORGANIZATION_CREATION_REQUEST_NOT_FOUND' }
@@ -375,6 +382,67 @@ export const listOrganizationBuildingsForSession = async (
     ok: true,
     value: {
       buildings: buildings.map(toBuildingResponse),
+    },
+  }
+}
+
+export const listOrganizationFloorsForSession = async (
+  sessionToken: string | undefined,
+  organizationId: string,
+  executor?: DbExecutor
+): Promise<OrganizationResult<{ floors: FloorResponse[] }>> => {
+  const actor = await requireOrganizationManagerOrAdmin(sessionToken, organizationId, executor)
+
+  if (!actor.ok) {
+    return actor
+  }
+
+  const floors = await listFloorRows({
+    organizationIds: [organizationId],
+  })
+
+  return {
+    ok: true,
+    value: {
+      floors: floors.map(toFloorResponse),
+    },
+  }
+}
+
+export const listOrganizationBuildingFloorsForSession = async (
+  sessionToken: string | undefined,
+  organizationId: string,
+  buildingId: string,
+  executor?: DbExecutor
+): Promise<OrganizationResult<{ floors: FloorResponse[] }>> => {
+  const actor = await requireOrganizationManagerOrAdmin(sessionToken, organizationId, executor)
+
+  if (!actor.ok) {
+    return actor
+  }
+
+  const building = await findBuildingDetailById(buildingId, {
+    organizationIds: [organizationId],
+  })
+
+  if (!building) {
+    return {
+      ok: false,
+      error: {
+        type: 'BUILDING_NOT_FOUND',
+      },
+    }
+  }
+
+  const floors = await listFloorRows({
+    buildingIds: [buildingId],
+    organizationIds: [organizationId],
+  })
+
+  return {
+    ok: true,
+    value: {
+      floors: floors.map(toFloorResponse),
     },
   }
 }

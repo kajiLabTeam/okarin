@@ -7,6 +7,7 @@ type Floor = Selectable<Floors>
 type NewFloor = Insertable<Floors>
 
 export interface ListFloorsOptions {
+  buildingIds?: string[]
   organizationIds?: string[]
 }
 
@@ -38,12 +39,16 @@ const floorRowsQuery = () =>
       'floors.updated_at',
     ])
 
-export const listFloors = async ({ organizationIds }: ListFloorsOptions = {}) => {
-  if (organizationIds?.length === 0) {
+export const listFloors = async ({ buildingIds, organizationIds }: ListFloorsOptions = {}) => {
+  if (buildingIds?.length === 0 || organizationIds?.length === 0) {
     return []
   }
 
   let query = floorRowsQuery()
+
+  if (buildingIds) {
+    query = query.where('floors.building_id', 'in', buildingIds)
+  }
 
   if (organizationIds) {
     query = query.where('floors.organization_id', 'in', organizationIds)
