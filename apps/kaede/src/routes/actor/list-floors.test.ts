@@ -1,11 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { RequestActor } from '../../middleware/request-actor-context.js'
 import { createRouteTestApp } from '../create-route-test-app.js'
-import { registerListFloorsRoute } from './list-floors.js'
+import { registerListActorFloorsRoute } from './list-floors.js'
 
-const serviceClientActor = {
-  type: 'service_client',
-  name: 'shared_token',
-} as const
+const userActor: RequestActor = {
+  type: 'user',
+  user_id: '11111111-1111-4111-8111-111111111111',
+  email: 'user@example.com',
+  global_role: 'none',
+  account_state: 'active',
+  password_must_change: false,
+  memberships: [],
+}
 
 const { listFloorsMock } = vi.hoisted(() => ({
   listFloorsMock: vi.fn(),
@@ -15,12 +21,12 @@ vi.mock('../../usecases/floors/list-floors.js', () => ({
   listFloors: listFloorsMock,
 }))
 
-describe('GET /api/floors', () => {
+describe('GET /api/actor/floors', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('floor 一覧を building 情報とあわせて返す', async () => {
+  it('actor がアクセス可能な floor 一覧を building 情報とあわせて返す', async () => {
     listFloorsMock.mockResolvedValue({
       floors: [
         {
@@ -37,10 +43,10 @@ describe('GET /api/floors', () => {
       ],
     })
 
-    const app = createRouteTestApp('/floors', registerListFloorsRoute, {
-      actor: serviceClientActor,
+    const app = createRouteTestApp('/actor', registerListActorFloorsRoute, {
+      actor: userActor,
     })
-    const response = await app.request('/api/floors')
+    const response = await app.request('/api/actor/floors')
 
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({
@@ -58,7 +64,6 @@ describe('GET /api/floors', () => {
         },
       ],
     })
-
-    expect(listFloorsMock).toHaveBeenCalledWith(serviceClientActor)
+    expect(listFloorsMock).toHaveBeenCalledWith(userActor)
   })
 })

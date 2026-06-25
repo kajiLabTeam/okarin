@@ -25,12 +25,13 @@ export type CreateFloorResult =
 
 export const createFloor = async (
   actor: RequestActor,
+  organizationId: string,
+  buildingId: string,
   payload: CreateFloorRequest
 ): Promise<CreateFloorResult> => {
-  const buildingId: string = payload.building_id
   const building = await findBuildingById(buildingId)
 
-  if (!building) {
+  if (building?.organization_id !== organizationId) {
     return {
       ok: false,
       error: {

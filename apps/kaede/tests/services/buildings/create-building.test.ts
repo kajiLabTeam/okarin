@@ -71,8 +71,7 @@ describe('createBuilding', () => {
       .returning(['id'])
       .executeTakeFirstOrThrow()
 
-    const result = await createBuilding(adminActor, {
-      organization_id: organization.id,
+    const result = await createBuilding(adminActor, organization.id, {
       name: 'Building Test Site',
       latitude: 35.681236,
       longitude: 139.767125,
@@ -112,8 +111,7 @@ describe('createBuilding', () => {
       .returning(['id'])
       .executeTakeFirstOrThrow()
 
-    const result = await createBuilding(serviceClientActor, {
-      organization_id: organization.id,
+    const result = await createBuilding(serviceClientActor, organization.id, {
       name: 'Minimal Building',
     })
 
@@ -147,8 +145,7 @@ describe('createBuilding', () => {
   it('存在しない organization_id では building を作成しない', async () => {
     const organizationId = '99999999-9999-4999-8999-999999999999'
 
-    const result = await createBuilding(serviceClientActor, {
-      organization_id: organizationId,
+    const result = await createBuilding(serviceClientActor, organizationId, {
       name: 'Missing Organization Building',
     })
 
@@ -173,8 +170,7 @@ describe('createBuilding', () => {
       .executeTakeFirstOrThrow()
 
     await expect(
-      createBuilding(serviceClientActor, {
-        organization_id: organization.id,
+      createBuilding(serviceClientActor, organization.id, {
         // route validation normally rejects this before usecase execution.
         name: undefined as unknown as string,
       })
@@ -192,8 +188,7 @@ describe('createBuilding', () => {
       .returning(['id'])
       .executeTakeFirstOrThrow()
 
-    const result = await createBuilding(managerActor(organization.id), {
-      organization_id: organization.id,
+    const result = await createBuilding(managerActor(organization.id), organization.id, {
       name: 'Manager Building',
     })
 
@@ -220,8 +215,7 @@ describe('createBuilding', () => {
       .returning(['id'])
       .executeTakeFirstOrThrow()
 
-    const result = await createBuilding(managerActor(ownOrganization.id), {
-      organization_id: otherOrganization.id,
+    const result = await createBuilding(managerActor(ownOrganization.id), otherOrganization.id, {
       name: 'Forbidden Building',
     })
 
@@ -240,8 +234,7 @@ describe('createBuilding', () => {
       .returning(['id'])
       .executeTakeFirstOrThrow()
 
-    const result = await createBuilding(memberActor(organization.id), {
-      organization_id: organization.id,
+    const result = await createBuilding(memberActor(organization.id), organization.id, {
       name: 'Forbidden Member Building',
     })
 
@@ -275,28 +268,35 @@ describe('listBuildings', () => {
 
     const result = await listBuildings(adminActor)
 
-    expect(result).toMatchObject({
-      ok: true,
-      value: {
-        buildings: [{ name: 'A Building' }, { name: 'B Building' }],
-      },
-    })
+    expect(result.buildings).toHaveLength(2)
+    expect(result.buildings.map((building) => building.name)).toEqual(['A Building', 'B Building'])
   })
 
-  it('member は全 organization の building 一覧を取得できない', async () => {
+  it('member は所属 organization の building だけ取得する', async () => {
     const ownOrganization = await db
       .insertInto('organizations')
       .values({ name: 'Own Building Organization' })
       .returning(['id'])
       .executeTakeFirstOrThrow()
+    const otherOrganization = await db
+      .insertInto('organizations')
+      .values({ name: 'Other Building Organization' })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+    await db
+      .insertInto('buildings')
+      .values([
+        { organization_id: ownOrganization.id, name: 'Own Building' },
+        { organization_id: otherOrganization.id, name: 'Other Building' },
+      ])
+      .execute()
 
     const result = await listBuildings(memberActor(ownOrganization.id))
 
-    expect(result).toEqual({
-      ok: false,
-      error: {
-        type: 'AUTH_DASHBOARD_FORBIDDEN',
-      },
+    expect(result.buildings).toHaveLength(1)
+    expect(result.buildings[0]).toMatchObject({
+      organization_id: ownOrganization.id,
+      name: 'Own Building',
     })
   })
 
@@ -316,12 +316,7 @@ describe('listBuildings', () => {
 
     const result = await listBuildings(serviceClientActor)
 
-    expect(result).toMatchObject({
-      ok: true,
-      value: {
-        buildings: [{ name: 'Service Building A' }, { name: 'Service Building B' }],
-      },
-    })
+    expect(result.buildings).toHaveLength(2)
   })
 })
 

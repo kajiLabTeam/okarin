@@ -5,15 +5,15 @@ import type { RequestActorHonoEnv } from '../../middleware/request-actor-context
 import { floorsListResponseSchema } from '../../schemas/floors.js'
 import { listFloors } from '../../usecases/floors/list-floors.js'
 
-export const registerListFloorsRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
+export const registerListActorFloorsRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
   const route: RouteConfig = createRoute({
     method: 'get',
-    path: '/',
-    tags: ['Floors'],
-    description: '計測場所として選択可能な floor 一覧を building 情報とあわせて返す',
+    path: '/floors',
+    tags: ['Actor'],
+    description: '現在の actor がアクセス可能な floor 一覧を building 情報とあわせて返す',
     responses: {
       200: {
-        description: 'floor list',
+        description: 'actor accessible floor list',
         content: {
           'application/json': {
             schema: floorsListResponseSchema,

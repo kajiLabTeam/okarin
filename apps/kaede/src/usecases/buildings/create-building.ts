@@ -25,16 +25,17 @@ export type CreateBuildingResult =
 
 export const createBuilding = async (
   actor: RequestActor,
+  organizationId: string,
   payload: CreateBuildingRequest
 ): Promise<CreateBuildingResult> => {
-  const organization = await findOrganizationById(payload.organization_id)
+  const organization = await findOrganizationById(organizationId)
 
   if (!organization) {
     return {
       ok: false,
       error: {
         type: 'ORGANIZATION_NOT_FOUND',
-        organizationId: payload.organization_id,
+        organizationId,
       },
     }
   }

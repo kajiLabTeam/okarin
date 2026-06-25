@@ -32,7 +32,7 @@ export interface RequestActorHonoEnv {
   Variables: RequestActorVariables
 }
 
-type RequestActorContext = Context<RequestActorHonoEnv>
+export type RequestActorContext = Context<RequestActorHonoEnv>
 
 const requestActorKey = 'requestActor' satisfies keyof RequestActorVariables
 
