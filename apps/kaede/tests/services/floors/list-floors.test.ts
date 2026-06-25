@@ -1,10 +1,15 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import type { RequestActor } from '../../../src/middleware/request-actor-context.js'
 import { createDb } from '../../../src/services/db/client.js'
+import { getFloor } from '../../../src/usecases/floors/get-floor.js'
 import { listFloors } from '../../../src/usecases/floors/list-floors.js'
 import { resetDatabase } from '../../db/helpers.js'
 
 const db = createDb()
+
+afterAll(async () => {
+  await db.destroy()
+})
 
 const serviceClientActor: RequestActor = {
   type: 'service_client',
@@ -56,10 +61,6 @@ const managerActor = (organizationId: string): RequestActor => ({
 describe('listFloors', () => {
   beforeEach(async () => {
     await resetDatabase(db)
-  })
-
-  afterAll(async () => {
-    await db.destroy()
   })
 
   it('building 情報を含む floor 一覧を返す', async () => {
@@ -302,5 +303,108 @@ describe('listFloors', () => {
     expect(result.floors.map((floor) => floor.organization_id).sort()).toEqual(
       organizations.map((organization) => organization.id).sort()
     )
+  })
+})
+
+describe('getFloor', () => {
+  beforeEach(async () => {
+    await resetDatabase(db)
+  })
+
+  it('member は所属 organization の floor を取得できる', async () => {
+    const organization = await db
+      .insertInto('organizations')
+      .values({ name: 'Get Floor Organization' })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+    const building = await db
+      .insertInto('buildings')
+      .values({ organization_id: organization.id, name: 'Get Floor Building' })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+    const floor = await db
+      .insertInto('floors')
+      .values({
+        building_id: building.id,
+        organization_id: organization.id,
+        level: 1,
+        name: '1F',
+        image_object_path: `maps/${building.id}/11111111-1111-4111-8111-111111111111.png`,
+        scale: 25,
+      })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+
+    const result = await getFloor(memberActor(organization.id), {
+      floorId: floor.id,
+    })
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        floor_id: floor.id,
+        building_id: building.id,
+        organization_id: organization.id,
+        building_name: 'Get Floor Building',
+        level: 1,
+        name: '1F',
+        scale: 25,
+      },
+    })
+  })
+
+  it('member は所属外 organization の floor を取得できない', async () => {
+    const ownOrganization = await db
+      .insertInto('organizations')
+      .values({ name: 'Own Floor Organization' })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+    const otherOrganization = await db
+      .insertInto('organizations')
+      .values({ name: 'Other Floor Organization' })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+    const otherBuilding = await db
+      .insertInto('buildings')
+      .values({ organization_id: otherOrganization.id, name: 'Other Building' })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+    const otherFloor = await db
+      .insertInto('floors')
+      .values({
+        building_id: otherBuilding.id,
+        organization_id: otherOrganization.id,
+        level: 1,
+        name: 'Other 1F',
+        image_object_path: `maps/${otherBuilding.id}/22222222-2222-4222-8222-222222222222.png`,
+      })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+
+    const result = await getFloor(memberActor(ownOrganization.id), {
+      floorId: otherFloor.id,
+    })
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'FLOOR_NOT_FOUND',
+        floorId: otherFloor.id,
+      },
+    })
+  })
+
+  it('存在しない floor は FLOOR_NOT_FOUND を返す', async () => {
+    const result = await getFloor(serviceClientActor, {
+      floorId: '11111111-1111-4111-8111-111111111111',
+    })
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'FLOOR_NOT_FOUND',
+        floorId: '11111111-1111-4111-8111-111111111111',
+      },
+    })
   })
 })

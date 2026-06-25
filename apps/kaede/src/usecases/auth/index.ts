@@ -254,11 +254,11 @@ const findOrCreateGoogleOidcUser = async (
       }
     }
 
-    await attachGoogleIdentityToUser(existingUser, claims, executor)
+    const linkedUser = await attachGoogleIdentityToUser(existingUser, claims, executor)
 
     return {
       ok: true,
-      value: existingUser,
+      value: linkedUser,
     }
   }
 
