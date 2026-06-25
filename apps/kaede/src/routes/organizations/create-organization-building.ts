@@ -1,9 +1,10 @@
 import { createRoute } from '@hono/zod-openapi'
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { requireRequestActor } from '../../middleware/request-actor-context.js'
-import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
+import type { RequestActorContext } from '../../middleware/request-actor-context.js'
 import { buildingSchema, createBuildingRequestSchema } from '../../schemas/buildings.js'
 import { errorResponseSchema } from '../../schemas/common.js'
+import { organizationIdParamsSchema } from '../../schemas/organizations.js'
 import { createBuilding } from '../../usecases/buildings/create-building.js'
 import type { CreateBuildingResult } from '../../usecases/buildings/create-building.js'
 import { toAuthorizationErrorResponse } from '../authorization-error.js'
@@ -29,13 +30,14 @@ const toCreateBuildingErrorResponse = (error: CreateBuildingError) => {
   }
 }
 
-export const registerCreateBuildingRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
+export const registerCreateOrganizationBuildingRoute = (app: OpenAPIHono) => {
   const route = createRoute({
     method: 'post',
-    path: '/',
-    tags: ['Buildings'],
-    description: 'building を作成する',
+    path: '/{organizationId}/buildings',
+    tags: ['Organizations'],
+    description: 'organization に building を作成する',
     request: {
+      params: organizationIdParamsSchema,
       body: {
         content: {
           'application/json': {
@@ -73,9 +75,10 @@ export const registerCreateBuildingRoute = (app: OpenAPIHono<RequestActorHonoEnv
   })
 
   app.openapi(route, async (c) => {
+    const { organizationId } = c.req.valid('param')
     const payload = c.req.valid('json')
-    const actor = requireRequestActor(c)
-    const result = await createBuilding(actor, payload)
+    const actor = requireRequestActor(c as RequestActorContext)
+    const result = await createBuilding(actor, organizationId, payload)
 
     if (!result.ok) {
       const error = toCreateBuildingErrorResponse(result.error)

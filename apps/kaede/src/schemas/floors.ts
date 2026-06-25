@@ -49,9 +49,6 @@ export const mapImageExtensionSchema = z.enum(['svg', 'png']).openapi({
 })
 
 export const createFloorRequestSchema = z.object({
-  building_id: uuidSchema.openapi({
-    description: 'floor を紐づける building の ID',
-  }),
   level: z.number().int().openapi({
     description: '階層',
   }),

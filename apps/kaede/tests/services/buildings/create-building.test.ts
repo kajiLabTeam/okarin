@@ -71,8 +71,7 @@ describe('createBuilding', () => {
       .returning(['id'])
       .executeTakeFirstOrThrow()
 
-    const result = await createBuilding(adminActor, {
-      organization_id: organization.id,
+    const result = await createBuilding(adminActor, organization.id, {
       name: 'Building Test Site',
       latitude: 35.681236,
       longitude: 139.767125,
@@ -112,8 +111,7 @@ describe('createBuilding', () => {
       .returning(['id'])
       .executeTakeFirstOrThrow()
 
-    const result = await createBuilding(serviceClientActor, {
-      organization_id: organization.id,
+    const result = await createBuilding(serviceClientActor, organization.id, {
       name: 'Minimal Building',
     })
 
@@ -147,8 +145,7 @@ describe('createBuilding', () => {
   it('存在しない organization_id では building を作成しない', async () => {
     const organizationId = '99999999-9999-4999-8999-999999999999'
 
-    const result = await createBuilding(serviceClientActor, {
-      organization_id: organizationId,
+    const result = await createBuilding(serviceClientActor, organizationId, {
       name: 'Missing Organization Building',
     })
 
@@ -173,8 +170,7 @@ describe('createBuilding', () => {
       .executeTakeFirstOrThrow()
 
     await expect(
-      createBuilding(serviceClientActor, {
-        organization_id: organization.id,
+      createBuilding(serviceClientActor, organization.id, {
         // route validation normally rejects this before usecase execution.
         name: undefined as unknown as string,
       })
@@ -192,8 +188,7 @@ describe('createBuilding', () => {
       .returning(['id'])
       .executeTakeFirstOrThrow()
 
-    const result = await createBuilding(managerActor(organization.id), {
-      organization_id: organization.id,
+    const result = await createBuilding(managerActor(organization.id), organization.id, {
       name: 'Manager Building',
     })
 
@@ -220,8 +215,7 @@ describe('createBuilding', () => {
       .returning(['id'])
       .executeTakeFirstOrThrow()
 
-    const result = await createBuilding(managerActor(ownOrganization.id), {
-      organization_id: otherOrganization.id,
+    const result = await createBuilding(managerActor(ownOrganization.id), otherOrganization.id, {
       name: 'Forbidden Building',
     })
 
@@ -240,8 +234,7 @@ describe('createBuilding', () => {
       .returning(['id'])
       .executeTakeFirstOrThrow()
 
-    const result = await createBuilding(memberActor(organization.id), {
-      organization_id: organization.id,
+    const result = await createBuilding(memberActor(organization.id), organization.id, {
       name: 'Forbidden Member Building',
     })
 

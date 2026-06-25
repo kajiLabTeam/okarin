@@ -75,8 +75,7 @@ describe('createFloor', () => {
       .returning(['id'])
       .executeTakeFirstOrThrow()
 
-    const result = await createFloor(adminActor, {
-      building_id: building.id,
+    const result = await createFloor(adminActor, organization.id, building.id, {
       level: 2,
       name: '2F',
       scale: 25,
@@ -117,11 +116,15 @@ describe('createFloor', () => {
   it('存在しない building_id では floor を作成しない', async () => {
     const buildingId = '11111111-1111-4111-8111-111111111111'
 
-    const result = await createFloor(serviceClientActor, {
-      building_id: buildingId,
-      level: 1,
-      name: '1F',
-    })
+    const result = await createFloor(
+      serviceClientActor,
+      '99999999-9999-4999-8999-999999999999',
+      buildingId,
+      {
+        level: 1,
+        name: '1F',
+      }
+    )
 
     expect(result).toEqual({
       ok: false,
@@ -149,8 +152,7 @@ describe('createFloor', () => {
       .returning(['id'])
       .executeTakeFirstOrThrow()
 
-    const result = await createFloor(managerActor(organization.id), {
-      building_id: building.id,
+    const result = await createFloor(managerActor(organization.id), organization.id, building.id, {
       level: 3,
       name: '3F',
     })
@@ -185,16 +187,21 @@ describe('createFloor', () => {
       .returning(['id'])
       .executeTakeFirstOrThrow()
 
-    const result = await createFloor(managerActor(ownOrganization.id), {
-      building_id: building.id,
-      level: 1,
-      name: '1F',
-    })
+    const result = await createFloor(
+      managerActor(ownOrganization.id),
+      ownOrganization.id,
+      building.id,
+      {
+        level: 1,
+        name: '1F',
+      }
+    )
 
     expect(result).toEqual({
       ok: false,
       error: {
-        type: 'AUTH_ORGANIZATION_FORBIDDEN',
+        type: 'BUILDING_NOT_FOUND',
+        buildingId: building.id,
       },
     })
   })
@@ -212,8 +219,7 @@ describe('createFloor', () => {
       .returning(['id'])
       .executeTakeFirstOrThrow()
 
-    const result = await createFloor(memberActor(organization.id), {
-      building_id: building.id,
+    const result = await createFloor(memberActor(organization.id), organization.id, building.id, {
       level: 1,
       name: '1F',
     })

@@ -1,7 +1,8 @@
 import { createRoute } from '@hono/zod-openapi'
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { requireRequestActor } from '../../middleware/request-actor-context.js'
-import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
+import type { RequestActorContext } from '../../middleware/request-actor-context.js'
+import { organizationBuildingIdParamsSchema } from '../../schemas/buildings.js'
 import { errorResponseSchema } from '../../schemas/common.js'
 import { createFloorRequestSchema, floorSchema } from '../../schemas/floors.js'
 import { createFloor } from '../../usecases/floors/create-floor.js'
@@ -19,7 +20,7 @@ const toCreateFloorErrorResponse = (error: CreateFloorError) => {
       return {
         body: {
           error_code: error.type,
-          error_message: 'building_id does not exist',
+          error_message: 'building not found',
           details: {
             building_id: error.buildingId,
           },
@@ -29,13 +30,14 @@ const toCreateFloorErrorResponse = (error: CreateFloorError) => {
   }
 }
 
-export const registerCreateFloorRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
+export const registerCreateOrganizationBuildingFloorRoute = (app: OpenAPIHono) => {
   const route = createRoute({
     method: 'post',
-    path: '/',
-    tags: ['Floors'],
-    description: 'building に紐づく floor を作成する',
+    path: '/{organizationId}/buildings/{buildingId}/floors',
+    tags: ['Organizations'],
+    description: 'organization 内 building に floor を作成する',
     request: {
+      params: organizationBuildingIdParamsSchema,
       body: {
         content: {
           'application/json': {
@@ -73,9 +75,10 @@ export const registerCreateFloorRoute = (app: OpenAPIHono<RequestActorHonoEnv>) 
   })
 
   app.openapi(route, async (c) => {
+    const { buildingId, organizationId } = c.req.valid('param')
     const payload = c.req.valid('json')
-    const actor = requireRequestActor(c)
-    const result = await createFloor(actor, payload)
+    const actor = requireRequestActor(c as RequestActorContext)
+    const result = await createFloor(actor, organizationId, buildingId, payload)
 
     if (!result.ok) {
       const error = toCreateFloorErrorResponse(result.error)
