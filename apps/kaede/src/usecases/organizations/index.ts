@@ -14,7 +14,10 @@ import type {
 } from '../../schemas/organizations.js'
 import type { RecordingDetailResponse } from '../../schemas/recordings.js'
 import { hashPassword } from '../../services/auth/password.js'
-import { listBuildings as listBuildingRows } from '../../services/buildings/index.js'
+import {
+  findBuildingDetailById,
+  listBuildings as listBuildingRows,
+} from '../../services/buildings/index.js'
 import { db } from '../../services/db/index.js'
 import type { DbExecutor } from '../../services/executor.js'
 import { listFloors as listFloorRows } from '../../services/floors/index.js'
@@ -60,6 +63,7 @@ export type OrganizationError =
   | { type: 'AUTH_SESSION_REVOKED' }
   | { type: 'AUTH_USER_DISABLED' }
   | { type: 'AUTH_FORBIDDEN' }
+  | { type: 'BUILDING_NOT_FOUND' }
   | { type: 'ORGANIZATION_NOT_FOUND' }
   | { type: 'ORGANIZATION_CREATION_REQUESTS_DISABLED' }
   | { type: 'ORGANIZATION_CREATION_REQUEST_NOT_FOUND' }
@@ -394,6 +398,44 @@ export const listOrganizationFloorsForSession = async (
   }
 
   const floors = await listFloorRows({
+    organizationIds: [organizationId],
+  })
+
+  return {
+    ok: true,
+    value: {
+      floors: floors.map(toFloorResponse),
+    },
+  }
+}
+
+export const listOrganizationBuildingFloorsForSession = async (
+  sessionToken: string | undefined,
+  organizationId: string,
+  buildingId: string,
+  executor?: DbExecutor
+): Promise<OrganizationResult<{ floors: FloorResponse[] }>> => {
+  const actor = await requireOrganizationManagerOrAdmin(sessionToken, organizationId, executor)
+
+  if (!actor.ok) {
+    return actor
+  }
+
+  const building = await findBuildingDetailById(buildingId, {
+    organizationIds: [organizationId],
+  })
+
+  if (!building) {
+    return {
+      ok: false,
+      error: {
+        type: 'BUILDING_NOT_FOUND',
+      },
+    }
+  }
+
+  const floors = await listFloorRows({
+    buildingIds: [buildingId],
     organizationIds: [organizationId],
   })
 

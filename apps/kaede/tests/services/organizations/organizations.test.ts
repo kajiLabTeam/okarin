@@ -8,6 +8,7 @@ import {
   createOrganizationForSession,
   getOrganizationForSession,
   getOrganizationUserForSession,
+  listOrganizationBuildingFloorsForSession,
   listOrganizationBuildingsForSession,
   listOrganizationFloorsForSession,
   listOrganizationRecordingsForSession,
@@ -627,6 +628,112 @@ describe('organizations usecase', () => {
       ok: false,
       error: {
         type: 'AUTH_FORBIDDEN',
+      },
+    })
+  })
+
+  it('manager can list floors in a building in their organization', async () => {
+    const organization = await createOrganization()
+    const manager = await createUserWithSession({
+      email: 'manager@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'manager',
+      },
+    })
+    const building = await db
+      .insertInto('buildings')
+      .values({
+        organization_id: organization.id,
+        name: 'Building A',
+      })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+    const otherBuilding = await db
+      .insertInto('buildings')
+      .values({
+        organization_id: organization.id,
+        name: 'Building B',
+      })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+    const floor = await db
+      .insertInto('floors')
+      .values({
+        building_id: building.id,
+        organization_id: organization.id,
+        level: 1,
+        name: '1F',
+        image_object_path: `maps/${building.id}/44444444-4444-4444-8444-444444444444.png`,
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    await db
+      .insertInto('floors')
+      .values({
+        building_id: otherBuilding.id,
+        organization_id: organization.id,
+        level: 2,
+        name: 'Other 2F',
+        image_object_path: `maps/${otherBuilding.id}/55555555-5555-4555-8555-555555555555.png`,
+      })
+      .execute()
+
+    const result = await listOrganizationBuildingFloorsForSession(
+      manager.sessionToken,
+      organization.id,
+      building.id,
+      db
+    )
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        floors: [
+          {
+            floor_id: floor.id,
+            building_id: building.id,
+            organization_id: organization.id,
+            building_name: 'Building A',
+            name: '1F',
+          },
+        ],
+      },
+    })
+  })
+
+  it('manager cannot list floors for a building in another organization', async () => {
+    const organization = await createOrganization()
+    const otherOrganization = await createOrganization('Group B')
+    const manager = await createUserWithSession({
+      email: 'manager@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'manager',
+      },
+    })
+    const otherBuilding = await db
+      .insertInto('buildings')
+      .values({
+        organization_id: otherOrganization.id,
+        name: 'Building B',
+      })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+
+    const result = await listOrganizationBuildingFloorsForSession(
+      manager.sessionToken,
+      organization.id,
+      otherBuilding.id,
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'BUILDING_NOT_FOUND',
       },
     })
   })
