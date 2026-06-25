@@ -8,6 +8,7 @@ import {
   createOrganizationForSession,
   getOrganizationForSession,
   getOrganizationUserForSession,
+  listOrganizationBuildingsForSession,
   listOrganizationRecordingsForSession,
   listOrganizationUsersForSession,
   listOrganizationsForSession,
@@ -369,6 +370,119 @@ describe('organizations usecase', () => {
     })
 
     const result = await listOrganizationUsersForSession(
+      manager.sessionToken,
+      otherOrganization.id,
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'AUTH_FORBIDDEN',
+      },
+    })
+  })
+
+  it('admin can list organization buildings', async () => {
+    const organization = await createOrganization()
+    const otherOrganization = await createOrganization('Group B')
+    const admin = await createUserWithSession({
+      email: 'admin@example.com',
+      globalRole: 'admin',
+    })
+    const building = await db
+      .insertInto('buildings')
+      .values({
+        organization_id: organization.id,
+        name: 'Building A',
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    await db
+      .insertInto('buildings')
+      .values({
+        organization_id: otherOrganization.id,
+        name: 'Building B',
+      })
+      .execute()
+
+    const result = await listOrganizationBuildingsForSession(
+      admin.sessionToken,
+      organization.id,
+      db
+    )
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        buildings: [
+          {
+            building_id: building.id,
+            organization_id: organization.id,
+            name: 'Building A',
+          },
+        ],
+      },
+    })
+  })
+
+  it('manager can list buildings in their organization', async () => {
+    const organization = await createOrganization()
+    const manager = await createUserWithSession({
+      email: 'manager@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'manager',
+      },
+    })
+    await db
+      .insertInto('buildings')
+      .values({
+        organization_id: organization.id,
+        name: 'Building A',
+      })
+      .execute()
+
+    const result = await listOrganizationBuildingsForSession(
+      manager.sessionToken,
+      organization.id,
+      db
+    )
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        buildings: [
+          {
+            organization_id: organization.id,
+            name: 'Building A',
+          },
+        ],
+      },
+    })
+  })
+
+  it('manager cannot list buildings in another organization', async () => {
+    const organization = await createOrganization()
+    const otherOrganization = await createOrganization('Group B')
+    const manager = await createUserWithSession({
+      email: 'manager@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'manager',
+      },
+    })
+    await db
+      .insertInto('buildings')
+      .values({
+        organization_id: otherOrganization.id,
+        name: 'Building B',
+      })
+      .execute()
+
+    const result = await listOrganizationBuildingsForSession(
       manager.sessionToken,
       otherOrganization.id,
       db

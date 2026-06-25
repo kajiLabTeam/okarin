@@ -1,4 +1,5 @@
 import { getOidcRuntimeConfig } from '../../config/runtime.js'
+import type { BuildingResponse } from '../../schemas/buildings.js'
 import type {
   ApproveOrganizationCreationRequestRequest,
   CreateOrganizationMembershipRequest,
@@ -12,6 +13,7 @@ import type {
 } from '../../schemas/organizations.js'
 import type { RecordingDetailResponse } from '../../schemas/recordings.js'
 import { hashPassword } from '../../services/auth/password.js'
+import { listBuildings as listBuildingRows } from '../../services/buildings/index.js'
 import { db } from '../../services/db/index.js'
 import type { DbExecutor } from '../../services/executor.js'
 import {
@@ -46,6 +48,7 @@ import {
 } from '../../services/users/index.js'
 import type { OrganizationUserRow } from '../../services/users/index.js'
 import { requireActiveSessionUser } from '../auth/index.js'
+import { toBuildingResponse } from '../buildings/building-response.js'
 import { toRecordingDetailResponse } from '../recordings/recording-response.js'
 
 export type OrganizationError =
@@ -349,6 +352,29 @@ export const listOrganizationRecordingsForSession = async (
     ok: true,
     value: {
       recordings: recordings.map(toRecordingDetailResponse),
+    },
+  }
+}
+
+export const listOrganizationBuildingsForSession = async (
+  sessionToken: string | undefined,
+  organizationId: string,
+  executor?: DbExecutor
+): Promise<OrganizationResult<{ buildings: BuildingResponse[] }>> => {
+  const actor = await requireOrganizationManagerOrAdmin(sessionToken, organizationId, executor)
+
+  if (!actor.ok) {
+    return actor
+  }
+
+  const buildings = await listBuildingRows({
+    organizationIds: [organizationId],
+  })
+
+  return {
+    ok: true,
+    value: {
+      buildings: buildings.map(toBuildingResponse),
     },
   }
 }

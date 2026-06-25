@@ -4,6 +4,7 @@ import { registerCreateOrganizationUserRoute } from './create-organization-user.
 import { registerCreateOrganizationRoute } from './create-organization.js'
 import { registerGetOrganizationUserRoute } from './get-organization-user.js'
 import { registerGetOrganizationRoute } from './get-organization.js'
+import { registerListOrganizationBuildingsRoute } from './list-organization-buildings.js'
 import { registerListOrganizationRecordingsRoute } from './list-organization-recordings.js'
 import { registerListOrganizationUsersRoute } from './list-organization-users.js'
 import { registerListOrganizationsRoute } from './list-organizations.js'
@@ -13,6 +14,7 @@ export const organizationsRoutes = new OpenAPIHono()
 registerListOrganizationsRoute(organizationsRoutes)
 registerCreateOrganizationRoute(organizationsRoutes)
 registerGetOrganizationRoute(organizationsRoutes)
+registerListOrganizationBuildingsRoute(organizationsRoutes)
 registerListOrganizationRecordingsRoute(organizationsRoutes)
 registerListOrganizationUsersRoute(organizationsRoutes)
 registerGetOrganizationUserRoute(organizationsRoutes)
