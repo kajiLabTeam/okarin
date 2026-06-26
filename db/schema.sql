@@ -293,21 +293,38 @@ CREATE TABLE public.trajectory_constraints (
 CREATE TABLE public.users (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     email text NOT NULL,
-    password_hash text NOT NULL,
+    password_hash text,
     display_name text NOT NULL,
     global_role text DEFAULT 'none'::text NOT NULL,
-    password_must_change boolean DEFAULT true NOT NULL,
     password_changed_at timestamp with time zone,
-    temporary_password_expires_at timestamp with time zone,
-    is_active boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     failed_login_attempts integer DEFAULT 0 NOT NULL,
     locked_until timestamp with time zone,
+    status text NOT NULL,
     CONSTRAINT users_display_name_nonempty_chk CHECK ((length(btrim(display_name)) > 0)),
     CONSTRAINT users_email_nonempty_chk CHECK ((length(btrim(email)) > 0)),
-    CONSTRAINT users_password_hash_nonempty_chk CHECK ((length(btrim(password_hash)) > 0)),
-    CONSTRAINT users_global_role_chk CHECK ((global_role = ANY (ARRAY['none'::text, 'admin'::text])))
+    CONSTRAINT users_password_hash_nonempty_chk CHECK (((password_hash IS NULL) OR (length(btrim(password_hash)) > 0))),
+    CONSTRAINT users_global_role_chk CHECK ((global_role = ANY (ARRAY['none'::text, 'admin'::text]))),
+    CONSTRAINT users_status_chk CHECK ((status = ANY (ARRAY['pending_activation'::text, 'active'::text, 'disabled'::text])))
+);
+
+
+--
+-- Name: user_activation_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.user_activation_tokens (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    token_hash text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    used_at timestamp with time zone,
+    revoked_at timestamp with time zone,
+    created_by_user_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT user_activation_tokens_token_hash_nonempty_chk CHECK ((length(btrim(token_hash)) > 0))
 );
 
 
@@ -389,6 +406,22 @@ ALTER TABLE ONLY public.organization_invites
 
 ALTER TABLE ONLY public.organization_invites
     ADD CONSTRAINT organization_invites_token_hash_key UNIQUE (token_hash);
+
+
+--
+-- Name: user_activation_tokens user_activation_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_activation_tokens
+    ADD CONSTRAINT user_activation_tokens_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: user_activation_tokens user_activation_tokens_token_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_activation_tokens
+    ADD CONSTRAINT user_activation_tokens_token_hash_key UNIQUE (token_hash);
 
 
 --
@@ -583,6 +616,41 @@ CREATE INDEX organization_invites_expires_at_idx ON public.organization_invites 
 --
 
 CREATE INDEX organization_invites_organization_id_idx ON public.organization_invites USING btree (organization_id);
+
+
+--
+-- Name: user_activation_tokens_created_by_user_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX user_activation_tokens_created_by_user_id_idx ON public.user_activation_tokens USING btree (created_by_user_id);
+
+
+--
+-- Name: user_activation_tokens_expires_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX user_activation_tokens_expires_at_idx ON public.user_activation_tokens USING btree (expires_at);
+
+
+--
+-- Name: user_activation_tokens_one_active_per_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX user_activation_tokens_one_active_per_user ON public.user_activation_tokens USING btree (user_id) WHERE ((used_at IS NULL) AND (revoked_at IS NULL));
+
+
+--
+-- Name: user_activation_tokens_organization_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX user_activation_tokens_organization_id_idx ON public.user_activation_tokens USING btree (organization_id);
+
+
+--
+-- Name: user_activation_tokens_user_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX user_activation_tokens_user_id_idx ON public.user_activation_tokens USING btree (user_id);
 
 
 --
@@ -848,6 +916,30 @@ ALTER TABLE ONLY public.organization_invites
 
 ALTER TABLE ONLY public.organization_invites
     ADD CONSTRAINT organization_invites_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: user_activation_tokens user_activation_tokens_created_by_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_activation_tokens
+    ADD CONSTRAINT user_activation_tokens_created_by_user_id_fkey FOREIGN KEY (created_by_user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: user_activation_tokens user_activation_tokens_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_activation_tokens
+    ADD CONSTRAINT user_activation_tokens_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: user_activation_tokens user_activation_tokens_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_activation_tokens
+    ADD CONSTRAINT user_activation_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
 
 
 --

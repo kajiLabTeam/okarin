@@ -3,6 +3,7 @@ import {
   accountStateSchema,
   isoDatetimeSchema,
   membershipRoleSchema,
+  userStatusSchema,
   uuidSchema,
 } from './common.js'
 
@@ -17,10 +18,9 @@ export const authUserSchema = z.object({
   email: z.string().email().max(255),
   display_name: z.string().min(1).max(255),
   global_role: z.enum(['none', 'admin']),
+  status: userStatusSchema,
   account_state: accountStateSchema,
-  password_must_change: z.boolean(),
   password_changed_at: isoDatetimeSchema.nullable(),
-  temporary_password_expires_at: isoDatetimeSchema.nullable(),
   memberships: z.array(authMembershipSchema),
 })
 

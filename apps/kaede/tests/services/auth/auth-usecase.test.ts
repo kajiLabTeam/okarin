@@ -19,10 +19,8 @@ const insertUser = async (
     email: string
     displayName: string
     globalRole: string
-    isActive: boolean
+    status: 'pending_activation' | 'active' | 'disabled'
     password: string
-    passwordMustChange: boolean
-    temporaryPasswordExpiresAt: Date | null
   }> = {}
 ) => {
   const password = overrides.password ?? 'temporary-password'
@@ -35,11 +33,8 @@ const insertUser = async (
       password_hash: passwordHash,
       display_name: overrides.displayName ?? 'User',
       global_role: overrides.globalRole ?? 'none',
-      is_active: overrides.isActive ?? true,
-      password_must_change: overrides.passwordMustChange ?? true,
       password_changed_at: null,
-      temporary_password_expires_at:
-        overrides.temporaryPasswordExpiresAt ?? new Date('2026-06-11T00:00:00.000Z'),
+      status: overrides.status ?? 'active',
     })
     .returningAll()
     .executeTakeFirstOrThrow()
@@ -100,10 +95,9 @@ describe('auth usecase', () => {
       email: 'user@example.com',
       display_name: 'User',
       global_role: 'none',
+      status: 'active',
       account_state: 'active',
-      password_must_change: true,
       password_changed_at: null,
-      temporary_password_expires_at: '2026-06-11T00:00:00.000Z',
       memberships: [
         {
           organization_id: organization.id,
@@ -273,9 +267,7 @@ describe('auth usecase', () => {
     expect(user).toMatchObject({
       display_name: 'OIDC User',
       global_role: 'none',
-      is_active: true,
-      password_must_change: false,
-      temporary_password_expires_at: null,
+      status: 'active',
     })
 
     const identity = await db
@@ -351,9 +343,7 @@ describe('auth usecase', () => {
       .where('id', '=', user.id)
       .executeTakeFirstOrThrow()
     expect(updatedUser).toMatchObject({
-      password_must_change: true,
       password_changed_at: null,
-      temporary_password_expires_at: new Date('2026-06-11T00:00:00.000Z'),
     })
 
     const session = await db
@@ -434,10 +424,8 @@ describe('auth usecase', () => {
       email: 'admin@example.com',
       display_name: 'Bootstrap Admin',
       global_role: 'admin',
-      is_active: true,
-      password_must_change: true,
-      password_changed_at: null,
-      temporary_password_expires_at: new Date('2026-06-11T00:00:00.000Z'),
+      status: 'active',
+      password_changed_at: new Date('2026-06-10T00:00:00.000Z'),
     })
     await expect(
       db
@@ -504,9 +492,7 @@ describe('auth usecase', () => {
       .executeTakeFirstOrThrow()
     expect(adminAfterOidc).toMatchObject({
       global_role: 'admin',
-      password_must_change: true,
-      password_changed_at: null,
-      temporary_password_expires_at: new Date('2026-06-11T00:00:00.000Z'),
+      password_changed_at: new Date('2026-06-10T00:00:00.000Z'),
     })
 
     const users = await db
@@ -569,9 +555,7 @@ describe('auth usecase', () => {
       .executeTakeFirstOrThrow()
     expect(adminAfterOidc).toMatchObject({
       global_role: 'admin',
-      password_must_change: true,
-      password_changed_at: null,
-      temporary_password_expires_at: new Date('2026-06-11T00:00:00.000Z'),
+      password_changed_at: new Date('2026-06-10T00:00:00.000Z'),
     })
 
     const identity = await db
@@ -653,9 +637,7 @@ describe('auth usecase', () => {
       .where('id', '=', user.id)
       .executeTakeFirstOrThrow()
     expect(updatedUser).toMatchObject({
-      password_must_change: true,
       password_changed_at: null,
-      temporary_password_expires_at: new Date('2026-06-11T00:00:00.000Z'),
     })
   })
 
@@ -771,33 +753,8 @@ describe('auth usecase', () => {
     })
   })
 
-  it('login は temporary password 期限切れなら AUTH_TEMPORARY_PASSWORD_EXPIRED を返す', async () => {
-    await insertUser({
-      temporaryPasswordExpiresAt: new Date('2026-06-09T00:00:00.000Z'),
-    })
-
-    const result = await login(
-      {
-        email: 'user@example.com',
-        password: 'temporary-password',
-      },
-      new Date('2026-06-10T00:00:00.000Z'),
-      db
-    )
-
-    expect(result).toEqual({
-      ok: false,
-      error: {
-        type: 'AUTH_TEMPORARY_PASSWORD_EXPIRED',
-      },
-    })
-  })
-
   it('getMe は session token から user を返す', async () => {
-    const user = await insertUser({
-      passwordMustChange: false,
-      temporaryPasswordExpiresAt: null,
-    })
+    const user = await insertUser()
     const { token } = await createSession(
       {
         userId: user.id,
@@ -816,7 +773,7 @@ describe('auth usecase', () => {
     expect(result.value.user.user_id).toBe(user.id)
     expect(result.value.session_auth_method).toBe('password')
     expect(result.value.user.account_state).toBe('pending_membership')
-    expect(result.value.user.password_must_change).toBe(false)
+    expect(result.value.user.status).toBe('active')
   })
 
   it('getMe は oidc session の auth method を返す', async () => {
@@ -838,7 +795,7 @@ describe('auth usecase', () => {
     }
 
     expect(result.value.session_auth_method).toBe('oidc')
-    expect(result.value.user.password_must_change).toBe(true)
+    expect(result.value.user.status).toBe('active')
   })
 
   it('logout は session を revoke する', async () => {
@@ -879,10 +836,9 @@ describe('auth usecase', () => {
       .where('id', '=', user.id)
       .executeTakeFirstOrThrow()
 
-    expect(updated.password_must_change).toBe(false)
     expect(updated.password_changed_at).toEqual(new Date('2026-06-10T00:00:00.000Z'))
-    expect(updated.temporary_password_expires_at).toBeNull()
-    await expect(verifyPassword(updated.password_hash, 'new-password')).resolves.toBe(true)
+    expect(updated.password_hash).not.toBeNull()
+    await expect(verifyPassword(updated.password_hash ?? '', 'new-password')).resolves.toBe(true)
 
     const sessions = await db
       .selectFrom('sessions')

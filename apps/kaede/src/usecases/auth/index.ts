@@ -30,7 +30,6 @@ type AuthError =
   | { type: 'AUTH_USER_LOCKED' }
   | { type: 'AUTH_SESSION_EXPIRED' }
   | { type: 'AUTH_SESSION_REVOKED' }
-  | { type: 'AUTH_TEMPORARY_PASSWORD_EXPIRED' }
 
 type AuthResult<T> =
   | {
@@ -151,14 +150,13 @@ const buildAuthUserResponse = async (
       email: user.email,
       display_name: user.display_name,
       global_role: user.global_role as 'none' | 'admin',
+      status: user.status as 'pending_activation' | 'active' | 'disabled',
       account_state: deriveAccountState({
         globalRole: user.global_role as 'none' | 'admin',
-        isActive: user.is_active,
+        status: user.status as 'pending_activation' | 'active' | 'disabled',
         membershipCount: memberships.length,
       }),
-      password_must_change: user.password_must_change,
       password_changed_at: toIsoOrNull(user.password_changed_at),
-      temporary_password_expires_at: toIsoOrNull(user.temporary_password_expires_at),
       memberships: memberships.map((membership) => ({
         organization_id: membership.organization_id,
         organization_name: membership.organization_name,
@@ -166,18 +164,6 @@ const buildAuthUserResponse = async (
       })),
     },
   }
-}
-
-const assertTemporaryPasswordNotExpired = (user: User, now: Date): AuthError | undefined => {
-  if (
-    user.password_must_change &&
-    user.temporary_password_expires_at &&
-    user.temporary_password_expires_at < now
-  ) {
-    return { type: 'AUTH_TEMPORARY_PASSWORD_EXPIRED' }
-  }
-
-  return undefined
 }
 
 const MAX_FAILED_LOGIN_ATTEMPTS = 5
@@ -268,10 +254,8 @@ const findOrCreateGoogleOidcUser = async (
       display_name: claims.name,
       password_hash: await createOidcPasswordHash(),
       global_role: 'none',
-      is_active: true,
-      password_must_change: false,
       password_changed_at: null,
-      temporary_password_expires_at: null,
+      status: 'active',
     },
     executor
   )
@@ -362,10 +346,17 @@ export const login = async (
     }
   }
 
-  if (!user.is_active) {
+  if (user.status !== 'active') {
     return {
       ok: false,
       error: { type: 'AUTH_USER_DISABLED' },
+    }
+  }
+
+  if (!user.password_hash) {
+    return {
+      ok: false,
+      error: { type: 'AUTH_INVALID_CREDENTIALS' },
     }
   }
 
@@ -404,15 +395,6 @@ export const login = async (
     return {
       ok: false,
       error: { type: 'AUTH_INVALID_CREDENTIALS' },
-    }
-  }
-
-  const temporaryPasswordError = assertTemporaryPasswordNotExpired(user, now)
-
-  if (temporaryPasswordError) {
-    return {
-      ok: false,
-      error: temporaryPasswordError,
     }
   }
 
@@ -463,7 +445,7 @@ export const completeGoogleOidcLogin = async (
     }
   }
 
-  if (!userResult.value.is_active) {
+  if (userResult.value.status !== 'active') {
     return {
       ok: false,
       error: { type: 'AUTH_USER_DISABLED' },
@@ -561,7 +543,7 @@ export const getMe = async (
     }
   }
 
-  if (!user.is_active) {
+  if (user.status !== 'active') {
     return {
       ok: false,
       error: { type: 'AUTH_USER_DISABLED' },
@@ -608,7 +590,7 @@ export const requireActiveSessionUser = async (
     }
   }
 
-  if (!user.is_active) {
+  if (user.status !== 'active') {
     return {
       ok: false,
       error: { type: 'AUTH_USER_DISABLED' },
@@ -664,10 +646,17 @@ export const changePassword = async (
     }
   }
 
-  if (!user.is_active) {
+  if (user.status !== 'active') {
     return {
       ok: false,
       error: { type: 'AUTH_USER_DISABLED' },
+    }
+  }
+
+  if (!user.password_hash) {
+    return {
+      ok: false,
+      error: { type: 'AUTH_INVALID_CREDENTIALS' },
     }
   }
 
@@ -680,24 +669,13 @@ export const changePassword = async (
     }
   }
 
-  const temporaryPasswordError = assertTemporaryPasswordNotExpired(user, now)
-
-  if (temporaryPasswordError) {
-    return {
-      ok: false,
-      error: temporaryPasswordError,
-    }
-  }
-
   const passwordHash = await hashPassword(payload.new_password)
 
   await updateUser(
     user.id,
     {
       password_hash: passwordHash,
-      password_must_change: false,
       password_changed_at: now,
-      temporary_password_expires_at: null,
     },
     executor
   )
@@ -717,7 +695,6 @@ export const authErrorStatus = (error: AuthError): 401 | 403 => {
     case 'AUTH_SESSION_REVOKED':
     case 'AUTH_UNAUTHENTICATED':
       return 401
-    case 'AUTH_TEMPORARY_PASSWORD_EXPIRED':
     case 'AUTH_USER_DISABLED':
     case 'AUTH_USER_LOCKED':
       return 403

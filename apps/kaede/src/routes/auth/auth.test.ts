@@ -38,7 +38,6 @@ vi.mock('../../services/auth/index.js', () => ({
 vi.mock('../../usecases/auth/index.js', () => ({
   authErrorStatus: (error: { type: string }) => {
     switch (error.type) {
-      case 'AUTH_TEMPORARY_PASSWORD_EXPIRED':
       case 'AUTH_USER_DISABLED':
         return 403
       default:
@@ -68,9 +67,7 @@ const userResponse = {
     display_name: 'User',
     global_role: 'none',
     account_state: 'active',
-    password_must_change: true,
     password_changed_at: null,
-    temporary_password_expires_at: '2026-06-11T00:00:00.000Z',
     memberships: [
       {
         organization_id: '22222222-2222-4222-8222-222222222222',
@@ -392,34 +389,6 @@ describe('auth routes', () => {
     expect(changePasswordMock).toHaveBeenCalledWith('session-token', {
       current_password: 'temporary-password',
       new_password: 'new-password',
-    })
-  })
-
-  it('POST /api/auth/change-password は temporary password 期限切れ時 403 を返す', async () => {
-    changePasswordMock.mockResolvedValue({
-      ok: false,
-      error: {
-        type: 'AUTH_TEMPORARY_PASSWORD_EXPIRED',
-      },
-    })
-
-    const app = createAuthTestApp()
-    const response = await app.request('/api/auth/change-password', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        cookie: 'okarin_session=session-token',
-      },
-      body: JSON.stringify({
-        current_password: 'temporary-password',
-        new_password: 'new-password',
-      }),
-    })
-
-    expect(response.status).toBe(403)
-    await expect(response.json()).resolves.toEqual({
-      error_code: 'AUTH_TEMPORARY_PASSWORD_EXPIRED',
-      error_message: 'temporary password expired',
     })
   })
 

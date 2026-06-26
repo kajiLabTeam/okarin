@@ -180,13 +180,23 @@ export interface Users {
   failed_login_attempts: Generated<number>
   global_role: Generated<string>
   id: Generated<string>
-  is_active: Generated<boolean>
   locked_until: Timestamp | null
   password_changed_at: Timestamp | null
-  password_hash: string
-  password_must_change: Generated<boolean>
-  temporary_password_expires_at: Timestamp | null
+  password_hash: string | null
+  status: string
   updated_at: Generated<Timestamp>
+}
+
+export interface UserActivationTokens {
+  created_at: Generated<Timestamp>
+  created_by_user_id: string
+  expires_at: Timestamp
+  id: Generated<string>
+  organization_id: string
+  revoked_at: Timestamp | null
+  token_hash: string
+  used_at: Timestamp | null
+  user_id: string
 }
 
 export interface DB {
@@ -203,5 +213,6 @@ export interface DB {
   sessions: Sessions
   trajectories: Trajectories
   trajectory_constraints: TrajectoryConstraints
+  user_activation_tokens: UserActivationTokens
   users: Users
 }

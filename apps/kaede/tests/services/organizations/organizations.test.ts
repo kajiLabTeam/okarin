@@ -82,10 +82,8 @@ const createUserWithSession = async (params: {
       display_name: params.email,
       password_hash: passwordHash,
       global_role: params.globalRole,
-      is_active: true,
-      password_must_change: false,
+      status: 'active',
       password_changed_at: fixedTimestamp,
-      temporary_password_expires_at: null,
     })
     .returningAll()
     .executeTakeFirstOrThrow()
@@ -985,7 +983,6 @@ describe('organizations usecase', () => {
 
   it('admin can create a manager user', async () => {
     const now = new Date('2026-06-11T00:00:00.000Z')
-    const expiresAt = new Date('2026-06-12T00:00:00.000Z')
     const organization = await createOrganization()
     const admin = await createUserWithSession({
       email: 'admin@example.com',
@@ -1012,8 +1009,6 @@ describe('organizations usecase', () => {
         email: 'manager@example.com',
         display_name: 'Manager A',
         role: 'manager',
-        password_must_change: true,
-        temporary_password_expires_at: '2026-06-12T00:00:00.000Z',
       },
     })
 
@@ -1030,8 +1025,8 @@ describe('organizations usecase', () => {
       .executeTakeFirstOrThrow()
 
     expect(user.global_role).toBe('none')
-    expect(user.temporary_password_expires_at).toEqual(expiresAt)
-    await expect(verifyPassword(user.password_hash, 'initial-password')).resolves.toBe(true)
+    expect(user.status).toBe('active')
+    await expect(verifyPassword(user.password_hash ?? '', 'initial-password')).resolves.toBe(true)
     expect(membership.role).toBe('manager')
   })
 

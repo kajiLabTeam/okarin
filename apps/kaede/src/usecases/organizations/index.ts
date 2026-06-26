@@ -108,8 +108,6 @@ const toOrganizationCreationRequestResponse = (
 })
 
 const mapAuthError = (error: Exclude<OrganizationError, { type: 'AUTH_FORBIDDEN' }>) => error
-const temporaryPasswordTtlMs = 24 * 60 * 60 * 1000
-
 const normalizeAttributes = (
   attributes: unknown
 ): NonNullable<OrganizationUserResponse['pedestrian']>['attributes'] => {
@@ -135,11 +133,9 @@ const toOrganizationUserResponse = (row: OrganizationUserRow): OrganizationUserR
   user_id: row.user_id,
   email: row.email,
   display_name: row.display_name,
-  is_active: row.is_active,
+  status: row.status as 'pending_activation' | 'active' | 'disabled',
   role: row.role as 'member' | 'manager' | 'owner',
-  password_must_change: row.password_must_change,
   password_changed_at: row.password_changed_at?.toISOString() ?? null,
-  temporary_password_expires_at: row.temporary_password_expires_at?.toISOString() ?? null,
   created_at: row.created_at.toISOString(),
   updated_at: row.updated_at.toISOString(),
   pedestrian:
@@ -630,7 +626,7 @@ export const approveOrganizationCreationRequestForAdminSession = async (
 
     const requester = await findUserById(request.requester_user_id, trx)
 
-    if (!requester || !requester.is_active || requester.global_role === 'admin') {
+    if (requester?.status !== 'active' || requester.global_role === 'admin') {
       return {
         ok: false,
         error: { type: 'ORGANIZATION_CREATION_REQUEST_REQUIRES_PENDING_USER' },
@@ -795,7 +791,7 @@ export const createOrganizationUserForSession = async (
   sessionToken: string | undefined,
   organizationId: string,
   payload: CreateOrganizationUserRequest,
-  now: Date = new Date(),
+  _now: Date = new Date(),
   executor?: DbExecutor
 ): Promise<OrganizationResult<OrganizationUserResponse>> => {
   const actor = await requireOrganizationManagerOrAdmin(sessionToken, organizationId, executor)
@@ -823,7 +819,6 @@ export const createOrganizationUserForSession = async (
 
   const displayName = payload.display_name.trim()
   const passwordHash = await hashPassword(payload.temporary_password)
-  const temporaryPasswordExpiresAt = new Date(now.getTime() + temporaryPasswordTtlMs)
 
   const createdUser = await runInTransaction(executor, async (trx) => {
     const user = await insertUser(
@@ -832,10 +827,8 @@ export const createOrganizationUserForSession = async (
         display_name: displayName,
         password_hash: passwordHash,
         global_role: 'none',
-        is_active: true,
-        password_must_change: true,
         password_changed_at: null,
-        temporary_password_expires_at: temporaryPasswordExpiresAt,
+        status: 'active',
       },
       trx
     )

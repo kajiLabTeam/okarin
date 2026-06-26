@@ -13,7 +13,6 @@ export interface UserRequestActor {
   email: string
   global_role: 'none' | 'admin'
   account_state: AccountState
-  password_must_change: boolean
   memberships: UserActorMembership[]
 }
 

@@ -9,7 +9,6 @@ const userActor: RequestActor = {
   email: 'user@example.com',
   global_role: 'none',
   account_state: 'active',
-  password_must_change: false,
   memberships: [
     {
       organization_id: '99999999-9999-4999-8999-999999999999',

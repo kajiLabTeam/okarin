@@ -15,7 +15,6 @@ export type CreateAdminUserResult =
         action: 'created' | 'password_reset'
         email: string
         userId: string
-        temporaryPasswordExpiresAt: Date
       }
     }
   | {
@@ -29,8 +28,6 @@ export interface CreateAdminUserParams {
   password: string
   resetPassword: boolean
 }
-
-const temporaryPasswordTtlMs = 24 * 60 * 60 * 1000
 
 export const createAdminUser = async (
   params: CreateAdminUserParams,
@@ -73,7 +70,6 @@ export const createAdminUser = async (
   const email = params.email.trim()
   const displayName = params.displayName.trim()
   const passwordHash = await hashPassword(params.password)
-  const temporaryPasswordExpiresAt = new Date(now.getTime() + temporaryPasswordTtlMs)
 
   const existingUser = await findUserByEmail(email, executor)
 
@@ -97,9 +93,8 @@ export const createAdminUser = async (
       {
         display_name: displayName,
         password_hash: passwordHash,
-        password_must_change: true,
-        password_changed_at: null,
-        temporary_password_expires_at: temporaryPasswordExpiresAt,
+        password_changed_at: now,
+        status: 'active',
         failed_login_attempts: 0,
         locked_until: null,
       },
@@ -112,7 +107,6 @@ export const createAdminUser = async (
         action: 'password_reset',
         email: updated.email,
         userId: updated.id,
-        temporaryPasswordExpiresAt,
       },
     }
   }
@@ -123,10 +117,8 @@ export const createAdminUser = async (
       display_name: displayName,
       password_hash: passwordHash,
       global_role: 'admin',
-      is_active: true,
-      password_must_change: true,
-      password_changed_at: null,
-      temporary_password_expires_at: temporaryPasswordExpiresAt,
+      password_changed_at: now,
+      status: 'active',
     },
     executor
   )
@@ -137,7 +129,6 @@ export const createAdminUser = async (
       action: 'created',
       email: user.email,
       userId: user.id,
-      temporaryPasswordExpiresAt,
     },
   }
 }

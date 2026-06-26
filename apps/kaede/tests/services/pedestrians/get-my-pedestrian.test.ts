@@ -17,7 +17,6 @@ const userActor = (userId: string): RequestActor => ({
   email: 'user@example.com',
   global_role: 'none',
   account_state: 'active',
-  password_must_change: false,
   memberships: [],
 })
 
@@ -43,6 +42,7 @@ describe('getMyPedestrian', () => {
         email: 'linked-user@example.com',
         display_name: 'Linked User',
         password_hash: 'hash',
+        status: 'active',
       })
       .returning(['id'])
       .executeTakeFirstOrThrow()
@@ -83,6 +83,7 @@ describe('getMyPedestrian', () => {
         email: 'unlinked-user@example.com',
         display_name: 'Unlinked User',
         password_hash: 'hash',
+        status: 'active',
       })
       .returning(['id'])
       .executeTakeFirstOrThrow()
@@ -126,6 +127,7 @@ describe('listMyRecordings', () => {
         email: 'linked-user@example.com',
         display_name: 'Linked User',
         password_hash: 'hash',
+        status: 'active',
       })
       .returning(['id'])
       .executeTakeFirstOrThrow()
@@ -209,6 +211,7 @@ describe('listMyRecordings', () => {
         email: 'unlinked-recording-user@example.com',
         display_name: 'Unlinked User',
         password_hash: 'hash',
+        status: 'active',
       })
       .returning(['id'])
       .executeTakeFirstOrThrow()
