@@ -1,15 +1,30 @@
 import { randomUUID } from 'node:crypto'
-import type { AuthUserResponse, ChangePasswordRequest, LoginRequest } from '../../schemas/auth.js'
+import type {
+  ActivationCompleteRequest,
+  ActivationVerifyRequest,
+  ActivationVerifyResponse,
+  AuthUserResponse,
+  ChangePasswordRequest,
+  LoginRequest,
+} from '../../schemas/auth.js'
+import { activationCompleteRequestSchema } from '../../schemas/auth.js'
+import type {
+  ActivationTokenContext,
+  GoogleIdTokenClaims,
+  GoogleOidcClient,
+} from '../../services/auth/index.js'
 import {
   createSession,
+  findActivationTokenContextByHash,
   findGoogleIdentityBySubject,
   findGoogleIdentityByUserId,
   findValidSessionByToken,
+  hashActivationToken,
   insertAuthIdentity,
+  markActivationTokenUsed,
   revokeAllSessionsByUserId,
   revokeSessionByToken,
 } from '../../services/auth/index.js'
-import type { GoogleIdTokenClaims, GoogleOidcClient } from '../../services/auth/index.js'
 import { hashPassword, verifyPassword } from '../../services/auth/password.js'
 import { db } from '../../services/db/index.js'
 import type { DbExecutor } from '../../services/executor.js'
@@ -30,6 +45,7 @@ type AuthError =
   | { type: 'AUTH_USER_LOCKED' }
   | { type: 'AUTH_SESSION_EXPIRED' }
   | { type: 'AUTH_SESSION_REVOKED' }
+  | { type: 'AUTH_ACTIVATION_TOKEN_INVALID' }
 
 type AuthResult<T> =
   | {
@@ -59,6 +75,20 @@ export type ActiveSessionUserResult =
 
 export interface LoginResultValue extends AuthUserResponse {
   sessionToken: string
+}
+
+export type ActivationCompleteResult =
+  | {
+      ok: true
+      value: { ok: true }
+    }
+  | {
+      ok: false
+      error: { type: 'AUTH_ACTIVATION_TOKEN_INVALID' }
+    }
+export interface ActivationVerifyResult {
+  ok: true
+  value: ActivationVerifyResponse
 }
 
 export type OidcLoginError =
@@ -168,6 +198,7 @@ const buildAuthUserResponse = async (
 
 const MAX_FAILED_LOGIN_ATTEMPTS = 5
 const LOGIN_LOCK_DURATION_MS = 15 * 60 * 1000
+const activationCompleteIdempotencyWindowMs = 3 * 1000
 
 const runInTransaction = async <T>(
   executor: DbExecutor | undefined,
@@ -184,6 +215,35 @@ const runInTransaction = async <T>(
 
 const createOidcPasswordHash = async () => {
   return hashPassword(`oidc:${randomUUID()}:${randomUUID()}`)
+}
+
+const isValidPendingActivationContext = (context: ActivationTokenContext, now: Date) => {
+  return (
+    context.used_at === null &&
+    context.revoked_at === null &&
+    context.expires_at > now &&
+    context.user_status === 'pending_activation' &&
+    context.user_password_hash === null
+  )
+}
+
+const isRecentCompletedActivationContext = (context: ActivationTokenContext, now: Date) => {
+  return (
+    context.used_at !== null &&
+    context.user_status === 'active' &&
+    now.getTime() - context.used_at.getTime() <= activationCompleteIdempotencyWindowMs
+  )
+}
+
+const findActivationContextByToken = async (
+  token: string,
+  executor: DbExecutor
+): Promise<ActivationTokenContext | undefined> => {
+  if (token.trim().length === 0) {
+    return undefined
+  }
+
+  return findActivationTokenContextByHash(hashActivationToken(token), executor)
 }
 
 const attachGoogleIdentityToUser = async (
@@ -615,6 +675,107 @@ export const logout = async (
   return { ok: true }
 }
 
+export const verifyActivationToken = async (
+  payload: ActivationVerifyRequest,
+  now: Date = new Date(),
+  executor: DbExecutor = db
+): Promise<ActivationVerifyResult> => {
+  const context = await findActivationContextByToken(payload.token, executor)
+
+  if (!context || !isValidPendingActivationContext(context, now)) {
+    return {
+      ok: true,
+      value: {
+        valid: false,
+      },
+    }
+  }
+
+  return {
+    ok: true,
+    value: {
+      valid: true,
+      email: context.user_email,
+      display_name: context.user_display_name,
+      organization_name: context.organization_name,
+      expires_at: context.expires_at.toISOString(),
+    },
+  }
+}
+
+export const completeActivation = async (
+  payload: ActivationCompleteRequest,
+  now: Date = new Date(),
+  executor?: DbExecutor
+): Promise<ActivationCompleteResult> => {
+  if (!activationCompleteRequestSchema.safeParse(payload).success) {
+    return {
+      ok: false,
+      error: { type: 'AUTH_ACTIVATION_TOKEN_INVALID' },
+    }
+  }
+
+  return runInTransaction(executor, async (trx) => {
+    const context = await findActivationContextByToken(payload.token, trx)
+
+    if (!context) {
+      return {
+        ok: false,
+        error: { type: 'AUTH_ACTIVATION_TOKEN_INVALID' },
+      }
+    }
+
+    if (isRecentCompletedActivationContext(context, now)) {
+      return {
+        ok: true,
+        value: { ok: true },
+      }
+    }
+
+    if (!isValidPendingActivationContext(context, now)) {
+      return {
+        ok: false,
+        error: { type: 'AUTH_ACTIVATION_TOKEN_INVALID' },
+      }
+    }
+
+    const usedToken = await markActivationTokenUsed(context.token_id, now, trx)
+
+    if (!usedToken) {
+      const latestContext = await findActivationContextByToken(payload.token, trx)
+
+      if (latestContext && isRecentCompletedActivationContext(latestContext, now)) {
+        return {
+          ok: true,
+          value: { ok: true },
+        }
+      }
+
+      return {
+        ok: false,
+        error: { type: 'AUTH_ACTIVATION_TOKEN_INVALID' },
+      }
+    }
+
+    await updateUser(
+      context.user_id,
+      {
+        password_hash: await hashPassword(payload.password),
+        password_changed_at: now,
+        status: 'active',
+        failed_login_attempts: 0,
+        locked_until: null,
+      },
+      trx
+    )
+
+    return {
+      ok: true,
+      value: { ok: true },
+    }
+  })
+}
+
 export const changePassword = async (
   sessionToken: string | undefined,
   payload: ChangePasswordRequest,
@@ -690,6 +851,7 @@ export const changePassword = async (
 
 export const authErrorStatus = (error: AuthError): 401 | 403 => {
   switch (error.type) {
+    case 'AUTH_ACTIVATION_TOKEN_INVALID':
     case 'AUTH_INVALID_CREDENTIALS':
     case 'AUTH_SESSION_EXPIRED':
     case 'AUTH_SESSION_REVOKED':

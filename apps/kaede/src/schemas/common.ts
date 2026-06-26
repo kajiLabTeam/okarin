@@ -97,6 +97,7 @@ export const userStatusSchema = z.enum(['pending_activation', 'active', 'disable
 
 export const authErrorCodes = [
   'AUTH_UNAUTHENTICATED',
+  'AUTH_ACTIVATION_TOKEN_INVALID',
   'AUTH_INVALID_CREDENTIALS',
   'AUTH_SESSION_EXPIRED',
   'AUTH_SESSION_REVOKED',
@@ -118,6 +119,7 @@ export const authErrorResponseSchema = errorResponseSchema.extend({
 
 export const authErrorMessages: Record<AuthErrorCode, string> = {
   AUTH_DASHBOARD_FORBIDDEN: 'dashboard access forbidden',
+  AUTH_ACTIVATION_TOKEN_INVALID: 'activation token is invalid',
   AUTH_INVALID_CREDENTIALS: 'invalid email or password',
   AUTH_ORGANIZATION_FORBIDDEN: 'organization access forbidden',
   AUTH_PASSWORD_CHANGE_REQUIRED: 'password change required',
@@ -131,6 +133,7 @@ export const authErrorMessages: Record<AuthErrorCode, string> = {
 
 export const authErrorStatuses: Record<AuthErrorCode, 401 | 403> = {
   AUTH_DASHBOARD_FORBIDDEN: 403,
+  AUTH_ACTIVATION_TOKEN_INVALID: 401,
   AUTH_INVALID_CREDENTIALS: 401,
   AUTH_ORGANIZATION_FORBIDDEN: 403,
   AUTH_PASSWORD_CHANGE_REQUIRED: 403,

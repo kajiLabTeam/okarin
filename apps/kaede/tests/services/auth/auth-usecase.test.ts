@@ -1,14 +1,21 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createSession, hashPassword, verifyPassword } from '../../../src/services/auth/index.js'
+import {
+  createSession,
+  hashActivationToken,
+  hashPassword,
+  verifyPassword,
+} from '../../../src/services/auth/index.js'
 import { createDb } from '../../../src/services/db/client.js'
 import { createAdminUser } from '../../../src/usecases/auth/create-admin-user.js'
 import {
   changePassword,
+  completeActivation,
   completeGoogleOidcLink,
   completeGoogleOidcLogin,
   getMe,
   login,
   logout,
+  verifyActivationToken,
 } from '../../../src/usecases/auth/index.js'
 import { resetDatabase } from '../../db/helpers.js'
 
@@ -20,11 +27,11 @@ const insertUser = async (
     displayName: string
     globalRole: string
     status: 'pending_activation' | 'active' | 'disabled'
-    password: string
+    password: string | null
   }> = {}
 ) => {
-  const password = overrides.password ?? 'temporary-password'
-  const passwordHash = await hashPassword(password)
+  const password = overrides.password === undefined ? 'temporary-password' : overrides.password
+  const passwordHash = password === null ? null : await hashPassword(password)
 
   return db
     .insertInto('users')
@@ -38,6 +45,59 @@ const insertUser = async (
     })
     .returningAll()
     .executeTakeFirstOrThrow()
+}
+
+const insertActivationToken = async ({
+  expiresAt = new Date('2026-06-17T00:00:00.000Z'),
+  revokedAt = null,
+  status = 'pending_activation',
+  token = 'activation-token',
+  usedAt = null,
+  userPassword = null,
+}: {
+  expiresAt?: Date
+  revokedAt?: Date | null
+  status?: 'pending_activation' | 'active' | 'disabled'
+  token?: string
+  usedAt?: Date | null
+  userPassword?: string | null
+} = {}) => {
+  const organization = await db
+    .insertInto('organizations')
+    .values({
+      name: 'Group A',
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow()
+  const creator = await insertUser({
+    email: 'creator@example.com',
+    globalRole: 'admin',
+  })
+  const user = await insertUser({
+    email: 'activation-user@example.com',
+    password: userPassword,
+    status,
+  })
+  const activationToken = await db
+    .insertInto('user_activation_tokens')
+    .values({
+      user_id: user.id,
+      organization_id: organization.id,
+      token_hash: hashActivationToken(token),
+      expires_at: expiresAt,
+      used_at: usedAt,
+      revoked_at: revokedAt,
+      created_by_user_id: creator.id,
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow()
+
+  return {
+    activationToken,
+    organization,
+    token,
+    user,
+  }
 }
 
 const insertOrganizationMembership = async (userId: string) => {
@@ -796,6 +856,187 @@ describe('auth usecase', () => {
 
     expect(result.value.session_auth_method).toBe('oidc')
     expect(result.value.user.status).toBe('active')
+  })
+
+  it('verifyActivationToken は valid token の表示情報を返し token を consume しない', async () => {
+    const { activationToken, organization, token, user } = await insertActivationToken()
+
+    const result = await verifyActivationToken(
+      {
+        token,
+      },
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        valid: true,
+        email: user.email,
+        display_name: user.display_name,
+        organization_name: organization.name,
+        expires_at: '2026-06-17T00:00:00.000Z',
+      },
+    })
+
+    const stored = await db
+      .selectFrom('user_activation_tokens')
+      .selectAll()
+      .where('id', '=', activationToken.id)
+      .executeTakeFirstOrThrow()
+    expect(stored.used_at).toBeNull()
+  })
+
+  it('verifyActivationToken は invalid token の詳細を返さない', async () => {
+    await insertActivationToken({
+      expiresAt: new Date('2026-06-09T00:00:00.000Z'),
+    })
+
+    const result = await verifyActivationToken(
+      {
+        token: 'activation-token',
+      },
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        valid: false,
+      },
+    })
+  })
+
+  it('completeActivation は password を設定して user を active にし token を consume する', async () => {
+    const { activationToken, token, user } = await insertActivationToken()
+
+    const result = await completeActivation(
+      {
+        token,
+        password: 'new-password',
+      },
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        ok: true,
+      },
+    })
+
+    const updatedUser = await db
+      .selectFrom('users')
+      .selectAll()
+      .where('id', '=', user.id)
+      .executeTakeFirstOrThrow()
+    expect(updatedUser.status).toBe('active')
+    expect(updatedUser.password_changed_at).toEqual(new Date('2026-06-10T00:00:00.000Z'))
+    expect(updatedUser.password_hash).not.toBeNull()
+    await expect(verifyPassword(updatedUser.password_hash ?? '', 'new-password')).resolves.toBe(
+      true
+    )
+
+    const usedToken = await db
+      .selectFrom('user_activation_tokens')
+      .selectAll()
+      .where('id', '=', activationToken.id)
+      .executeTakeFirstOrThrow()
+    expect(usedToken.used_at).toEqual(new Date('2026-06-10T00:00:00.000Z'))
+  })
+
+  it('completeActivation 後は password login できる', async () => {
+    const { token, user } = await insertActivationToken()
+    await insertOrganizationMembership(user.id)
+
+    await completeActivation(
+      {
+        token,
+        password: 'new-password',
+      },
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    const result = await login(
+      {
+        email: user.email,
+        password: 'new-password',
+      },
+      new Date('2026-06-10T00:00:01.000Z'),
+      db
+    )
+
+    expect(result.ok).toBe(true)
+  })
+
+  it('completeActivation は invalid token を拒否する', async () => {
+    await insertActivationToken({
+      revokedAt: new Date('2026-06-09T00:00:00.000Z'),
+    })
+
+    const result = await completeActivation(
+      {
+        token: 'activation-token',
+        password: 'new-password',
+      },
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'AUTH_ACTIVATION_TOKEN_INVALID',
+      },
+    })
+  })
+
+  it('completeActivation は直近で成功済みの同一 token を idempotent success にする', async () => {
+    const { token } = await insertActivationToken({
+      status: 'active',
+      usedAt: new Date('2026-06-10T00:00:00.000Z'),
+      userPassword: 'new-password',
+    })
+
+    const result = await completeActivation(
+      {
+        token,
+        password: 'new-password',
+      },
+      new Date('2026-06-10T00:00:02.000Z'),
+      db
+    )
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        ok: true,
+      },
+    })
+  })
+
+  it('completeActivation は password policy 違反を拒否する', async () => {
+    const { token } = await insertActivationToken()
+
+    const result = await completeActivation(
+      {
+        token,
+        password: '',
+      },
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'AUTH_ACTIVATION_TOKEN_INVALID',
+      },
+    })
   })
 
   it('logout は session を revoke する', async () => {

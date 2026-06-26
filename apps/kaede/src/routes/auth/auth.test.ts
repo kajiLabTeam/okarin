@@ -8,20 +8,24 @@ const originalAppEnv = process.env.APP_ENV
 
 const {
   changePasswordMock,
+  completeActivationMock,
   completeGoogleOidcLinkMock,
   completeGoogleOidcLoginMock,
   getMeMock,
   loginMock,
   logoutMock,
   requireActiveSessionUserMock,
+  verifyActivationTokenMock,
 } = vi.hoisted(() => ({
   changePasswordMock: vi.fn(),
+  completeActivationMock: vi.fn(),
   completeGoogleOidcLinkMock: vi.fn(),
   completeGoogleOidcLoginMock: vi.fn(),
   getMeMock: vi.fn(),
   loginMock: vi.fn(),
   logoutMock: vi.fn(),
   requireActiveSessionUserMock: vi.fn(),
+  verifyActivationTokenMock: vi.fn(),
 }))
 
 vi.mock('../../services/auth/index.js', () => ({
@@ -45,12 +49,14 @@ vi.mock('../../usecases/auth/index.js', () => ({
     }
   },
   changePassword: changePasswordMock,
+  completeActivation: completeActivationMock,
   completeGoogleOidcLink: completeGoogleOidcLinkMock,
   completeGoogleOidcLogin: completeGoogleOidcLoginMock,
   getMe: getMeMock,
   login: loginMock,
   logout: logoutMock,
   requireActiveSessionUser: requireActiveSessionUserMock,
+  verifyActivationToken: verifyActivationTokenMock,
 }))
 
 const createAuthTestApp = () => {
@@ -389,6 +395,122 @@ describe('auth routes', () => {
     expect(changePasswordMock).toHaveBeenCalledWith('session-token', {
       current_password: 'temporary-password',
       new_password: 'new-password',
+    })
+  })
+
+  it('POST /api/auth/activation/verify は valid result を返す', async () => {
+    verifyActivationTokenMock.mockResolvedValue({
+      ok: true,
+      value: {
+        valid: true,
+        email: 'user@example.com',
+        display_name: 'User',
+        organization_name: 'Group A',
+        expires_at: '2026-07-03T00:00:00.000Z',
+      },
+    })
+
+    const app = createAuthTestApp()
+    const response = await app.request('/api/auth/activation/verify', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        token: 'activation-token',
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      valid: true,
+      email: 'user@example.com',
+      display_name: 'User',
+      organization_name: 'Group A',
+      expires_at: '2026-07-03T00:00:00.000Z',
+    })
+    expect(verifyActivationTokenMock).toHaveBeenCalledWith({
+      token: 'activation-token',
+    })
+  })
+
+  it('POST /api/auth/activation/verify は invalid result を返す', async () => {
+    verifyActivationTokenMock.mockResolvedValue({
+      ok: true,
+      value: {
+        valid: false,
+      },
+    })
+
+    const app = createAuthTestApp()
+    const response = await app.request('/api/auth/activation/verify', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        token: 'activation-token',
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      valid: false,
+    })
+  })
+
+  it('POST /api/auth/activation/complete は password 初期設定を完了する', async () => {
+    completeActivationMock.mockResolvedValue({
+      ok: true,
+      value: {
+        ok: true,
+      },
+    })
+
+    const app = createAuthTestApp()
+    const response = await app.request('/api/auth/activation/complete', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        token: 'activation-token',
+        password: 'new-password',
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ ok: true })
+    expect(completeActivationMock).toHaveBeenCalledWith({
+      token: 'activation-token',
+      password: 'new-password',
+    })
+  })
+
+  it('POST /api/auth/activation/complete は invalid token なら 401 を返す', async () => {
+    completeActivationMock.mockResolvedValue({
+      ok: false,
+      error: {
+        type: 'AUTH_ACTIVATION_TOKEN_INVALID',
+      },
+    })
+
+    const app = createAuthTestApp()
+    const response = await app.request('/api/auth/activation/complete', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        token: 'activation-token',
+        password: 'new-password',
+      }),
+    })
+
+    expect(response.status).toBe(401)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'AUTH_ACTIVATION_TOKEN_INVALID',
+      error_message: 'activation token is invalid',
     })
   })
 
