@@ -20,7 +20,7 @@ describe('POST /api/organizations/:organizationId/users/:userId/activation-link'
     createOrganizationUserActivationLinkForSessionMock.mockResolvedValue({
       ok: true,
       value: {
-        activation_url: 'https://dashboard.example.test/auth/activate?token=abc123',
+        token: 'abc123',
         expires_at: '2026-06-18T00:00:00.000Z',
       },
     })
@@ -42,7 +42,7 @@ describe('POST /api/organizations/:organizationId/users/:userId/activation-link'
 
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({
-      activation_url: 'https://dashboard.example.test/auth/activate?token=abc123',
+      token: 'abc123',
       expires_at: '2026-06-18T00:00:00.000Z',
     })
     expect(createOrganizationUserActivationLinkForSessionMock).toHaveBeenCalledWith(

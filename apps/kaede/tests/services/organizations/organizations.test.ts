@@ -1261,9 +1261,9 @@ describe('organizations usecase', () => {
       },
     })
 
-    const firstToken = new URL(first.ok ? first.value.activation_url : '').searchParams.get('token')
+    const firstToken = first.ok ? first.value.token : ''
     expect(firstToken).toBeTruthy()
-    const firstTokenHash = hashActivationToken(firstToken ?? '')
+    const firstTokenHash = hashActivationToken(firstToken)
 
     const firstTokenRow = await db
       .selectFrom('user_activation_tokens')
@@ -1289,9 +1289,9 @@ describe('organizations usecase', () => {
       return
     }
 
-    const secondToken = new URL(second.value.activation_url).searchParams.get('token')
+    const secondToken = second.value.token
     expect(secondToken).toBeTruthy()
-    const secondTokenHash = hashActivationToken(secondToken ?? '')
+    const secondTokenHash = hashActivationToken(secondToken)
 
     const tokens = await db
       .selectFrom('user_activation_tokens')
@@ -1368,7 +1368,7 @@ describe('organizations usecase', () => {
       return
     }
 
-    expect(result.value.activation_url).toContain('/auth/activate?token=')
+    expect(result.value.token).toBeTruthy()
     expect(result.value.expires_at).toBe('2026-06-18T00:00:00.000Z')
   })
 

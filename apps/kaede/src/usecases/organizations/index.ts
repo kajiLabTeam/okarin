@@ -1,4 +1,4 @@
-import { getAppRuntimeConfig, getOidcRuntimeConfig } from '../../config/runtime.js'
+import { getOidcRuntimeConfig } from '../../config/runtime.js'
 import type { BuildingResponse } from '../../schemas/buildings.js'
 import type { FloorResponse } from '../../schemas/floors.js'
 import type {
@@ -184,21 +184,6 @@ const canCreateOrganizationUserRole = (
   }
 
   return false
-}
-
-const getDashboardBaseUrl = () => {
-  const { frontendOrigin } = getAppRuntimeConfig()
-  if (!frontendOrigin) {
-    throw new Error('FRONTEND_ORIGIN is required to generate activation URL')
-  }
-
-  return frontendOrigin
-}
-
-const buildActivationUrl = (token: string): string => {
-  const activationUrl = new URL('/auth/activate', getDashboardBaseUrl())
-  activationUrl.searchParams.set('token', token)
-  return activationUrl.toString()
 }
 
 const runInTransaction = async <T>(
@@ -1023,7 +1008,6 @@ export const createOrganizationUserActivationLinkForSession = async (
   const activationUserId = user.user_id
   const activationToken = generateActivationToken()
   const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
-  const activationUrl = buildActivationUrl(activationToken)
 
   await runInTransaction(executor, async (trx) => {
     await revokeActivationTokensByUserId(activationUserId, now, trx)
@@ -1045,7 +1029,7 @@ export const createOrganizationUserActivationLinkForSession = async (
   return {
     ok: true,
     value: {
-      activation_url: activationUrl,
+      token: activationToken,
       expires_at: expiresAt.toISOString(),
     },
   }

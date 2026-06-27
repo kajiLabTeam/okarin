@@ -112,7 +112,7 @@ export const createOrganizationUserRequestSchema = z
   })
 
 export const organizationUserActivationLinkResponseSchema = z.object({
-  activation_url: z.string().url(),
+  token: z.string().min(1),
   expires_at: isoDatetimeSchema,
 })
 
