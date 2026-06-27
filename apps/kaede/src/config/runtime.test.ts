@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { getAppRuntimeConfig, getOidcRuntimeConfig, resetRuntimeConfigForTests } from './runtime.js'
 
 const originalAppEnv = process.env.APP_ENV
-const originalDashboardBaseUrl = process.env.DASHBOARD_BASE_URL
 const originalFrontendOrigin = process.env.FRONTEND_ORIGIN
 const originalSharedToken = process.env.KAEDE_API_SHARED_TOKEN
 const originalSessionCookieSameSite = process.env.SESSION_COOKIE_SAME_SITE
@@ -20,12 +19,6 @@ const restoreEnv = () => {
     Reflect.deleteProperty(process.env, 'APP_ENV')
   } else {
     process.env.APP_ENV = originalAppEnv
-  }
-
-  if (originalDashboardBaseUrl === undefined) {
-    Reflect.deleteProperty(process.env, 'DASHBOARD_BASE_URL')
-  } else {
-    process.env.DASHBOARD_BASE_URL = originalDashboardBaseUrl
   }
 
   if (originalSharedToken === undefined) {
@@ -65,7 +58,6 @@ describe('getAppRuntimeConfig', () => {
 
   it('local では shared token 未設定を許可する', () => {
     process.env.APP_ENV = 'local'
-    process.env.DASHBOARD_BASE_URL = 'http://dashboard.example.test'
     Reflect.deleteProperty(process.env, 'KAEDE_API_SHARED_TOKEN')
     resetRuntimeConfigForTests()
 
@@ -80,7 +72,6 @@ describe('getAppRuntimeConfig', () => {
 
   it('test では shared token 未設定を許可する', () => {
     process.env.APP_ENV = 'test'
-    process.env.DASHBOARD_BASE_URL = 'http://dashboard.example.test'
     Reflect.deleteProperty(process.env, 'KAEDE_API_SHARED_TOKEN')
     resetRuntimeConfigForTests()
 
@@ -95,7 +86,6 @@ describe('getAppRuntimeConfig', () => {
 
   it('local/test 以外では shared token 未設定を拒否する', () => {
     process.env.APP_ENV = 'staging'
-    process.env.DASHBOARD_BASE_URL = 'http://dashboard.example.test'
     Reflect.deleteProperty(process.env, 'KAEDE_API_SHARED_TOKEN')
     resetRuntimeConfigForTests()
 
@@ -107,7 +97,6 @@ describe('getAppRuntimeConfig', () => {
   it('frontend origin から CORS allowed origin を導出し session cookie SameSite を読む', () => {
     process.env.APP_ENV = 'staging'
     process.env.KAEDE_API_SHARED_TOKEN = 'shared-token'
-    process.env.DASHBOARD_BASE_URL = 'http://dashboard.example.test'
     process.env.FRONTEND_ORIGIN = 'https://mio.example.test/'
     process.env.SESSION_COOKIE_SAME_SITE = 'None'
     resetRuntimeConfigForTests()
@@ -121,7 +110,6 @@ describe('getAppRuntimeConfig', () => {
 
   it('local では session cookie SameSite=None を拒否する', () => {
     process.env.APP_ENV = 'local'
-    process.env.DASHBOARD_BASE_URL = 'http://dashboard.example.test'
     process.env.SESSION_COOKIE_SAME_SITE = 'None'
     resetRuntimeConfigForTests()
 

@@ -187,7 +187,12 @@ const canCreateOrganizationUserRole = (
 }
 
 const getDashboardBaseUrl = () => {
-  return getAppRuntimeConfig().dashboardBaseUrl
+  const { frontendOrigin } = getAppRuntimeConfig()
+  if (!frontendOrigin) {
+    throw new Error('FRONTEND_ORIGIN is required to generate activation URL')
+  }
+
+  return frontendOrigin
 }
 
 const buildActivationUrl = (token: string): string => {

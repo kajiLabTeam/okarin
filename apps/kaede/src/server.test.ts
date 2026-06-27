@@ -5,7 +5,6 @@ const envNames = [
   'APP_ENV',
   'CALLBACK_TOKEN_SECRET',
   'DATABASE_URL',
-  'DASHBOARD_BASE_URL',
   'FRONTEND_ORIGIN',
   'KAEDE_API_SHARED_TOKEN',
   'KAEDE_INTERNAL_BASE_URL',
@@ -84,7 +83,6 @@ describe('createApp auth wiring', { timeout: 60_000 }, () => {
     process.env.APP_ENV = 'test'
     process.env.CALLBACK_TOKEN_SECRET = 'callback-secret'
     process.env.DATABASE_URL = 'postgres://user:password@localhost:5432/okarin'
-    process.env.DASHBOARD_BASE_URL = 'http://dashboard.example.test'
     Reflect.deleteProperty(process.env, 'FRONTEND_ORIGIN')
     process.env.KAEDE_API_SHARED_TOKEN = 'shared-token'
     process.env.KAEDE_INTERNAL_BASE_URL = 'http://kaede:8080'

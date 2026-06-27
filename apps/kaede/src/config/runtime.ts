@@ -10,7 +10,6 @@ export interface AppRuntimeConfig {
   apiSharedToken?: string
   corsAllowedOrigins: string[]
   env: string
-  dashboardBaseUrl: string
   frontendOrigin?: string
   deployRef: string
   deployedAt: string
@@ -118,7 +117,6 @@ export const getAppRuntimeConfig = (): AppRuntimeConfig => {
   const env = getOptionalEnv('APP_ENV', 'local')
   const apiSharedToken = process.env.KAEDE_API_SHARED_TOKEN
   const frontendOrigin = getFrontendOriginEnv()
-  const dashboardBaseUrl = normalizeBaseUrl(getRequiredEnv('DASHBOARD_BASE_URL'))
   const sessionCookieSameSite = parseSessionCookieSameSiteEnv()
 
   if (!apiSharedToken && !isSharedTokenOptionalEnv(env)) {
@@ -135,7 +133,6 @@ export const getAppRuntimeConfig = (): AppRuntimeConfig => {
     apiSharedToken,
     corsAllowedOrigins: frontendOrigin ? [frontendOrigin] : [],
     env,
-    dashboardBaseUrl,
     frontendOrigin,
     deployRef: getOptionalEnv('APP_DEPLOY_REF', 'unknown'),
     deployedAt: getOptionalEnv('APP_DEPLOYED_AT', 'unknown'),

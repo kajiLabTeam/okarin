@@ -110,7 +110,7 @@ docker compose -p okarin-local -f docker/compose.yml -f docker/compose.local.yml
 
 ローカルの共通環境変数は `deploy/env/local.env` を使います。
 `kaede` と `nozomi` で共有する Sentry 設定は `deploy/env/local.env`、`kaede` 用の S3 設定は `deploy/apps/kaede.local.env`、`storage-bootstrap` 用の認証情報は `deploy/apps/storage-bootstrap.local.env` を使います。
-`DASHBOARD_BASE_URL` は user 初期設定 URL の生成先です。通常は dashboard の origin を設定してください。
+`FRONTEND_ORIGIN` は CORS 許可 origin と user 初期設定 URL の生成先として使います。通常は dashboard の origin を設定してください。
 
 `deploy/seaweedfs/s3.local.conf` で S3 認証情報（`accessKey` / `secretKey`）を管理しています。
 キーを変更する場合は `deploy/seaweedfs/s3.local.conf` と `deploy/apps/kaede.local.env` / `deploy/apps/storage-bootstrap.local.env` の対応する値を同じに更新してください。
