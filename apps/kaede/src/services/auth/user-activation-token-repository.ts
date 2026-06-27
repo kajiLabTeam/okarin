@@ -1,9 +1,10 @@
-import type { Selectable, Updateable } from 'kysely'
+import type { Insertable, Selectable, Updateable } from 'kysely'
 import type { UserActivationTokens } from '../db/generated.js'
 import { db } from '../db/index.js'
 import type { DbExecutor } from '../executor.js'
 
 export type UserActivationToken = Selectable<UserActivationTokens>
+export type NewUserActivationToken = Insertable<UserActivationTokens>
 export type UserActivationTokenUpdate = Updateable<UserActivationTokens>
 
 export interface ActivationTokenContext {
@@ -65,4 +66,32 @@ export const markActivationTokenUsed = async (
     .where('expires_at', '>', now)
     .returningAll()
     .executeTakeFirst()
+}
+
+export const revokeActivationTokensByUserId = async (
+  userId: string,
+  now: Date,
+  executor: DbExecutor = db
+): Promise<UserActivationToken[]> => {
+  return executor
+    .updateTable('user_activation_tokens')
+    .set({
+      revoked_at: now,
+    })
+    .where('user_id', '=', userId)
+    .where('used_at', 'is', null)
+    .where('revoked_at', 'is', null)
+    .returningAll()
+    .execute()
+}
+
+export const insertUserActivationToken = async (
+  token: NewUserActivationToken,
+  executor: DbExecutor = db
+): Promise<UserActivationToken> => {
+  return executor
+    .insertInto('user_activation_tokens')
+    .values(token)
+    .returningAll()
+    .executeTakeFirstOrThrow()
 }

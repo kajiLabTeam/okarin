@@ -22,7 +22,7 @@ describe('POST /api/organizations/:organizationId/users', () => {
         user_id: '22222222-2222-4222-8222-222222222222',
         email: 'member@example.com',
         display_name: 'Member A',
-        status: 'active',
+        status: 'pending_activation',
         role: 'member',
         password_changed_at: null,
         created_at: '2026-06-11T00:00:00.000Z',
@@ -44,7 +44,6 @@ describe('POST /api/organizations/:organizationId/users', () => {
           email: 'member@example.com',
           display_name: 'Member A',
           role: 'member',
-          temporary_password: 'initial-password',
           create_pedestrian: false,
         }),
       }
@@ -55,7 +54,7 @@ describe('POST /api/organizations/:organizationId/users', () => {
       user_id: '22222222-2222-4222-8222-222222222222',
       email: 'member@example.com',
       display_name: 'Member A',
-      status: 'active',
+      status: 'pending_activation',
       role: 'member',
       password_changed_at: null,
       created_at: '2026-06-11T00:00:00.000Z',
@@ -69,7 +68,6 @@ describe('POST /api/organizations/:organizationId/users', () => {
         email: 'member@example.com',
         display_name: 'Member A',
         role: 'member',
-        temporary_password: 'initial-password',
         create_pedestrian: false,
       }
     )
@@ -96,7 +94,6 @@ describe('POST /api/organizations/:organizationId/users', () => {
           email: 'manager@example.com',
           display_name: 'Manager A',
           role: 'manager',
-          temporary_password: 'initial-password',
           create_pedestrian: false,
         }),
       }
@@ -130,7 +127,6 @@ describe('POST /api/organizations/:organizationId/users', () => {
           email: 'member@example.com',
           display_name: 'Member A',
           role: 'member',
-          temporary_password: 'initial-password',
           create_pedestrian: false,
         }),
       }
@@ -150,7 +146,7 @@ describe('POST /api/organizations/:organizationId/users', () => {
         user_id: '22222222-2222-4222-8222-222222222222',
         email: 'member@example.com',
         display_name: 'Member A',
-        status: 'active',
+        status: 'pending_activation',
         role: 'member',
         password_changed_at: null,
         created_at: '2026-06-11T00:00:00.000Z',
@@ -183,7 +179,6 @@ describe('POST /api/organizations/:organizationId/users', () => {
           email: 'member@example.com',
           display_name: 'Member A',
           role: 'member',
-          temporary_password: 'initial-password',
           create_pedestrian: true,
           pedestrian: {
             display_name: 'Pedestrian A',
@@ -212,7 +207,6 @@ describe('POST /api/organizations/:organizationId/users', () => {
         email: 'member@example.com',
         display_name: 'Member A',
         role: 'member',
-        temporary_password: 'initial-password',
         create_pedestrian: true,
         pedestrian: {
           display_name: 'Pedestrian A',
@@ -240,7 +234,6 @@ describe('POST /api/organizations/:organizationId/users', () => {
           email: 'member@example.com',
           display_name: 'Member A',
           role: 'member',
-          temporary_password: 'initial-password',
           create_pedestrian: true,
         }),
       }

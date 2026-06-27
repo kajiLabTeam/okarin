@@ -5,6 +5,7 @@ const envNames = [
   'APP_ENV',
   'CALLBACK_TOKEN_SECRET',
   'DATABASE_URL',
+  'DASHBOARD_BASE_URL',
   'FRONTEND_ORIGIN',
   'KAEDE_API_SHARED_TOKEN',
   'KAEDE_INTERNAL_BASE_URL',
@@ -83,6 +84,7 @@ describe('createApp auth wiring', { timeout: 60_000 }, () => {
     process.env.APP_ENV = 'test'
     process.env.CALLBACK_TOKEN_SECRET = 'callback-secret'
     process.env.DATABASE_URL = 'postgres://user:password@localhost:5432/okarin'
+    process.env.DASHBOARD_BASE_URL = 'http://dashboard.example.test'
     Reflect.deleteProperty(process.env, 'FRONTEND_ORIGIN')
     process.env.KAEDE_API_SHARED_TOKEN = 'shared-token'
     process.env.KAEDE_INTERNAL_BASE_URL = 'http://kaede:8080'
@@ -216,6 +218,7 @@ describe('createApp auth wiring', { timeout: 60_000 }, () => {
       ['/api/organizations/{organizationId}/recordings', 'get'],
       ['/api/organizations/{organizationId}/users', 'get'],
       ['/api/organizations/{organizationId}/users', 'post'],
+      ['/api/organizations/{organizationId}/users/{userId}/activation-link', 'post'],
       ['/api/organizations/{organizationId}/memberships', 'post'],
       ['/api/pedestrians/me', 'get'],
       ['/api/pedestrians/me/recordings', 'get'],
@@ -256,6 +259,10 @@ describe('createApp auth wiring', { timeout: 60_000 }, () => {
       ['/api/organizations/{organizationId}/users', 'get', '403'],
       ['/api/organizations/{organizationId}/users', 'post', '401'],
       ['/api/organizations/{organizationId}/users', 'post', '403'],
+      ['/api/organizations/{organizationId}/users/{userId}/activation-link', 'post', '401'],
+      ['/api/organizations/{organizationId}/users/{userId}/activation-link', 'post', '403'],
+      ['/api/organizations/{organizationId}/users/{userId}/activation-link', 'post', '404'],
+      ['/api/organizations/{organizationId}/users/{userId}/activation-link', 'post', '409'],
       ['/api/organizations/{organizationId}/memberships', 'post', '401'],
       ['/api/organizations/{organizationId}/memberships', 'post', '403'],
       ['/api/pedestrians/me', 'get', '403'],

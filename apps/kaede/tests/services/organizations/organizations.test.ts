@@ -1,9 +1,9 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createSession } from '../../../src/services/auth/index.js'
-import { verifyPassword } from '../../../src/services/auth/password.js'
+import { createSession, hashActivationToken } from '../../../src/services/auth/index.js'
 import { createDb } from '../../../src/services/db/client.js'
 import {
   createOrUpdateOrganizationMembershipForSession,
+  createOrganizationUserActivationLinkForSession,
   createOrganizationUserForSession,
   createOrganizationForSession,
   getOrganizationForSession,
@@ -104,6 +104,38 @@ const createUserWithSession = async (params: {
     user,
     sessionToken: session.token,
   }
+}
+
+const createPendingActivationOrganizationUser = async (params: {
+  organizationId: string
+  email: string
+  displayName?: string
+  role: 'member' | 'manager' | 'owner'
+  passwordHash?: string | null
+}) => {
+  const user = await db
+    .insertInto('users')
+    .values({
+      email: params.email,
+      display_name: params.displayName ?? params.email,
+      password_hash: params.passwordHash ?? null,
+      global_role: 'none',
+      status: 'pending_activation',
+      password_changed_at: null,
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow()
+
+  await db
+    .insertInto('organization_memberships')
+    .values({
+      organization_id: params.organizationId,
+      user_id: user.id,
+      role: params.role,
+    })
+    .execute()
+
+  return user
 }
 
 describe('organizations usecase', () => {
@@ -996,7 +1028,6 @@ describe('organizations usecase', () => {
         email: 'manager@example.com',
         display_name: 'Manager A',
         role: 'manager',
-        temporary_password: 'initial-password',
         create_pedestrian: false,
       },
       now,
@@ -1025,8 +1056,8 @@ describe('organizations usecase', () => {
       .executeTakeFirstOrThrow()
 
     expect(user.global_role).toBe('none')
-    expect(user.status).toBe('active')
-    await expect(verifyPassword(user.password_hash ?? '', 'initial-password')).resolves.toBe(true)
+    expect(user.status).toBe('pending_activation')
+    expect(user.password_hash).toBeNull()
     expect(membership.role).toBe('manager')
   })
 
@@ -1048,7 +1079,6 @@ describe('organizations usecase', () => {
         email: 'member@example.com',
         display_name: 'Member A',
         role: 'member',
-        temporary_password: 'initial-password',
         create_pedestrian: true,
         pedestrian: {
           display_name: 'Pedestrian A',
@@ -1098,6 +1128,48 @@ describe('organizations usecase', () => {
     })
   })
 
+  it('owner can create a manager user', async () => {
+    const organization = await createOrganization()
+    const owner = await createUserWithSession({
+      email: 'owner@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'owner',
+      },
+    })
+
+    const result = await createOrganizationUserForSession(
+      owner.sessionToken,
+      organization.id,
+      {
+        email: 'manager@example.com',
+        display_name: 'Manager B',
+        role: 'manager',
+        create_pedestrian: false,
+      },
+      new Date('2026-06-11T00:00:00.000Z'),
+      db
+    )
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        email: 'manager@example.com',
+        role: 'manager',
+      },
+    })
+
+    const user = await db
+      .selectFrom('users')
+      .selectAll()
+      .where('email', '=', 'manager@example.com')
+      .executeTakeFirstOrThrow()
+
+    expect(user.status).toBe('pending_activation')
+    expect(user.password_hash).toBeNull()
+  })
+
   it('manager cannot create a manager user', async () => {
     const organization = await createOrganization()
     const manager = await createUserWithSession({
@@ -1116,7 +1188,6 @@ describe('organizations usecase', () => {
         email: 'another-manager@example.com',
         display_name: 'Manager B',
         role: 'manager',
-        temporary_password: 'initial-password',
         create_pedestrian: false,
       },
       new Date('2026-06-11T00:00:00.000Z'),
@@ -1149,7 +1220,6 @@ describe('organizations usecase', () => {
         email: 'member@example.com',
         display_name: 'Member A',
         role: 'member',
-        temporary_password: 'initial-password',
         create_pedestrian: false,
       },
       new Date('2026-06-11T00:00:00.000Z'),
@@ -1160,6 +1230,175 @@ describe('organizations usecase', () => {
       ok: false,
       error: {
         type: 'USER_ALREADY_EXISTS',
+      },
+    })
+  })
+
+  it('admin can issue an activation link for a pending user and revoke the previous one', async () => {
+    const organization = await createOrganization()
+    const admin = await createUserWithSession({
+      email: 'admin@example.com',
+      globalRole: 'admin',
+    })
+    const pendingUser = await createPendingActivationOrganizationUser({
+      organizationId: organization.id,
+      email: 'pending@example.com',
+      role: 'manager',
+    })
+
+    const first = await createOrganizationUserActivationLinkForSession(
+      admin.sessionToken,
+      organization.id,
+      pendingUser.id,
+      fixedTimestamp,
+      db
+    )
+
+    expect(first).toMatchObject({
+      ok: true,
+      value: {
+        expires_at: '2026-06-18T00:00:00.000Z',
+      },
+    })
+
+    const firstToken = new URL(first.ok ? first.value.activation_url : '').searchParams.get('token')
+    expect(firstToken).toBeTruthy()
+    const firstTokenHash = hashActivationToken(firstToken ?? '')
+
+    const firstTokenRow = await db
+      .selectFrom('user_activation_tokens')
+      .selectAll()
+      .where('user_id', '=', pendingUser.id)
+      .where('token_hash', '=', firstTokenHash)
+      .executeTakeFirstOrThrow()
+
+    expect(firstTokenRow.revoked_at).toBeNull()
+    expect(firstTokenRow.used_at).toBeNull()
+    expect(firstTokenRow.created_by_user_id).toBe(admin.user.id)
+
+    const second = await createOrganizationUserActivationLinkForSession(
+      admin.sessionToken,
+      organization.id,
+      pendingUser.id,
+      new Date('2026-06-12T00:00:00.000Z'),
+      db
+    )
+
+    expect(second.ok).toBe(true)
+    if (!second.ok) {
+      return
+    }
+
+    const secondToken = new URL(second.value.activation_url).searchParams.get('token')
+    expect(secondToken).toBeTruthy()
+    const secondTokenHash = hashActivationToken(secondToken ?? '')
+
+    const tokens = await db
+      .selectFrom('user_activation_tokens')
+      .selectAll()
+      .where('user_id', '=', pendingUser.id)
+      .orderBy('created_at', 'asc')
+      .execute()
+
+    expect(tokens).toHaveLength(2)
+    expect(tokens[0]?.token_hash).toBe(firstTokenHash)
+    expect(tokens[0]?.revoked_at).not.toBeNull()
+    expect(tokens[1]?.token_hash).toBe(secondTokenHash)
+    expect(tokens[1]?.revoked_at).toBeNull()
+  })
+
+  it('manager cannot issue an activation link for a manager user', async () => {
+    const organization = await createOrganization()
+    const manager = await createUserWithSession({
+      email: 'manager@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'manager',
+      },
+    })
+    const pendingManager = await createPendingActivationOrganizationUser({
+      organizationId: organization.id,
+      email: 'pending-manager@example.com',
+      role: 'manager',
+    })
+
+    const result = await createOrganizationUserActivationLinkForSession(
+      manager.sessionToken,
+      organization.id,
+      pendingManager.id,
+      fixedTimestamp,
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'AUTH_FORBIDDEN',
+      },
+    })
+  })
+
+  it('owner can issue an activation link for a manager user', async () => {
+    const organization = await createOrganization()
+    const owner = await createUserWithSession({
+      email: 'owner@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'owner',
+      },
+    })
+    const pendingManager = await createPendingActivationOrganizationUser({
+      organizationId: organization.id,
+      email: 'pending-manager@example.com',
+      role: 'manager',
+    })
+
+    const result = await createOrganizationUserActivationLinkForSession(
+      owner.sessionToken,
+      organization.id,
+      pendingManager.id,
+      fixedTimestamp,
+      db
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      return
+    }
+
+    expect(result.value.activation_url).toContain('/auth/activate?token=')
+    expect(result.value.expires_at).toBe('2026-06-18T00:00:00.000Z')
+  })
+
+  it('organization user activation link returns 409 when the user is already active', async () => {
+    const organization = await createOrganization()
+    const admin = await createUserWithSession({
+      email: 'admin@example.com',
+      globalRole: 'admin',
+    })
+    const activeUser = await createUserWithSession({
+      email: 'active@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'member',
+      },
+    })
+
+    const result = await createOrganizationUserActivationLinkForSession(
+      admin.sessionToken,
+      organization.id,
+      activeUser.user.id,
+      fixedTimestamp,
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'ORGANIZATION_USER_NOT_PENDING_ACTIVATION',
       },
     })
   })

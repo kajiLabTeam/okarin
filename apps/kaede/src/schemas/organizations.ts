@@ -98,7 +98,6 @@ export const createOrganizationUserRequestSchema = z
     email: loginRequestSchema.shape.email,
     display_name: authUserSchema.shape.display_name,
     role: membershipRoleSchema,
-    temporary_password: loginRequestSchema.shape.password,
     create_pedestrian: z.boolean().default(false),
     pedestrian: createPedestrianWithoutOrganizationRequestSchema.optional(),
   })
@@ -111,6 +110,11 @@ export const createOrganizationUserRequestSchema = z
       })
     }
   })
+
+export const organizationUserActivationLinkResponseSchema = z.object({
+  activation_url: z.string().url(),
+  expires_at: isoDatetimeSchema,
+})
 
 export const createOrganizationMembershipRequestSchema = z.object({
   user_id: uuidSchema,
@@ -138,6 +142,9 @@ export type OrganizationCreationRequestsResponse = z.infer<
 >
 export type OrganizationIdParams = z.infer<typeof organizationIdParamsSchema>
 export type OrganizationResponse = z.infer<typeof organizationSchema>
+export type OrganizationUserActivationLinkResponse = z.infer<
+  typeof organizationUserActivationLinkResponseSchema
+>
 export type OrganizationUserParams = z.infer<typeof organizationUserParamsSchema>
 export type OrganizationUserResponse = z.infer<typeof organizationUserSchema>
 export type OrganizationUsersResponse = z.infer<typeof organizationUsersResponseSchema>

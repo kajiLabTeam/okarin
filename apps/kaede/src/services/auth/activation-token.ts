@@ -1,4 +1,10 @@
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
+
+const activationTokenBytes = 32
+
+export const generateActivationToken = (): string => {
+  return randomBytes(activationTokenBytes).toString('base64url')
+}
 
 export const hashActivationToken = (token: string): string => {
   if (token.trim().length === 0) {

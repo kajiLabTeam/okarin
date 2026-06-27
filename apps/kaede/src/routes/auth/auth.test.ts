@@ -5,6 +5,7 @@ import { serializeGoogleOidcStateCookie } from './oidc-cookie.js'
 import { authRoutes } from './index.js'
 
 const originalAppEnv = process.env.APP_ENV
+const originalDashboardBaseUrl = process.env.DASHBOARD_BASE_URL
 
 const {
   changePasswordMock,
@@ -92,6 +93,7 @@ describe('auth routes', () => {
     } else {
       process.env.APP_ENV = originalAppEnv
     }
+    process.env.DASHBOARD_BASE_URL = 'http://dashboard.example.test'
     process.env.OIDC_ENABLED = 'false'
     Reflect.deleteProperty(process.env, 'FRONTEND_ORIGIN')
     Reflect.deleteProperty(process.env, 'OIDC_GOOGLE_CLIENT_ID')
@@ -108,6 +110,11 @@ describe('auth routes', () => {
       Reflect.deleteProperty(process.env, 'APP_ENV')
     } else {
       process.env.APP_ENV = originalAppEnv
+    }
+    if (originalDashboardBaseUrl === undefined) {
+      Reflect.deleteProperty(process.env, 'DASHBOARD_BASE_URL')
+    } else {
+      process.env.DASHBOARD_BASE_URL = originalDashboardBaseUrl
     }
     Reflect.deleteProperty(process.env, 'OIDC_ENABLED')
     Reflect.deleteProperty(process.env, 'FRONTEND_ORIGIN')
