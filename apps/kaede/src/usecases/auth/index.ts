@@ -136,6 +136,7 @@ export interface CompleteGoogleOidcLoginParams {
   expectedState: string
   nonce: string
   codeVerifier: string
+  allowUserCreation?: boolean
 }
 
 const toIsoOrNull = (value: Date | null): string | null => value?.toISOString() ?? null
@@ -268,6 +269,7 @@ const attachGoogleIdentityToUser = async (
 
 const findOrCreateGoogleOidcUser = async (
   claims: GoogleIdTokenClaims,
+  options: { allowUserCreation: boolean },
   executor: DbExecutor
 ): Promise<AuthResult<User>> => {
   const identity = await findGoogleIdentityBySubject(claims.sub, executor)
@@ -291,6 +293,13 @@ const findOrCreateGoogleOidcUser = async (
   const existingUser = await findUserByEmail(claims.email, executor)
 
   if (existingUser) {
+    if (existingUser.status !== 'active') {
+      return {
+        ok: false,
+        error: { type: 'AUTH_INVALID_CREDENTIALS' },
+      }
+    }
+
     const existingUserIdentity = await findGoogleIdentityByUserId(existingUser.id, executor)
 
     if (existingUserIdentity) {
@@ -305,6 +314,13 @@ const findOrCreateGoogleOidcUser = async (
     return {
       ok: true,
       value: linkedUser,
+    }
+  }
+
+  if (!options.allowUserCreation) {
+    return {
+      ok: false,
+      error: { type: 'AUTH_INVALID_CREDENTIALS' },
     }
   }
 
@@ -492,7 +508,11 @@ export const completeGoogleOidcLogin = async (
   }
 
   const userResult = await runInTransaction(executor, async (trx) => {
-    return findOrCreateGoogleOidcUser(claimsResult.value, trx)
+    return findOrCreateGoogleOidcUser(
+      claimsResult.value,
+      { allowUserCreation: params.allowUserCreation ?? true },
+      trx
+    )
   })
 
   if (!userResult.ok) {

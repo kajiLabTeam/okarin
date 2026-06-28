@@ -414,6 +414,133 @@ describe('auth usecase', () => {
     expect(session.auth_method).toBe('oidc')
   })
 
+  it('Google OIDC mobile login は未登録 user を作成しない', async () => {
+    const client = {
+      exchangeCodeForIdToken: vi.fn().mockResolvedValue('id-token'),
+      verifyIdToken: vi.fn().mockResolvedValue({
+        sub: 'mobile-google-subject',
+        email: 'mobile-unregistered@example.com',
+        emailVerified: true,
+        name: 'Mobile OIDC User',
+        hostedDomain: null,
+      }),
+    }
+
+    const result = await completeGoogleOidcLogin(
+      {
+        code: 'authorization-code',
+        state: 'state-value',
+        expectedState: 'state-value',
+        nonce: 'nonce-value',
+        codeVerifier: 'code-verifier',
+        allowUserCreation: false,
+      },
+      client as never,
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: { type: 'OIDC_IDENTITY_CONFLICT' },
+    })
+
+    const user = await db
+      .selectFrom('users')
+      .selectAll()
+      .where('email', '=', 'mobile-unregistered@example.com')
+      .executeTakeFirst()
+    expect(user).toBeUndefined()
+  })
+
+  it('Google OIDC mobile login は active user と email が一致すれば Google identity を紐づける', async () => {
+    const user = await insertUser({
+      email: 'mobile-user@example.com',
+      status: 'active',
+    })
+    const client = {
+      exchangeCodeForIdToken: vi.fn().mockResolvedValue('id-token'),
+      verifyIdToken: vi.fn().mockResolvedValue({
+        sub: 'mobile-google-subject',
+        email: 'mobile-user@example.com',
+        emailVerified: true,
+        name: 'Mobile OIDC User',
+        hostedDomain: null,
+      }),
+    }
+
+    const result = await completeGoogleOidcLogin(
+      {
+        code: 'authorization-code',
+        state: 'state-value',
+        expectedState: 'state-value',
+        nonce: 'nonce-value',
+        codeVerifier: 'code-verifier',
+        allowUserCreation: false,
+      },
+      client as never,
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    expect(result.ok).toBe(true)
+
+    const identity = await db
+      .selectFrom('auth_identities')
+      .selectAll()
+      .where('user_id', '=', user.id)
+      .executeTakeFirstOrThrow()
+    expect(identity).toMatchObject({
+      provider: 'google',
+      provider_subject: 'mobile-google-subject',
+      email: 'mobile-user@example.com',
+    })
+  })
+
+  it('Google OIDC mobile login は pending_activation user に Google identity を紐づけない', async () => {
+    const user = await insertUser({
+      email: 'pending-mobile-user@example.com',
+      password_hash: null,
+      status: 'pending_activation',
+    })
+    const client = {
+      exchangeCodeForIdToken: vi.fn().mockResolvedValue('id-token'),
+      verifyIdToken: vi.fn().mockResolvedValue({
+        sub: 'pending-mobile-google-subject',
+        email: 'pending-mobile-user@example.com',
+        emailVerified: true,
+        name: 'Pending Mobile OIDC User',
+        hostedDomain: null,
+      }),
+    }
+
+    const result = await completeGoogleOidcLogin(
+      {
+        code: 'authorization-code',
+        state: 'state-value',
+        expectedState: 'state-value',
+        nonce: 'nonce-value',
+        codeVerifier: 'code-verifier',
+        allowUserCreation: false,
+      },
+      client as never,
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: { type: 'OIDC_IDENTITY_CONFLICT' },
+    })
+
+    const identity = await db
+      .selectFrom('auth_identities')
+      .selectAll()
+      .where('user_id', '=', user.id)
+      .executeTakeFirst()
+    expect(identity).toBeUndefined()
+  })
+
   it('Google OIDC callback は既存 user に別 Google identity があれば conflict を返す', async () => {
     const user = await insertUser({
       email: 'user@example.com',

@@ -11,6 +11,7 @@ export interface GoogleOidcStateCookiePayload {
   codeVerifier: string
   expiresAt: string
   intent: 'login' | 'link'
+  client?: 'web' | 'mobile'
   inviteToken?: string
 }
 

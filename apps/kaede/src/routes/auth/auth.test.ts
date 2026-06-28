@@ -1,7 +1,7 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetRuntimeConfigForTests } from '../../config/runtime.js'
-import { serializeGoogleOidcStateCookie } from './oidc-cookie.js'
+import { parseGoogleOidcStateCookie, serializeGoogleOidcStateCookie } from './oidc-cookie.js'
 import { authRoutes } from './index.js'
 
 const originalAppEnv = process.env.APP_ENV
@@ -265,6 +265,35 @@ describe('auth routes', () => {
     expect(requireActiveSessionUserMock).toHaveBeenCalledWith('session-token')
   })
 
+  it('GET /api/auth/oidc/google/login は mobile client を state cookie に保存する', async () => {
+    process.env.OIDC_ENABLED = 'true'
+    process.env.OIDC_GOOGLE_CLIENT_ID = 'client-id'
+    process.env.OIDC_GOOGLE_CLIENT_SECRET = 'client-secret'
+    process.env.OIDC_GOOGLE_REDIRECT_URI = 'https://api.example.test/api/auth/oidc/google/callback'
+    process.env.OIDC_STATE_COOKIE_SECRET = 'state-cookie-secret'
+    process.env.FRONTEND_ORIGIN = 'https://app.example.test'
+    resetRuntimeConfigForTests()
+
+    const app = createAuthTestApp()
+    const response = await app.request('/api/auth/oidc/google/login?client=mobile')
+
+    expect(response.status).toBe(302)
+    const setCookie = response.headers.get('set-cookie')
+    expect(setCookie).toContain('okarin_oidc_google=')
+    const cookieValue = setCookie?.match(/okarin_oidc_google=([^;]+)/)?.[1]
+    expect(cookieValue).toBeDefined()
+    if (!cookieValue) {
+      throw new Error('missing oidc state cookie')
+    }
+    expect(parseGoogleOidcStateCookie(cookieValue, 'state-cookie-secret')).toMatchObject({
+      state: 'state-value',
+      nonce: 'nonce-value',
+      codeVerifier: 'code-verifier',
+      intent: 'login',
+      client: 'mobile',
+    })
+  })
+
   it('GET /api/auth/oidc/google/callback は link intent なら Google 連携を完了する', async () => {
     process.env.OIDC_ENABLED = 'true'
     process.env.OIDC_GOOGLE_CLIENT_ID = 'client-id'
@@ -313,6 +342,54 @@ describe('auth routes', () => {
       expect.any(Object)
     )
     expect(completeGoogleOidcLoginMock).not.toHaveBeenCalled()
+  })
+
+  it('GET /api/auth/oidc/google/callback は mobile client なら user 自動作成を許可しない', async () => {
+    process.env.OIDC_ENABLED = 'true'
+    process.env.OIDC_GOOGLE_CLIENT_ID = 'client-id'
+    process.env.OIDC_GOOGLE_CLIENT_SECRET = 'client-secret'
+    process.env.OIDC_GOOGLE_REDIRECT_URI = 'https://api.example.test/api/auth/oidc/google/callback'
+    process.env.OIDC_STATE_COOKIE_SECRET = 'state-cookie-secret'
+    process.env.FRONTEND_ORIGIN = 'https://app.example.test'
+    resetRuntimeConfigForTests()
+    completeGoogleOidcLoginMock.mockResolvedValue({
+      ok: true,
+      value: { sessionToken: 'session-token' },
+    })
+    const stateCookie = serializeGoogleOidcStateCookie(
+      {
+        state: 'state-value',
+        nonce: 'nonce-value',
+        codeVerifier: 'code-verifier',
+        expiresAt: '2099-06-17T00:10:00.000Z',
+        intent: 'login',
+        client: 'mobile',
+      },
+      'state-cookie-secret'
+    )
+
+    const app = createAuthTestApp()
+    const response = await app.request(
+      '/api/auth/oidc/google/callback?code=authorization-code&state=state-value',
+      {
+        headers: {
+          cookie: `okarin_oidc_google=${stateCookie}`,
+        },
+      }
+    )
+
+    expect(response.status).toBe(302)
+    expect(completeGoogleOidcLoginMock).toHaveBeenCalledWith(
+      {
+        code: 'authorization-code',
+        state: 'state-value',
+        expectedState: 'state-value',
+        nonce: 'nonce-value',
+        codeVerifier: 'code-verifier',
+        allowUserCreation: false,
+      },
+      expect.any(Object)
+    )
   })
 
   it('GET /api/auth/me は cookie の session token で user を返す', async () => {

@@ -83,6 +83,7 @@ export const registerGoogleOidcCallbackRoute = (app: OpenAPIHono) => {
         expectedState: params.expectedState,
         nonce: params.nonce,
         codeVerifier: params.codeVerifier,
+        allowUserCreation: stateCookie.client !== 'mobile',
       },
       client
     )
