@@ -18,7 +18,6 @@ const userActor = (overrides: Partial<UserRequestActor> = {}): UserRequestActor 
   email: 'user@example.test',
   global_role: 'none',
   account_state: 'active',
-  password_must_change: false,
   memberships: [
     {
       organization_id: organizationId,
@@ -184,28 +183,28 @@ describe('organization role helpers', () => {
     expect(
       deriveAccountState({
         globalRole: 'none',
-        isActive: true,
+        status: 'active',
         membershipCount: 1,
       })
     ).toBe('active')
     expect(
       deriveAccountState({
         globalRole: 'admin',
-        isActive: true,
+        status: 'active',
         membershipCount: 0,
       })
     ).toBe('active')
     expect(
       deriveAccountState({
         globalRole: 'none',
-        isActive: true,
+        status: 'active',
         membershipCount: 0,
       })
     ).toBe('pending_membership')
     expect(
       deriveAccountState({
         globalRole: 'admin',
-        isActive: false,
+        status: 'disabled',
         membershipCount: 1,
       })
     ).toBe('suspended')

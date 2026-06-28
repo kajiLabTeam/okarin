@@ -40,10 +40,12 @@ const createTestApp = (sharedToken = 'shared-token') => {
 
 const mockActiveSessionUser = ({
   authMethod = 'password',
-  passwordMustChange = false,
+  passwordHash = 'hashed-password',
+  status = 'active',
 }: {
   authMethod?: 'password' | 'oidc'
-  passwordMustChange?: boolean
+  passwordHash?: string | null
+  status?: 'pending_activation' | 'active' | 'disabled'
 } = {}) => {
   findValidSessionByTokenMock.mockResolvedValue({
     ok: true,
@@ -56,8 +58,8 @@ const mockActiveSessionUser = ({
     id: '11111111-1111-4111-8111-111111111111',
     email: 'user@example.com',
     global_role: 'none',
-    is_active: true,
-    password_must_change: passwordMustChange,
+    password_hash: passwordHash,
+    status,
   })
   listUserOrganizationMembershipsMock.mockResolvedValue([
     {
@@ -148,7 +150,6 @@ describe('requestActorMiddleware', () => {
         email: 'user@example.com',
         global_role: 'none',
         account_state: 'active',
-        password_must_change: false,
         memberships: [
           {
             organization_id: '22222222-2222-4222-8222-222222222222',
@@ -173,8 +174,8 @@ describe('requestActorMiddleware', () => {
     })
   })
 
-  it('password session の password_must_change user は非 auth API を拒否される', async () => {
-    mockActiveSessionUser({ passwordMustChange: true })
+  it('password session の password 未設定 user は非 auth API を拒否される', async () => {
+    mockActiveSessionUser({ passwordHash: null })
     const app = createTestApp()
 
     const response = await app.request('/api/ping', {
@@ -190,8 +191,8 @@ describe('requestActorMiddleware', () => {
     })
   })
 
-  it('oidc session の password_must_change user は非 auth API を利用できる', async () => {
-    mockActiveSessionUser({ authMethod: 'oidc', passwordMustChange: true })
+  it('oidc session の password 未設定 user は非 auth API を利用できる', async () => {
+    mockActiveSessionUser({ authMethod: 'oidc', passwordHash: null })
     const app = createTestApp()
 
     const response = await app.request('/api/ping', {
@@ -202,7 +203,7 @@ describe('requestActorMiddleware', () => {
 
     expect(response.status).toBe(200)
     const body = await response.json()
-    expect(body.actor.password_must_change).toBe(true)
+    expect(body.actor.account_state).toBe('active')
   })
 
   it('membership がない user は pending_membership actor として設定する', async () => {
@@ -223,7 +224,7 @@ describe('requestActorMiddleware', () => {
   })
 
   it('auth endpoint は actor middleware の対象外にする', async () => {
-    mockActiveSessionUser({ passwordMustChange: true })
+    mockActiveSessionUser({ passwordHash: null })
     const app = createTestApp()
 
     const response = await app.request('/api/auth/me', {

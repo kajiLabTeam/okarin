@@ -93,15 +93,16 @@ export const errorResponseSchema = z.object({
 export const membershipRoleSchema = z.enum(['member', 'manager', 'owner'])
 
 export const accountStateSchema = z.enum(['active', 'pending_membership', 'suspended'])
+export const userStatusSchema = z.enum(['pending_activation', 'active', 'disabled'])
 
 export const authErrorCodes = [
   'AUTH_UNAUTHENTICATED',
+  'AUTH_ACTIVATION_TOKEN_INVALID',
   'AUTH_INVALID_CREDENTIALS',
   'AUTH_SESSION_EXPIRED',
   'AUTH_SESSION_REVOKED',
   'AUTH_USER_DISABLED',
   'AUTH_USER_LOCKED',
-  'AUTH_TEMPORARY_PASSWORD_EXPIRED',
   'AUTH_PASSWORD_CHANGE_REQUIRED',
   'AUTH_PASSWORD_LOGIN_DISABLED',
   'AUTH_DASHBOARD_FORBIDDEN',
@@ -118,13 +119,13 @@ export const authErrorResponseSchema = errorResponseSchema.extend({
 
 export const authErrorMessages: Record<AuthErrorCode, string> = {
   AUTH_DASHBOARD_FORBIDDEN: 'dashboard access forbidden',
+  AUTH_ACTIVATION_TOKEN_INVALID: 'activation token is invalid',
   AUTH_INVALID_CREDENTIALS: 'invalid email or password',
   AUTH_ORGANIZATION_FORBIDDEN: 'organization access forbidden',
   AUTH_PASSWORD_CHANGE_REQUIRED: 'password change required',
   AUTH_PASSWORD_LOGIN_DISABLED: 'password login is disabled',
   AUTH_SESSION_EXPIRED: 'session expired',
   AUTH_SESSION_REVOKED: 'session revoked',
-  AUTH_TEMPORARY_PASSWORD_EXPIRED: 'temporary password expired',
   AUTH_UNAUTHENTICATED: 'login required',
   AUTH_USER_DISABLED: 'user is disabled',
   AUTH_USER_LOCKED: 'account is locked due to too many failed attempts',
@@ -132,13 +133,13 @@ export const authErrorMessages: Record<AuthErrorCode, string> = {
 
 export const authErrorStatuses: Record<AuthErrorCode, 401 | 403> = {
   AUTH_DASHBOARD_FORBIDDEN: 403,
+  AUTH_ACTIVATION_TOKEN_INVALID: 401,
   AUTH_INVALID_CREDENTIALS: 401,
   AUTH_ORGANIZATION_FORBIDDEN: 403,
   AUTH_PASSWORD_CHANGE_REQUIRED: 403,
   AUTH_PASSWORD_LOGIN_DISABLED: 403,
   AUTH_SESSION_EXPIRED: 401,
   AUTH_SESSION_REVOKED: 401,
-  AUTH_TEMPORARY_PASSWORD_EXPIRED: 403,
   AUTH_UNAUTHENTICATED: 401,
   AUTH_USER_DISABLED: 403,
   AUTH_USER_LOCKED: 403,

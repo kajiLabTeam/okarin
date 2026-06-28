@@ -14,10 +14,8 @@ const createUser = async (email: string) => {
       display_name: email,
       password_hash: passwordHash,
       global_role: 'none',
-      is_active: true,
-      password_must_change: false,
+      status: 'active',
       password_changed_at: new Date('2026-06-16T00:00:00.000Z'),
-      temporary_password_expires_at: null,
     })
     .returningAll()
     .executeTakeFirstOrThrow()

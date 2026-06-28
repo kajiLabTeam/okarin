@@ -1,14 +1,21 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createSession, hashPassword, verifyPassword } from '../../../src/services/auth/index.js'
+import {
+  createSession,
+  hashActivationToken,
+  hashPassword,
+  verifyPassword,
+} from '../../../src/services/auth/index.js'
 import { createDb } from '../../../src/services/db/client.js'
 import { createAdminUser } from '../../../src/usecases/auth/create-admin-user.js'
 import {
   changePassword,
+  completeActivation,
   completeGoogleOidcLink,
   completeGoogleOidcLogin,
   getMe,
   login,
   logout,
+  verifyActivationToken,
 } from '../../../src/usecases/auth/index.js'
 import { resetDatabase } from '../../db/helpers.js'
 
@@ -19,14 +26,12 @@ const insertUser = async (
     email: string
     displayName: string
     globalRole: string
-    isActive: boolean
-    password: string
-    passwordMustChange: boolean
-    temporaryPasswordExpiresAt: Date | null
+    status: 'pending_activation' | 'active' | 'disabled'
+    password: string | null
   }> = {}
 ) => {
-  const password = overrides.password ?? 'temporary-password'
-  const passwordHash = await hashPassword(password)
+  const password = overrides.password === undefined ? 'temporary-password' : overrides.password
+  const passwordHash = password === null ? null : await hashPassword(password)
 
   return db
     .insertInto('users')
@@ -35,14 +40,64 @@ const insertUser = async (
       password_hash: passwordHash,
       display_name: overrides.displayName ?? 'User',
       global_role: overrides.globalRole ?? 'none',
-      is_active: overrides.isActive ?? true,
-      password_must_change: overrides.passwordMustChange ?? true,
       password_changed_at: null,
-      temporary_password_expires_at:
-        overrides.temporaryPasswordExpiresAt ?? new Date('2026-06-11T00:00:00.000Z'),
+      status: overrides.status ?? 'active',
     })
     .returningAll()
     .executeTakeFirstOrThrow()
+}
+
+const insertActivationToken = async ({
+  expiresAt = new Date('2026-06-17T00:00:00.000Z'),
+  revokedAt = null,
+  status = 'pending_activation',
+  token = 'activation-token',
+  usedAt = null,
+  userPassword = null,
+}: {
+  expiresAt?: Date
+  revokedAt?: Date | null
+  status?: 'pending_activation' | 'active' | 'disabled'
+  token?: string
+  usedAt?: Date | null
+  userPassword?: string | null
+} = {}) => {
+  const organization = await db
+    .insertInto('organizations')
+    .values({
+      name: 'Group A',
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow()
+  const creator = await insertUser({
+    email: 'creator@example.com',
+    globalRole: 'admin',
+  })
+  const user = await insertUser({
+    email: 'activation-user@example.com',
+    password: userPassword,
+    status,
+  })
+  const activationToken = await db
+    .insertInto('user_activation_tokens')
+    .values({
+      user_id: user.id,
+      organization_id: organization.id,
+      token_hash: hashActivationToken(token),
+      expires_at: expiresAt,
+      used_at: usedAt,
+      revoked_at: revokedAt,
+      created_by_user_id: creator.id,
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow()
+
+  return {
+    activationToken,
+    organization,
+    token,
+    user,
+  }
 }
 
 const insertOrganizationMembership = async (userId: string) => {
@@ -100,10 +155,9 @@ describe('auth usecase', () => {
       email: 'user@example.com',
       display_name: 'User',
       global_role: 'none',
+      status: 'active',
       account_state: 'active',
-      password_must_change: true,
       password_changed_at: null,
-      temporary_password_expires_at: '2026-06-11T00:00:00.000Z',
       memberships: [
         {
           organization_id: organization.id,
@@ -273,9 +327,7 @@ describe('auth usecase', () => {
     expect(user).toMatchObject({
       display_name: 'OIDC User',
       global_role: 'none',
-      is_active: true,
-      password_must_change: false,
-      temporary_password_expires_at: null,
+      status: 'active',
     })
 
     const identity = await db
@@ -351,9 +403,7 @@ describe('auth usecase', () => {
       .where('id', '=', user.id)
       .executeTakeFirstOrThrow()
     expect(updatedUser).toMatchObject({
-      password_must_change: true,
       password_changed_at: null,
-      temporary_password_expires_at: new Date('2026-06-11T00:00:00.000Z'),
     })
 
     const session = await db
@@ -362,6 +412,133 @@ describe('auth usecase', () => {
       .where('user_id', '=', user.id)
       .executeTakeFirstOrThrow()
     expect(session.auth_method).toBe('oidc')
+  })
+
+  it('Google OIDC mobile login は未登録 user を作成しない', async () => {
+    const client = {
+      exchangeCodeForIdToken: vi.fn().mockResolvedValue('id-token'),
+      verifyIdToken: vi.fn().mockResolvedValue({
+        sub: 'mobile-google-subject',
+        email: 'mobile-unregistered@example.com',
+        emailVerified: true,
+        name: 'Mobile OIDC User',
+        hostedDomain: null,
+      }),
+    }
+
+    const result = await completeGoogleOidcLogin(
+      {
+        code: 'authorization-code',
+        state: 'state-value',
+        expectedState: 'state-value',
+        nonce: 'nonce-value',
+        codeVerifier: 'code-verifier',
+        allowUserCreation: false,
+      },
+      client as never,
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: { type: 'OIDC_IDENTITY_CONFLICT' },
+    })
+
+    const user = await db
+      .selectFrom('users')
+      .selectAll()
+      .where('email', '=', 'mobile-unregistered@example.com')
+      .executeTakeFirst()
+    expect(user).toBeUndefined()
+  })
+
+  it('Google OIDC mobile login は active user と email が一致すれば Google identity を紐づける', async () => {
+    const user = await insertUser({
+      email: 'mobile-user@example.com',
+      status: 'active',
+    })
+    const client = {
+      exchangeCodeForIdToken: vi.fn().mockResolvedValue('id-token'),
+      verifyIdToken: vi.fn().mockResolvedValue({
+        sub: 'mobile-google-subject',
+        email: 'mobile-user@example.com',
+        emailVerified: true,
+        name: 'Mobile OIDC User',
+        hostedDomain: null,
+      }),
+    }
+
+    const result = await completeGoogleOidcLogin(
+      {
+        code: 'authorization-code',
+        state: 'state-value',
+        expectedState: 'state-value',
+        nonce: 'nonce-value',
+        codeVerifier: 'code-verifier',
+        allowUserCreation: false,
+      },
+      client as never,
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    expect(result.ok).toBe(true)
+
+    const identity = await db
+      .selectFrom('auth_identities')
+      .selectAll()
+      .where('user_id', '=', user.id)
+      .executeTakeFirstOrThrow()
+    expect(identity).toMatchObject({
+      provider: 'google',
+      provider_subject: 'mobile-google-subject',
+      email: 'mobile-user@example.com',
+    })
+  })
+
+  it('Google OIDC mobile login は pending_activation user に Google identity を紐づけない', async () => {
+    const user = await insertUser({
+      email: 'pending-mobile-user@example.com',
+      password_hash: null,
+      status: 'pending_activation',
+    })
+    const client = {
+      exchangeCodeForIdToken: vi.fn().mockResolvedValue('id-token'),
+      verifyIdToken: vi.fn().mockResolvedValue({
+        sub: 'pending-mobile-google-subject',
+        email: 'pending-mobile-user@example.com',
+        emailVerified: true,
+        name: 'Pending Mobile OIDC User',
+        hostedDomain: null,
+      }),
+    }
+
+    const result = await completeGoogleOidcLogin(
+      {
+        code: 'authorization-code',
+        state: 'state-value',
+        expectedState: 'state-value',
+        nonce: 'nonce-value',
+        codeVerifier: 'code-verifier',
+        allowUserCreation: false,
+      },
+      client as never,
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: { type: 'OIDC_IDENTITY_CONFLICT' },
+    })
+
+    const identity = await db
+      .selectFrom('auth_identities')
+      .selectAll()
+      .where('user_id', '=', user.id)
+      .executeTakeFirst()
+    expect(identity).toBeUndefined()
   })
 
   it('Google OIDC callback は既存 user に別 Google identity があれば conflict を返す', async () => {
@@ -434,10 +611,8 @@ describe('auth usecase', () => {
       email: 'admin@example.com',
       display_name: 'Bootstrap Admin',
       global_role: 'admin',
-      is_active: true,
-      password_must_change: true,
-      password_changed_at: null,
-      temporary_password_expires_at: new Date('2026-06-11T00:00:00.000Z'),
+      status: 'active',
+      password_changed_at: new Date('2026-06-10T00:00:00.000Z'),
     })
     await expect(
       db
@@ -504,9 +679,7 @@ describe('auth usecase', () => {
       .executeTakeFirstOrThrow()
     expect(adminAfterOidc).toMatchObject({
       global_role: 'admin',
-      password_must_change: true,
-      password_changed_at: null,
-      temporary_password_expires_at: new Date('2026-06-11T00:00:00.000Z'),
+      password_changed_at: new Date('2026-06-10T00:00:00.000Z'),
     })
 
     const users = await db
@@ -569,9 +742,7 @@ describe('auth usecase', () => {
       .executeTakeFirstOrThrow()
     expect(adminAfterOidc).toMatchObject({
       global_role: 'admin',
-      password_must_change: true,
-      password_changed_at: null,
-      temporary_password_expires_at: new Date('2026-06-11T00:00:00.000Z'),
+      password_changed_at: new Date('2026-06-10T00:00:00.000Z'),
     })
 
     const identity = await db
@@ -653,9 +824,7 @@ describe('auth usecase', () => {
       .where('id', '=', user.id)
       .executeTakeFirstOrThrow()
     expect(updatedUser).toMatchObject({
-      password_must_change: true,
       password_changed_at: null,
-      temporary_password_expires_at: new Date('2026-06-11T00:00:00.000Z'),
     })
   })
 
@@ -771,33 +940,8 @@ describe('auth usecase', () => {
     })
   })
 
-  it('login は temporary password 期限切れなら AUTH_TEMPORARY_PASSWORD_EXPIRED を返す', async () => {
-    await insertUser({
-      temporaryPasswordExpiresAt: new Date('2026-06-09T00:00:00.000Z'),
-    })
-
-    const result = await login(
-      {
-        email: 'user@example.com',
-        password: 'temporary-password',
-      },
-      new Date('2026-06-10T00:00:00.000Z'),
-      db
-    )
-
-    expect(result).toEqual({
-      ok: false,
-      error: {
-        type: 'AUTH_TEMPORARY_PASSWORD_EXPIRED',
-      },
-    })
-  })
-
   it('getMe は session token から user を返す', async () => {
-    const user = await insertUser({
-      passwordMustChange: false,
-      temporaryPasswordExpiresAt: null,
-    })
+    const user = await insertUser()
     const { token } = await createSession(
       {
         userId: user.id,
@@ -816,7 +960,7 @@ describe('auth usecase', () => {
     expect(result.value.user.user_id).toBe(user.id)
     expect(result.value.session_auth_method).toBe('password')
     expect(result.value.user.account_state).toBe('pending_membership')
-    expect(result.value.user.password_must_change).toBe(false)
+    expect(result.value.user.status).toBe('active')
   })
 
   it('getMe は oidc session の auth method を返す', async () => {
@@ -838,7 +982,188 @@ describe('auth usecase', () => {
     }
 
     expect(result.value.session_auth_method).toBe('oidc')
-    expect(result.value.user.password_must_change).toBe(true)
+    expect(result.value.user.status).toBe('active')
+  })
+
+  it('verifyActivationToken は valid token の表示情報を返し token を consume しない', async () => {
+    const { activationToken, organization, token, user } = await insertActivationToken()
+
+    const result = await verifyActivationToken(
+      {
+        token,
+      },
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        valid: true,
+        email: user.email,
+        display_name: user.display_name,
+        organization_name: organization.name,
+        expires_at: '2026-06-17T00:00:00.000Z',
+      },
+    })
+
+    const stored = await db
+      .selectFrom('user_activation_tokens')
+      .selectAll()
+      .where('id', '=', activationToken.id)
+      .executeTakeFirstOrThrow()
+    expect(stored.used_at).toBeNull()
+  })
+
+  it('verifyActivationToken は invalid token の詳細を返さない', async () => {
+    await insertActivationToken({
+      expiresAt: new Date('2026-06-09T00:00:00.000Z'),
+    })
+
+    const result = await verifyActivationToken(
+      {
+        token: 'activation-token',
+      },
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        valid: false,
+      },
+    })
+  })
+
+  it('completeActivation は password を設定して user を active にし token を consume する', async () => {
+    const { activationToken, token, user } = await insertActivationToken()
+
+    const result = await completeActivation(
+      {
+        token,
+        password: 'new-password',
+      },
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        ok: true,
+      },
+    })
+
+    const updatedUser = await db
+      .selectFrom('users')
+      .selectAll()
+      .where('id', '=', user.id)
+      .executeTakeFirstOrThrow()
+    expect(updatedUser.status).toBe('active')
+    expect(updatedUser.password_changed_at).toEqual(new Date('2026-06-10T00:00:00.000Z'))
+    expect(updatedUser.password_hash).not.toBeNull()
+    await expect(verifyPassword(updatedUser.password_hash ?? '', 'new-password')).resolves.toBe(
+      true
+    )
+
+    const usedToken = await db
+      .selectFrom('user_activation_tokens')
+      .selectAll()
+      .where('id', '=', activationToken.id)
+      .executeTakeFirstOrThrow()
+    expect(usedToken.used_at).toEqual(new Date('2026-06-10T00:00:00.000Z'))
+  })
+
+  it('completeActivation 後は password login できる', async () => {
+    const { token, user } = await insertActivationToken()
+    await insertOrganizationMembership(user.id)
+
+    await completeActivation(
+      {
+        token,
+        password: 'new-password',
+      },
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    const result = await login(
+      {
+        email: user.email,
+        password: 'new-password',
+      },
+      new Date('2026-06-10T00:00:01.000Z'),
+      db
+    )
+
+    expect(result.ok).toBe(true)
+  })
+
+  it('completeActivation は invalid token を拒否する', async () => {
+    await insertActivationToken({
+      revokedAt: new Date('2026-06-09T00:00:00.000Z'),
+    })
+
+    const result = await completeActivation(
+      {
+        token: 'activation-token',
+        password: 'new-password',
+      },
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'AUTH_ACTIVATION_TOKEN_INVALID',
+      },
+    })
+  })
+
+  it('completeActivation は直近で成功済みの同一 token を idempotent success にする', async () => {
+    const { token } = await insertActivationToken({
+      status: 'active',
+      usedAt: new Date('2026-06-10T00:00:00.000Z'),
+      userPassword: 'new-password',
+    })
+
+    const result = await completeActivation(
+      {
+        token,
+        password: 'new-password',
+      },
+      new Date('2026-06-10T00:00:02.000Z'),
+      db
+    )
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        ok: true,
+      },
+    })
+  })
+
+  it('completeActivation は password policy 違反を拒否する', async () => {
+    const { token } = await insertActivationToken()
+
+    const result = await completeActivation(
+      {
+        token,
+        password: '',
+      },
+      new Date('2026-06-10T00:00:00.000Z'),
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'AUTH_ACTIVATION_TOKEN_INVALID',
+      },
+    })
   })
 
   it('logout は session を revoke する', async () => {
@@ -879,10 +1204,9 @@ describe('auth usecase', () => {
       .where('id', '=', user.id)
       .executeTakeFirstOrThrow()
 
-    expect(updated.password_must_change).toBe(false)
     expect(updated.password_changed_at).toEqual(new Date('2026-06-10T00:00:00.000Z'))
-    expect(updated.temporary_password_expires_at).toBeNull()
-    await expect(verifyPassword(updated.password_hash, 'new-password')).resolves.toBe(true)
+    expect(updated.password_hash).not.toBeNull()
+    await expect(verifyPassword(updated.password_hash ?? '', 'new-password')).resolves.toBe(true)
 
     const sessions = await db
       .selectFrom('sessions')

@@ -10,6 +10,7 @@ import {
 import { setGoogleOidcStateCookie } from './oidc-cookie.js'
 
 const loginQuerySchema = z.object({
+  client: z.enum(['web', 'mobile']).optional(),
   invite_token: z.string().min(1).optional(),
 })
 
@@ -63,6 +64,7 @@ export const registerGoogleOidcLoginRoute = (app: OpenAPIHono) => {
         codeVerifier,
         expiresAt: expiresAt.toISOString(),
         intent: 'login',
+        client: query.client ?? 'web',
         inviteToken: query.invite_token,
       },
       config.stateCookieSecret

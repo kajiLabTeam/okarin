@@ -23,7 +23,6 @@ const adminActor: RequestActor = {
   email: 'admin@example.com',
   global_role: 'admin',
   account_state: 'active',
-  password_must_change: false,
   memberships: [],
 }
 
@@ -33,7 +32,6 @@ const managerActor = (organizationId: string): RequestActor => ({
   email: 'manager@example.com',
   global_role: 'none',
   account_state: 'active',
-  password_must_change: false,
   memberships: [
     {
       organization_id: organizationId,
@@ -49,7 +47,6 @@ const memberActor = (organizationId: string): RequestActor => ({
   email: 'member@example.com',
   global_role: 'none',
   account_state: 'active',
-  password_must_change: false,
   memberships: [
     {
       organization_id: organizationId,

@@ -152,7 +152,6 @@ export const runAdminCreateUserCli = async (
         `admin user ${result.value.action}`,
         `email: ${result.value.email}`,
         `user_id: ${result.value.userId}`,
-        `temporary_password_expires_at: ${result.value.temporaryPasswordExpiresAt.toISOString()}`,
       ].join('\n') + '\n'
     )
 

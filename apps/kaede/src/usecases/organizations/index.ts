@@ -9,11 +9,17 @@ import type {
   CreateOrganizationUserRequest,
   OrganizationCreationRequestResponse,
   OrganizationResponse,
+  OrganizationUserActivationLinkResponse,
   OrganizationUserResponse,
   RejectOrganizationCreationRequestRequest,
 } from '../../schemas/organizations.js'
 import type { RecordingDetailResponse } from '../../schemas/recordings.js'
-import { hashPassword } from '../../services/auth/password.js'
+import {
+  generateActivationToken,
+  hashActivationToken,
+  insertUserActivationToken,
+  revokeActivationTokensByUserId,
+} from '../../services/auth/index.js'
 import {
   findBuildingDetailById,
   listBuildings as listBuildingRows,
@@ -71,6 +77,8 @@ export type OrganizationError =
   | { type: 'ORGANIZATION_CREATION_REQUEST_ALREADY_PENDING' }
   | { type: 'ORGANIZATION_CREATION_REQUEST_REQUIRES_PENDING_USER' }
   | { type: 'ORGANIZATION_SLUG_ALREADY_EXISTS' }
+  | { type: 'ORGANIZATION_USER_NOT_FOUND' }
+  | { type: 'ORGANIZATION_USER_NOT_PENDING_ACTIVATION' }
   | { type: 'USER_NOT_FOUND' }
   | { type: 'USER_ALREADY_EXISTS' }
 
@@ -108,8 +116,6 @@ const toOrganizationCreationRequestResponse = (
 })
 
 const mapAuthError = (error: Exclude<OrganizationError, { type: 'AUTH_FORBIDDEN' }>) => error
-const temporaryPasswordTtlMs = 24 * 60 * 60 * 1000
-
 const normalizeAttributes = (
   attributes: unknown
 ): NonNullable<OrganizationUserResponse['pedestrian']>['attributes'] => {
@@ -135,11 +141,9 @@ const toOrganizationUserResponse = (row: OrganizationUserRow): OrganizationUserR
   user_id: row.user_id,
   email: row.email,
   display_name: row.display_name,
-  is_active: row.is_active,
+  status: row.status as 'pending_activation' | 'active' | 'disabled',
   role: row.role as 'member' | 'manager' | 'owner',
-  password_must_change: row.password_must_change,
   password_changed_at: row.password_changed_at?.toISOString() ?? null,
-  temporary_password_expires_at: row.temporary_password_expires_at?.toISOString() ?? null,
   created_at: row.created_at.toISOString(),
   updated_at: row.updated_at.toISOString(),
   pedestrian:
@@ -159,6 +163,28 @@ const toOrganizationUserResponse = (row: OrganizationUserRow): OrganizationUserR
         }
       : null,
 })
+
+const canCreateOrganizationUserRole = (
+  actor: {
+    globalRole: 'none' | 'admin'
+    membershipRole: 'manager' | 'owner' | null
+  },
+  targetRole: 'member' | 'manager' | 'owner'
+): boolean => {
+  if (actor.globalRole === 'admin') {
+    return true
+  }
+
+  if (actor.membershipRole === 'owner') {
+    return targetRole === 'member' || targetRole === 'manager'
+  }
+
+  if (actor.membershipRole === 'manager') {
+    return targetRole === 'member'
+  }
+
+  return false
+}
 
 const runInTransaction = async <T>(
   executor: DbExecutor | undefined,
@@ -630,7 +656,7 @@ export const approveOrganizationCreationRequestForAdminSession = async (
 
     const requester = await findUserById(request.requester_user_id, trx)
 
-    if (!requester || !requester.is_active || requester.global_role === 'admin') {
+    if (requester?.status !== 'active' || requester.global_role === 'admin') {
       return {
         ok: false,
         error: { type: 'ORGANIZATION_CREATION_REQUEST_REQUIRES_PENDING_USER' },
@@ -795,7 +821,7 @@ export const createOrganizationUserForSession = async (
   sessionToken: string | undefined,
   organizationId: string,
   payload: CreateOrganizationUserRequest,
-  now: Date = new Date(),
+  _now: Date = new Date(),
   executor?: DbExecutor
 ): Promise<OrganizationResult<OrganizationUserResponse>> => {
   const actor = await requireOrganizationManagerOrAdmin(sessionToken, organizationId, executor)
@@ -804,7 +830,15 @@ export const createOrganizationUserForSession = async (
     return actor
   }
 
-  if (actor.value.globalRole !== 'admin' && payload.role !== 'member') {
+  if (
+    !canCreateOrganizationUserRole(
+      {
+        globalRole: actor.value.globalRole,
+        membershipRole: actor.value.membershipRole,
+      },
+      payload.role
+    )
+  ) {
     return {
       ok: false,
       error: { type: 'AUTH_FORBIDDEN' },
@@ -822,20 +856,16 @@ export const createOrganizationUserForSession = async (
   }
 
   const displayName = payload.display_name.trim()
-  const passwordHash = await hashPassword(payload.temporary_password)
-  const temporaryPasswordExpiresAt = new Date(now.getTime() + temporaryPasswordTtlMs)
 
   const createdUser = await runInTransaction(executor, async (trx) => {
     const user = await insertUser(
       {
         email,
         display_name: displayName,
-        password_hash: passwordHash,
+        password_hash: null,
         global_role: 'none',
-        is_active: true,
-        password_must_change: true,
         password_changed_at: null,
-        temporary_password_expires_at: temporaryPasswordExpiresAt,
+        status: 'pending_activation',
       },
       trx
     )
@@ -928,5 +958,79 @@ export const createOrUpdateOrganizationMembershipForSession = async (
   return {
     ok: true,
     value: toOrganizationUserResponse(organizationUser),
+  }
+}
+
+export const createOrganizationUserActivationLinkForSession = async (
+  sessionToken: string | undefined,
+  organizationId: string,
+  userId: string,
+  now: Date = new Date(),
+  executor?: DbExecutor
+): Promise<OrganizationResult<OrganizationUserActivationLinkResponse>> => {
+  const actor = await requireOrganizationManagerOrAdmin(sessionToken, organizationId, executor)
+
+  if (!actor.ok) {
+    return actor
+  }
+
+  const user = await findOrganizationUserById(organizationId, userId, executor)
+
+  if (!user) {
+    return {
+      ok: false,
+      error: { type: 'ORGANIZATION_USER_NOT_FOUND' },
+    }
+  }
+
+  if (user.status !== 'pending_activation') {
+    return {
+      ok: false,
+      error: { type: 'ORGANIZATION_USER_NOT_PENDING_ACTIVATION' },
+    }
+  }
+
+  if (
+    !canCreateOrganizationUserRole(
+      {
+        globalRole: actor.value.globalRole,
+        membershipRole: actor.value.membershipRole,
+      },
+      user.role as 'member' | 'manager' | 'owner'
+    )
+  ) {
+    return {
+      ok: false,
+      error: { type: 'AUTH_FORBIDDEN' },
+    }
+  }
+
+  const activationUserId = user.user_id
+  const activationToken = generateActivationToken()
+  const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+
+  await runInTransaction(executor, async (trx) => {
+    await revokeActivationTokensByUserId(activationUserId, now, trx)
+    await insertUserActivationToken(
+      {
+        user_id: activationUserId,
+        organization_id: organizationId,
+        token_hash: hashActivationToken(activationToken),
+        expires_at: expiresAt,
+        used_at: null,
+        revoked_at: null,
+        created_by_user_id: actor.value.userId,
+        created_at: now,
+      },
+      trx
+    )
+  })
+
+  return {
+    ok: true,
+    value: {
+      token: activationToken,
+      expires_at: expiresAt.toISOString(),
+    },
   }
 }

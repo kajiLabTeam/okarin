@@ -32,14 +32,14 @@ const isUnrestrictedActor = (actor: RequestActor) =>
 
 export const deriveAccountState = ({
   globalRole,
-  isActive,
+  status,
   membershipCount,
 }: {
   globalRole: 'none' | 'admin'
-  isActive: boolean
+  status: 'pending_activation' | 'active' | 'disabled'
   membershipCount: number
 }): AccountState => {
-  if (!isActive) {
+  if (status !== 'active') {
     return 'suspended'
   }
 

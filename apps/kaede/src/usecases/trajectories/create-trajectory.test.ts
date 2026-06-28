@@ -204,7 +204,6 @@ describe('createTrajectory', () => {
         email: 'member@example.test',
         global_role: 'none',
         account_state: 'active',
-        password_must_change: false,
         memberships: [
           {
             organization_id: organizationId,
@@ -251,7 +250,6 @@ describe('createTrajectory', () => {
         email: 'member@example.test',
         global_role: 'none',
         account_state: 'active',
-        password_must_change: false,
         memberships: [
           {
             organization_id: '88888888-8888-4888-8888-888888888888',

@@ -13,10 +13,8 @@ export interface OrganizationUserRow {
   user_id: string
   email: string
   display_name: string
-  is_active: boolean
-  password_must_change: boolean
+  status: string
   password_changed_at: Date | null
-  temporary_password_expires_at: Date | null
   created_at: Date
   updated_at: Date
   role: string
@@ -110,10 +108,8 @@ const organizationUsersQuery = (executor: DbExecutor) =>
       'user.id as user_id',
       'user.email as email',
       'user.display_name as display_name',
-      'user.is_active as is_active',
-      'user.password_must_change as password_must_change',
+      'user.status as status',
       'user.password_changed_at as password_changed_at',
-      'user.temporary_password_expires_at as temporary_password_expires_at',
       'user.created_at as created_at',
       'user.updated_at as updated_at',
       'membership.role as role',

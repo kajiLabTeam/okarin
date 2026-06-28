@@ -19,6 +19,7 @@ const insertUser = async () => {
       email: 'session-user@example.com',
       password_hash: 'hashed-password',
       display_name: 'Session User',
+      status: 'active',
     })
     .returning(['id'])
     .executeTakeFirstOrThrow()

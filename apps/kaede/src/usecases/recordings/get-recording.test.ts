@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { RequestActor } from '../../middleware/request-actor-context.js'
+import type { UserRequestActor } from '../../middleware/request-actor-context.js'
 
 const { findRecordingAuthorizationByIdMock, findRecordingByIdMock } = vi.hoisted(() => ({
   findRecordingAuthorizationByIdMock: vi.fn(),
@@ -13,13 +13,12 @@ vi.mock('../../services/recordings/index.js', () => ({
 
 import { getRecording } from './get-recording.js'
 
-const managerActor: RequestActor = {
+const managerActor: UserRequestActor = {
   type: 'user',
   user_id: '99999999-9999-4999-8999-999999999999',
   email: 'manager@example.com',
   global_role: 'none',
   account_state: 'active',
-  password_must_change: false,
   memberships: [
     {
       organization_id: '11111111-1111-4111-8111-111111111111',
@@ -29,7 +28,7 @@ const managerActor: RequestActor = {
   ],
 }
 
-const memberActor: RequestActor = {
+const memberActor: UserRequestActor = {
   ...managerActor,
   memberships: [
     {

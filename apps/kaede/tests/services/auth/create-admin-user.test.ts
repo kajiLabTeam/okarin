@@ -6,7 +6,6 @@ import { resetDatabase } from '../../db/helpers.js'
 
 const db = createDb()
 const now = new Date('2026-06-10T00:00:00.000Z')
-const expiresAt = new Date('2026-06-11T00:00:00.000Z')
 
 const createUser = async (overrides: { email?: string; globalRole?: string } = {}) => {
   const passwordHash =
@@ -19,10 +18,8 @@ const createUser = async (overrides: { email?: string; globalRole?: string } = {
       display_name: 'Existing User',
       password_hash: passwordHash,
       global_role: overrides.globalRole ?? 'admin',
-      is_active: true,
-      password_must_change: false,
+      status: 'active',
       password_changed_at: new Date('2026-06-09T00:00:00.000Z'),
-      temporary_password_expires_at: null,
       failed_login_attempts: 5,
       locked_until: new Date('2026-06-10T00:15:00.000Z'),
     })
@@ -39,7 +36,7 @@ describe('createAdminUser', () => {
     await db.destroy()
   })
 
-  it('creates an admin user with a temporary password', async () => {
+  it('creates an active admin user with a password', async () => {
     const result = await createAdminUser(
       {
         email: 'admin@example.com',
@@ -59,7 +56,6 @@ describe('createAdminUser', () => {
     expect(result.value).toMatchObject({
       action: 'created',
       email: 'admin@example.com',
-      temporaryPasswordExpiresAt: expiresAt,
     })
 
     const user = await db
@@ -69,12 +65,10 @@ describe('createAdminUser', () => {
       .executeTakeFirstOrThrow()
 
     expect(user.global_role).toBe('admin')
-    expect(user.password_must_change).toBe(true)
-    expect(user.password_changed_at).toBeNull()
-    expect(user.temporary_password_expires_at).toEqual(expiresAt)
-    expect(user.is_active).toBe(true)
+    expect(user.status).toBe('active')
+    expect(user.password_changed_at).toEqual(now)
     expect(user.password_hash).not.toBe('temporary-password')
-    await expect(verifyPassword(user.password_hash, 'temporary-password')).resolves.toBe(true)
+    await expect(verifyPassword(user.password_hash ?? '', 'temporary-password')).resolves.toBe(true)
   })
 
   it('returns an error when admin already exists without reset', async () => {
@@ -137,7 +131,6 @@ describe('createAdminUser', () => {
         action: 'password_reset',
         email: 'admin@example.com',
         userId: existingUser.id,
-        temporaryPasswordExpiresAt: expiresAt,
       },
     })
 
@@ -147,14 +140,13 @@ describe('createAdminUser', () => {
       .where('id', '=', existingUser.id)
       .executeTakeFirstOrThrow()
 
-    expect(updated.password_must_change).toBe(true)
-    expect(updated.password_changed_at).toBeNull()
-    expect(updated.temporary_password_expires_at).toEqual(expiresAt)
+    expect(updated.status).toBe('active')
+    expect(updated.password_changed_at).toEqual(now)
     expect(updated.failed_login_attempts).toBe(0)
     expect(updated.locked_until).toBeNull()
-    await expect(verifyPassword(updated.password_hash, 'new-temporary-password')).resolves.toBe(
-      true
-    )
+    await expect(
+      verifyPassword(updated.password_hash ?? '', 'new-temporary-password')
+    ).resolves.toBe(true)
   })
 
   it('returns a validation error when email is invalid', async () => {

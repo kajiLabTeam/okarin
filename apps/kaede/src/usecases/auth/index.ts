@@ -1,15 +1,30 @@
 import { randomUUID } from 'node:crypto'
-import type { AuthUserResponse, ChangePasswordRequest, LoginRequest } from '../../schemas/auth.js'
+import type {
+  ActivationCompleteRequest,
+  ActivationVerifyRequest,
+  ActivationVerifyResponse,
+  AuthUserResponse,
+  ChangePasswordRequest,
+  LoginRequest,
+} from '../../schemas/auth.js'
+import { activationCompleteRequestSchema } from '../../schemas/auth.js'
+import type {
+  ActivationTokenContext,
+  GoogleIdTokenClaims,
+  GoogleOidcClient,
+} from '../../services/auth/index.js'
 import {
   createSession,
+  findActivationTokenContextByHash,
   findGoogleIdentityBySubject,
   findGoogleIdentityByUserId,
   findValidSessionByToken,
+  hashActivationToken,
   insertAuthIdentity,
+  markActivationTokenUsed,
   revokeAllSessionsByUserId,
   revokeSessionByToken,
 } from '../../services/auth/index.js'
-import type { GoogleIdTokenClaims, GoogleOidcClient } from '../../services/auth/index.js'
 import { hashPassword, verifyPassword } from '../../services/auth/password.js'
 import { db } from '../../services/db/index.js'
 import type { DbExecutor } from '../../services/executor.js'
@@ -30,7 +45,7 @@ type AuthError =
   | { type: 'AUTH_USER_LOCKED' }
   | { type: 'AUTH_SESSION_EXPIRED' }
   | { type: 'AUTH_SESSION_REVOKED' }
-  | { type: 'AUTH_TEMPORARY_PASSWORD_EXPIRED' }
+  | { type: 'AUTH_ACTIVATION_TOKEN_INVALID' }
 
 type AuthResult<T> =
   | {
@@ -60,6 +75,20 @@ export type ActiveSessionUserResult =
 
 export interface LoginResultValue extends AuthUserResponse {
   sessionToken: string
+}
+
+export type ActivationCompleteResult =
+  | {
+      ok: true
+      value: { ok: true }
+    }
+  | {
+      ok: false
+      error: { type: 'AUTH_ACTIVATION_TOKEN_INVALID' }
+    }
+export interface ActivationVerifyResult {
+  ok: true
+  value: ActivationVerifyResponse
 }
 
 export type OidcLoginError =
@@ -107,6 +136,7 @@ export interface CompleteGoogleOidcLoginParams {
   expectedState: string
   nonce: string
   codeVerifier: string
+  allowUserCreation?: boolean
 }
 
 const toIsoOrNull = (value: Date | null): string | null => value?.toISOString() ?? null
@@ -151,14 +181,13 @@ const buildAuthUserResponse = async (
       email: user.email,
       display_name: user.display_name,
       global_role: user.global_role as 'none' | 'admin',
+      status: user.status as 'pending_activation' | 'active' | 'disabled',
       account_state: deriveAccountState({
         globalRole: user.global_role as 'none' | 'admin',
-        isActive: user.is_active,
+        status: user.status as 'pending_activation' | 'active' | 'disabled',
         membershipCount: memberships.length,
       }),
-      password_must_change: user.password_must_change,
       password_changed_at: toIsoOrNull(user.password_changed_at),
-      temporary_password_expires_at: toIsoOrNull(user.temporary_password_expires_at),
       memberships: memberships.map((membership) => ({
         organization_id: membership.organization_id,
         organization_name: membership.organization_name,
@@ -168,20 +197,9 @@ const buildAuthUserResponse = async (
   }
 }
 
-const assertTemporaryPasswordNotExpired = (user: User, now: Date): AuthError | undefined => {
-  if (
-    user.password_must_change &&
-    user.temporary_password_expires_at &&
-    user.temporary_password_expires_at < now
-  ) {
-    return { type: 'AUTH_TEMPORARY_PASSWORD_EXPIRED' }
-  }
-
-  return undefined
-}
-
 const MAX_FAILED_LOGIN_ATTEMPTS = 5
 const LOGIN_LOCK_DURATION_MS = 15 * 60 * 1000
+const activationCompleteIdempotencyWindowMs = 3 * 1000
 
 const runInTransaction = async <T>(
   executor: DbExecutor | undefined,
@@ -198,6 +216,35 @@ const runInTransaction = async <T>(
 
 const createOidcPasswordHash = async () => {
   return hashPassword(`oidc:${randomUUID()}:${randomUUID()}`)
+}
+
+const isValidPendingActivationContext = (context: ActivationTokenContext, now: Date) => {
+  return (
+    context.used_at === null &&
+    context.revoked_at === null &&
+    context.expires_at > now &&
+    context.user_status === 'pending_activation' &&
+    context.user_password_hash === null
+  )
+}
+
+const isRecentCompletedActivationContext = (context: ActivationTokenContext, now: Date) => {
+  return (
+    context.used_at !== null &&
+    context.user_status === 'active' &&
+    now.getTime() - context.used_at.getTime() <= activationCompleteIdempotencyWindowMs
+  )
+}
+
+const findActivationContextByToken = async (
+  token: string,
+  executor: DbExecutor
+): Promise<ActivationTokenContext | undefined> => {
+  if (token.trim().length === 0) {
+    return undefined
+  }
+
+  return findActivationTokenContextByHash(hashActivationToken(token), executor)
 }
 
 const attachGoogleIdentityToUser = async (
@@ -222,6 +269,7 @@ const attachGoogleIdentityToUser = async (
 
 const findOrCreateGoogleOidcUser = async (
   claims: GoogleIdTokenClaims,
+  options: { allowUserCreation: boolean },
   executor: DbExecutor
 ): Promise<AuthResult<User>> => {
   const identity = await findGoogleIdentityBySubject(claims.sub, executor)
@@ -245,6 +293,13 @@ const findOrCreateGoogleOidcUser = async (
   const existingUser = await findUserByEmail(claims.email, executor)
 
   if (existingUser) {
+    if (existingUser.status !== 'active') {
+      return {
+        ok: false,
+        error: { type: 'AUTH_INVALID_CREDENTIALS' },
+      }
+    }
+
     const existingUserIdentity = await findGoogleIdentityByUserId(existingUser.id, executor)
 
     if (existingUserIdentity) {
@@ -262,16 +317,21 @@ const findOrCreateGoogleOidcUser = async (
     }
   }
 
+  if (!options.allowUserCreation) {
+    return {
+      ok: false,
+      error: { type: 'AUTH_INVALID_CREDENTIALS' },
+    }
+  }
+
   const createdUser = await insertUser(
     {
       email: claims.email,
       display_name: claims.name,
       password_hash: await createOidcPasswordHash(),
       global_role: 'none',
-      is_active: true,
-      password_must_change: false,
       password_changed_at: null,
-      temporary_password_expires_at: null,
+      status: 'active',
     },
     executor
   )
@@ -362,10 +422,17 @@ export const login = async (
     }
   }
 
-  if (!user.is_active) {
+  if (user.status !== 'active') {
     return {
       ok: false,
       error: { type: 'AUTH_USER_DISABLED' },
+    }
+  }
+
+  if (!user.password_hash) {
+    return {
+      ok: false,
+      error: { type: 'AUTH_INVALID_CREDENTIALS' },
     }
   }
 
@@ -407,15 +474,6 @@ export const login = async (
     }
   }
 
-  const temporaryPasswordError = assertTemporaryPasswordNotExpired(user, now)
-
-  if (temporaryPasswordError) {
-    return {
-      ok: false,
-      error: temporaryPasswordError,
-    }
-  }
-
   await updateUser(
     user.id,
     {
@@ -450,7 +508,11 @@ export const completeGoogleOidcLogin = async (
   }
 
   const userResult = await runInTransaction(executor, async (trx) => {
-    return findOrCreateGoogleOidcUser(claimsResult.value, trx)
+    return findOrCreateGoogleOidcUser(
+      claimsResult.value,
+      { allowUserCreation: params.allowUserCreation ?? true },
+      trx
+    )
   })
 
   if (!userResult.ok) {
@@ -463,7 +525,7 @@ export const completeGoogleOidcLogin = async (
     }
   }
 
-  if (!userResult.value.is_active) {
+  if (userResult.value.status !== 'active') {
     return {
       ok: false,
       error: { type: 'AUTH_USER_DISABLED' },
@@ -561,7 +623,7 @@ export const getMe = async (
     }
   }
 
-  if (!user.is_active) {
+  if (user.status !== 'active') {
     return {
       ok: false,
       error: { type: 'AUTH_USER_DISABLED' },
@@ -608,7 +670,7 @@ export const requireActiveSessionUser = async (
     }
   }
 
-  if (!user.is_active) {
+  if (user.status !== 'active') {
     return {
       ok: false,
       error: { type: 'AUTH_USER_DISABLED' },
@@ -631,6 +693,107 @@ export const logout = async (
   }
 
   return { ok: true }
+}
+
+export const verifyActivationToken = async (
+  payload: ActivationVerifyRequest,
+  now: Date = new Date(),
+  executor: DbExecutor = db
+): Promise<ActivationVerifyResult> => {
+  const context = await findActivationContextByToken(payload.token, executor)
+
+  if (!context || !isValidPendingActivationContext(context, now)) {
+    return {
+      ok: true,
+      value: {
+        valid: false,
+      },
+    }
+  }
+
+  return {
+    ok: true,
+    value: {
+      valid: true,
+      email: context.user_email,
+      display_name: context.user_display_name,
+      organization_name: context.organization_name,
+      expires_at: context.expires_at.toISOString(),
+    },
+  }
+}
+
+export const completeActivation = async (
+  payload: ActivationCompleteRequest,
+  now: Date = new Date(),
+  executor?: DbExecutor
+): Promise<ActivationCompleteResult> => {
+  if (!activationCompleteRequestSchema.safeParse(payload).success) {
+    return {
+      ok: false,
+      error: { type: 'AUTH_ACTIVATION_TOKEN_INVALID' },
+    }
+  }
+
+  return runInTransaction(executor, async (trx) => {
+    const context = await findActivationContextByToken(payload.token, trx)
+
+    if (!context) {
+      return {
+        ok: false,
+        error: { type: 'AUTH_ACTIVATION_TOKEN_INVALID' },
+      }
+    }
+
+    if (isRecentCompletedActivationContext(context, now)) {
+      return {
+        ok: true,
+        value: { ok: true },
+      }
+    }
+
+    if (!isValidPendingActivationContext(context, now)) {
+      return {
+        ok: false,
+        error: { type: 'AUTH_ACTIVATION_TOKEN_INVALID' },
+      }
+    }
+
+    const usedToken = await markActivationTokenUsed(context.token_id, now, trx)
+
+    if (!usedToken) {
+      const latestContext = await findActivationContextByToken(payload.token, trx)
+
+      if (latestContext && isRecentCompletedActivationContext(latestContext, now)) {
+        return {
+          ok: true,
+          value: { ok: true },
+        }
+      }
+
+      return {
+        ok: false,
+        error: { type: 'AUTH_ACTIVATION_TOKEN_INVALID' },
+      }
+    }
+
+    await updateUser(
+      context.user_id,
+      {
+        password_hash: await hashPassword(payload.password),
+        password_changed_at: now,
+        status: 'active',
+        failed_login_attempts: 0,
+        locked_until: null,
+      },
+      trx
+    )
+
+    return {
+      ok: true,
+      value: { ok: true },
+    }
+  })
 }
 
 export const changePassword = async (
@@ -664,10 +827,17 @@ export const changePassword = async (
     }
   }
 
-  if (!user.is_active) {
+  if (user.status !== 'active') {
     return {
       ok: false,
       error: { type: 'AUTH_USER_DISABLED' },
+    }
+  }
+
+  if (!user.password_hash) {
+    return {
+      ok: false,
+      error: { type: 'AUTH_INVALID_CREDENTIALS' },
     }
   }
 
@@ -680,24 +850,13 @@ export const changePassword = async (
     }
   }
 
-  const temporaryPasswordError = assertTemporaryPasswordNotExpired(user, now)
-
-  if (temporaryPasswordError) {
-    return {
-      ok: false,
-      error: temporaryPasswordError,
-    }
-  }
-
   const passwordHash = await hashPassword(payload.new_password)
 
   await updateUser(
     user.id,
     {
       password_hash: passwordHash,
-      password_must_change: false,
       password_changed_at: now,
-      temporary_password_expires_at: null,
     },
     executor
   )
@@ -712,12 +871,12 @@ export const changePassword = async (
 
 export const authErrorStatus = (error: AuthError): 401 | 403 => {
   switch (error.type) {
+    case 'AUTH_ACTIVATION_TOKEN_INVALID':
     case 'AUTH_INVALID_CREDENTIALS':
     case 'AUTH_SESSION_EXPIRED':
     case 'AUTH_SESSION_REVOKED':
     case 'AUTH_UNAUTHENTICATED':
       return 401
-    case 'AUTH_TEMPORARY_PASSWORD_EXPIRED':
     case 'AUTH_USER_DISABLED':
     case 'AUTH_USER_LOCKED':
       return 403

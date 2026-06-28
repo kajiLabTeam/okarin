@@ -125,11 +125,11 @@ export const requestActorMiddleware = ({
       return authError(c, 'AUTH_UNAUTHENTICATED')
     }
 
-    if (!user.is_active) {
+    if (user.status !== 'active') {
       return authError(c, 'AUTH_USER_DISABLED')
     }
 
-    if (sessionResult.session.auth_method === 'password' && user.password_must_change) {
+    if (sessionResult.session.auth_method === 'password' && !user.password_hash) {
       return authError(c, 'AUTH_PASSWORD_CHANGE_REQUIRED')
     }
 
@@ -142,10 +142,9 @@ export const requestActorMiddleware = ({
       global_role: user.global_role as 'none' | 'admin',
       account_state: deriveAccountState({
         globalRole: user.global_role as 'none' | 'admin',
-        isActive: user.is_active,
+        status: user.status as 'pending_activation' | 'active' | 'disabled',
         membershipCount: memberships.length,
       }),
-      password_must_change: user.password_must_change,
       memberships: memberships.map((membership) => ({
         organization_id: membership.organization_id,
         organization_name: membership.organization_name,

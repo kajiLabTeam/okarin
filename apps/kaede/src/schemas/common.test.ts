@@ -37,12 +37,12 @@ describe('authErrorCodeSchema', () => {
   it('定義済み auth / authorization error code を受け入れる', () => {
     const codes = [
       'AUTH_UNAUTHENTICATED',
+      'AUTH_ACTIVATION_TOKEN_INVALID',
       'AUTH_INVALID_CREDENTIALS',
       'AUTH_SESSION_EXPIRED',
       'AUTH_SESSION_REVOKED',
       'AUTH_USER_DISABLED',
       'AUTH_USER_LOCKED',
-      'AUTH_TEMPORARY_PASSWORD_EXPIRED',
       'AUTH_PASSWORD_CHANGE_REQUIRED',
       'AUTH_DASHBOARD_FORBIDDEN',
       'AUTH_ORGANIZATION_FORBIDDEN',

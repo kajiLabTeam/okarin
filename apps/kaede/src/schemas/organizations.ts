@@ -81,11 +81,9 @@ export const organizationUserSchema = z.object({
   user_id: authUserSchema.shape.user_id,
   email: authUserSchema.shape.email,
   display_name: authUserSchema.shape.display_name,
-  is_active: z.boolean(),
+  status: authUserSchema.shape.status,
   role: membershipRoleSchema,
-  password_must_change: authUserSchema.shape.password_must_change,
   password_changed_at: authUserSchema.shape.password_changed_at,
-  temporary_password_expires_at: authUserSchema.shape.temporary_password_expires_at,
   created_at: isoDatetimeSchema,
   updated_at: isoDatetimeSchema,
   pedestrian: pedestrianSchema.nullable(),
@@ -100,7 +98,6 @@ export const createOrganizationUserRequestSchema = z
     email: loginRequestSchema.shape.email,
     display_name: authUserSchema.shape.display_name,
     role: membershipRoleSchema,
-    temporary_password: loginRequestSchema.shape.password,
     create_pedestrian: z.boolean().default(false),
     pedestrian: createPedestrianWithoutOrganizationRequestSchema.optional(),
   })
@@ -113,6 +110,11 @@ export const createOrganizationUserRequestSchema = z
       })
     }
   })
+
+export const organizationUserActivationLinkResponseSchema = z.object({
+  token: z.string().min(1),
+  expires_at: isoDatetimeSchema,
+})
 
 export const createOrganizationMembershipRequestSchema = z.object({
   user_id: uuidSchema,
@@ -140,6 +142,9 @@ export type OrganizationCreationRequestsResponse = z.infer<
 >
 export type OrganizationIdParams = z.infer<typeof organizationIdParamsSchema>
 export type OrganizationResponse = z.infer<typeof organizationSchema>
+export type OrganizationUserActivationLinkResponse = z.infer<
+  typeof organizationUserActivationLinkResponseSchema
+>
 export type OrganizationUserParams = z.infer<typeof organizationUserParamsSchema>
 export type OrganizationUserResponse = z.infer<typeof organizationUserSchema>
 export type OrganizationUsersResponse = z.infer<typeof organizationUsersResponseSchema>

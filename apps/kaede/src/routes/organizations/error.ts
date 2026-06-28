@@ -15,6 +15,8 @@ const errorStatuses: Record<OrganizationError['type'], 401 | 403 | 404 | 409> = 
   ORGANIZATION_CREATION_REQUEST_REQUIRES_PENDING_USER: 403,
   ORGANIZATION_NOT_FOUND: 404,
   ORGANIZATION_SLUG_ALREADY_EXISTS: 409,
+  ORGANIZATION_USER_NOT_FOUND: 404,
+  ORGANIZATION_USER_NOT_PENDING_ACTIVATION: 409,
   USER_NOT_FOUND: 404,
   USER_ALREADY_EXISTS: 409,
 }
@@ -34,6 +36,8 @@ const errorMessages: Record<OrganizationError['type'], string> = {
     'organization creation request requires pending user',
   ORGANIZATION_NOT_FOUND: 'organization not found',
   ORGANIZATION_SLUG_ALREADY_EXISTS: 'organization slug already exists',
+  ORGANIZATION_USER_NOT_FOUND: 'organization user not found',
+  ORGANIZATION_USER_NOT_PENDING_ACTIVATION: 'organization user is not pending activation',
   USER_NOT_FOUND: 'user not found',
   USER_ALREADY_EXISTS: 'user already exists',
 }

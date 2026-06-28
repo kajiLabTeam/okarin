@@ -23,10 +23,8 @@ const createUserWithSession = async (params: { email: string; globalRole?: 'admi
       display_name: params.email,
       password_hash: passwordHash,
       global_role: params.globalRole ?? 'none',
-      is_active: true,
-      password_must_change: false,
+      status: 'active',
       password_changed_at: now,
-      temporary_password_expires_at: null,
     })
     .returningAll()
     .executeTakeFirstOrThrow()

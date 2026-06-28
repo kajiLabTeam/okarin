@@ -1,27 +1,31 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetRuntimeConfigForTests } from '../../config/runtime.js'
-import { serializeGoogleOidcStateCookie } from './oidc-cookie.js'
+import { parseGoogleOidcStateCookie, serializeGoogleOidcStateCookie } from './oidc-cookie.js'
 import { authRoutes } from './index.js'
 
 const originalAppEnv = process.env.APP_ENV
 
 const {
   changePasswordMock,
+  completeActivationMock,
   completeGoogleOidcLinkMock,
   completeGoogleOidcLoginMock,
   getMeMock,
   loginMock,
   logoutMock,
   requireActiveSessionUserMock,
+  verifyActivationTokenMock,
 } = vi.hoisted(() => ({
   changePasswordMock: vi.fn(),
+  completeActivationMock: vi.fn(),
   completeGoogleOidcLinkMock: vi.fn(),
   completeGoogleOidcLoginMock: vi.fn(),
   getMeMock: vi.fn(),
   loginMock: vi.fn(),
   logoutMock: vi.fn(),
   requireActiveSessionUserMock: vi.fn(),
+  verifyActivationTokenMock: vi.fn(),
 }))
 
 vi.mock('../../services/auth/index.js', () => ({
@@ -38,7 +42,6 @@ vi.mock('../../services/auth/index.js', () => ({
 vi.mock('../../usecases/auth/index.js', () => ({
   authErrorStatus: (error: { type: string }) => {
     switch (error.type) {
-      case 'AUTH_TEMPORARY_PASSWORD_EXPIRED':
       case 'AUTH_USER_DISABLED':
         return 403
       default:
@@ -46,12 +49,14 @@ vi.mock('../../usecases/auth/index.js', () => ({
     }
   },
   changePassword: changePasswordMock,
+  completeActivation: completeActivationMock,
   completeGoogleOidcLink: completeGoogleOidcLinkMock,
   completeGoogleOidcLogin: completeGoogleOidcLoginMock,
   getMe: getMeMock,
   login: loginMock,
   logout: logoutMock,
   requireActiveSessionUser: requireActiveSessionUserMock,
+  verifyActivationToken: verifyActivationTokenMock,
 }))
 
 const createAuthTestApp = () => {
@@ -68,9 +73,7 @@ const userResponse = {
     display_name: 'User',
     global_role: 'none',
     account_state: 'active',
-    password_must_change: true,
     password_changed_at: null,
-    temporary_password_expires_at: '2026-06-11T00:00:00.000Z',
     memberships: [
       {
         organization_id: '22222222-2222-4222-8222-222222222222',
@@ -262,6 +265,35 @@ describe('auth routes', () => {
     expect(requireActiveSessionUserMock).toHaveBeenCalledWith('session-token')
   })
 
+  it('GET /api/auth/oidc/google/login は mobile client を state cookie に保存する', async () => {
+    process.env.OIDC_ENABLED = 'true'
+    process.env.OIDC_GOOGLE_CLIENT_ID = 'client-id'
+    process.env.OIDC_GOOGLE_CLIENT_SECRET = 'client-secret'
+    process.env.OIDC_GOOGLE_REDIRECT_URI = 'https://api.example.test/api/auth/oidc/google/callback'
+    process.env.OIDC_STATE_COOKIE_SECRET = 'state-cookie-secret'
+    process.env.FRONTEND_ORIGIN = 'https://app.example.test'
+    resetRuntimeConfigForTests()
+
+    const app = createAuthTestApp()
+    const response = await app.request('/api/auth/oidc/google/login?client=mobile')
+
+    expect(response.status).toBe(302)
+    const setCookie = response.headers.get('set-cookie')
+    expect(setCookie).toContain('okarin_oidc_google=')
+    const cookieValue = setCookie?.match(/okarin_oidc_google=([^;]+)/)?.[1]
+    expect(cookieValue).toBeDefined()
+    if (!cookieValue) {
+      throw new Error('missing oidc state cookie')
+    }
+    expect(parseGoogleOidcStateCookie(cookieValue, 'state-cookie-secret')).toMatchObject({
+      state: 'state-value',
+      nonce: 'nonce-value',
+      codeVerifier: 'code-verifier',
+      intent: 'login',
+      client: 'mobile',
+    })
+  })
+
   it('GET /api/auth/oidc/google/callback は link intent なら Google 連携を完了する', async () => {
     process.env.OIDC_ENABLED = 'true'
     process.env.OIDC_GOOGLE_CLIENT_ID = 'client-id'
@@ -310,6 +342,54 @@ describe('auth routes', () => {
       expect.any(Object)
     )
     expect(completeGoogleOidcLoginMock).not.toHaveBeenCalled()
+  })
+
+  it('GET /api/auth/oidc/google/callback は mobile client なら user 自動作成を許可しない', async () => {
+    process.env.OIDC_ENABLED = 'true'
+    process.env.OIDC_GOOGLE_CLIENT_ID = 'client-id'
+    process.env.OIDC_GOOGLE_CLIENT_SECRET = 'client-secret'
+    process.env.OIDC_GOOGLE_REDIRECT_URI = 'https://api.example.test/api/auth/oidc/google/callback'
+    process.env.OIDC_STATE_COOKIE_SECRET = 'state-cookie-secret'
+    process.env.FRONTEND_ORIGIN = 'https://app.example.test'
+    resetRuntimeConfigForTests()
+    completeGoogleOidcLoginMock.mockResolvedValue({
+      ok: true,
+      value: { sessionToken: 'session-token' },
+    })
+    const stateCookie = serializeGoogleOidcStateCookie(
+      {
+        state: 'state-value',
+        nonce: 'nonce-value',
+        codeVerifier: 'code-verifier',
+        expiresAt: '2099-06-17T00:10:00.000Z',
+        intent: 'login',
+        client: 'mobile',
+      },
+      'state-cookie-secret'
+    )
+
+    const app = createAuthTestApp()
+    const response = await app.request(
+      '/api/auth/oidc/google/callback?code=authorization-code&state=state-value',
+      {
+        headers: {
+          cookie: `okarin_oidc_google=${stateCookie}`,
+        },
+      }
+    )
+
+    expect(response.status).toBe(302)
+    expect(completeGoogleOidcLoginMock).toHaveBeenCalledWith(
+      {
+        code: 'authorization-code',
+        state: 'state-value',
+        expectedState: 'state-value',
+        nonce: 'nonce-value',
+        codeVerifier: 'code-verifier',
+        allowUserCreation: false,
+      },
+      expect.any(Object)
+    )
   })
 
   it('GET /api/auth/me は cookie の session token で user を返す', async () => {
@@ -395,31 +475,119 @@ describe('auth routes', () => {
     })
   })
 
-  it('POST /api/auth/change-password は temporary password 期限切れ時 403 を返す', async () => {
-    changePasswordMock.mockResolvedValue({
-      ok: false,
-      error: {
-        type: 'AUTH_TEMPORARY_PASSWORD_EXPIRED',
+  it('POST /api/auth/activation/verify は valid result を返す', async () => {
+    verifyActivationTokenMock.mockResolvedValue({
+      ok: true,
+      value: {
+        valid: true,
+        email: 'user@example.com',
+        display_name: 'User',
+        organization_name: 'Group A',
+        expires_at: '2026-07-03T00:00:00.000Z',
       },
     })
 
     const app = createAuthTestApp()
-    const response = await app.request('/api/auth/change-password', {
+    const response = await app.request('/api/auth/activation/verify', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        cookie: 'okarin_session=session-token',
       },
       body: JSON.stringify({
-        current_password: 'temporary-password',
-        new_password: 'new-password',
+        token: 'activation-token',
       }),
     })
 
-    expect(response.status).toBe(403)
+    expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({
-      error_code: 'AUTH_TEMPORARY_PASSWORD_EXPIRED',
-      error_message: 'temporary password expired',
+      valid: true,
+      email: 'user@example.com',
+      display_name: 'User',
+      organization_name: 'Group A',
+      expires_at: '2026-07-03T00:00:00.000Z',
+    })
+    expect(verifyActivationTokenMock).toHaveBeenCalledWith({
+      token: 'activation-token',
+    })
+  })
+
+  it('POST /api/auth/activation/verify は invalid result を返す', async () => {
+    verifyActivationTokenMock.mockResolvedValue({
+      ok: true,
+      value: {
+        valid: false,
+      },
+    })
+
+    const app = createAuthTestApp()
+    const response = await app.request('/api/auth/activation/verify', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        token: 'activation-token',
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      valid: false,
+    })
+  })
+
+  it('POST /api/auth/activation/complete は password 初期設定を完了する', async () => {
+    completeActivationMock.mockResolvedValue({
+      ok: true,
+      value: {
+        ok: true,
+      },
+    })
+
+    const app = createAuthTestApp()
+    const response = await app.request('/api/auth/activation/complete', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        token: 'activation-token',
+        password: 'new-password',
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ ok: true })
+    expect(completeActivationMock).toHaveBeenCalledWith({
+      token: 'activation-token',
+      password: 'new-password',
+    })
+  })
+
+  it('POST /api/auth/activation/complete は invalid token なら 401 を返す', async () => {
+    completeActivationMock.mockResolvedValue({
+      ok: false,
+      error: {
+        type: 'AUTH_ACTIVATION_TOKEN_INVALID',
+      },
+    })
+
+    const app = createAuthTestApp()
+    const response = await app.request('/api/auth/activation/complete', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        token: 'activation-token',
+        password: 'new-password',
+      }),
+    })
+
+    expect(response.status).toBe(401)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'AUTH_ACTIVATION_TOKEN_INVALID',
+      error_message: 'activation token is invalid',
     })
   })
 

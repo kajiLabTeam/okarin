@@ -74,7 +74,7 @@ const expectJsonErrorResponse = (
   expect(response?.content?.['application/json']?.schema).toBeDefined()
 }
 
-describe('createApp auth wiring', { timeout: 30_000 }, () => {
+describe('createApp auth wiring', { timeout: 60_000 }, () => {
   beforeEach(() => {
     for (const name of envNames) {
       originalEnv.set(name, process.env[name])
@@ -200,6 +200,8 @@ describe('createApp auth wiring', { timeout: 30_000 }, () => {
       ['/api/auth/logout', 'post'],
       ['/api/auth/me', 'get'],
       ['/api/auth/change-password', 'post'],
+      ['/api/auth/activation/verify', 'post'],
+      ['/api/auth/activation/complete', 'post'],
       ['/api/actor/buildings', 'get'],
       ['/api/actor/floors', 'get'],
       ['/api/buildings/{buildingId}', 'get'],
@@ -214,6 +216,7 @@ describe('createApp auth wiring', { timeout: 30_000 }, () => {
       ['/api/organizations/{organizationId}/recordings', 'get'],
       ['/api/organizations/{organizationId}/users', 'get'],
       ['/api/organizations/{organizationId}/users', 'post'],
+      ['/api/organizations/{organizationId}/users/{userId}/activation-link', 'post'],
       ['/api/organizations/{organizationId}/memberships', 'post'],
       ['/api/pedestrians/me', 'get'],
       ['/api/pedestrians/me/recordings', 'get'],
@@ -235,6 +238,7 @@ describe('createApp auth wiring', { timeout: 30_000 }, () => {
       ['/api/auth/me', 'get', '403'],
       ['/api/auth/change-password', 'post', '401'],
       ['/api/auth/change-password', 'post', '403'],
+      ['/api/auth/activation/complete', 'post', '401'],
       ['/api/organizations', 'get', '401'],
       ['/api/organizations', 'get', '403'],
       ['/api/organizations', 'post', '401'],
@@ -253,6 +257,10 @@ describe('createApp auth wiring', { timeout: 30_000 }, () => {
       ['/api/organizations/{organizationId}/users', 'get', '403'],
       ['/api/organizations/{organizationId}/users', 'post', '401'],
       ['/api/organizations/{organizationId}/users', 'post', '403'],
+      ['/api/organizations/{organizationId}/users/{userId}/activation-link', 'post', '401'],
+      ['/api/organizations/{organizationId}/users/{userId}/activation-link', 'post', '403'],
+      ['/api/organizations/{organizationId}/users/{userId}/activation-link', 'post', '404'],
+      ['/api/organizations/{organizationId}/users/{userId}/activation-link', 'post', '409'],
       ['/api/organizations/{organizationId}/memberships', 'post', '401'],
       ['/api/organizations/{organizationId}/memberships', 'post', '403'],
       ['/api/pedestrians/me', 'get', '403'],

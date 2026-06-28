@@ -23,3 +23,15 @@ export {
 } from './session-repository.js'
 export type { CreateSessionParams, CreateSessionResult, Session } from './session-repository.js'
 export { generateSessionToken, hashSessionToken } from './session-token.js'
+export { generateActivationToken, hashActivationToken } from './activation-token.js'
+export {
+  findActivationTokenContextByHash,
+  insertUserActivationToken,
+  markActivationTokenUsed,
+  revokeActivationTokensByUserId,
+} from './user-activation-token-repository.js'
+export type {
+  ActivationTokenContext,
+  NewUserActivationToken,
+  UserActivationToken,
+} from './user-activation-token-repository.js'
