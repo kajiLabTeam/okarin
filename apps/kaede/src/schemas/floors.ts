@@ -32,6 +32,12 @@ export const floorSchema = z.object({
       download_expires_at: isoDatetimeSchema.openapi({
         description: 'download_url の有効期限',
       }),
+      content_type: z.enum(['image/png', 'image/svg+xml']).openapi({
+        description: 'floor map 画像の Content-Type',
+      }),
+      extension: z.enum(['png', 'svg']).openapi({
+        description: 'floor map 画像の拡張子',
+      }),
     })
     .openapi({
       description: 'floor map 画像の表示用情報',
@@ -70,27 +76,26 @@ export const createFloorRequestSchema = z.object({
   scale: z.number().positive().nullable().optional().openapi({
     description: '縮尺。未設定の場合は null',
   }),
-  map_image_extension: mapImageExtensionSchema.optional().openapi({
-    description: 'floor map 画像の拡張子。未指定時は png',
+})
+
+export const createFloorMultipartRequestSchema = z.object({
+  level: z.string().openapi({
+    description: '階層',
+  }),
+  name: z.string().min(1).openapi({
+    description: 'floor の名称',
+  }),
+  scale: z.string().optional().openapi({
+    description: '縮尺。未設定の場合は null',
+  }),
+  map_image: z.any().openapi({
+    type: 'string',
+    format: 'binary',
+    description: 'floor map 画像ファイル',
   }),
 })
 
-export const createFloorResponseSchema = floorSchema.extend({
-  map_upload: z
-    .object({
-      url: z.string().url().openapi({
-        description: 'floor map 画像をアップロードするための署名付き URL',
-      }),
-      expires_at: isoDatetimeSchema.openapi({
-        description: 'url の有効期限',
-      }),
-    })
-    .openapi({
-      description: 'floor map 画像のアップロード用情報',
-    }),
-})
-
 export type CreateFloorRequest = z.infer<typeof createFloorRequestSchema>
-export type CreateFloorResponse = z.infer<typeof createFloorResponseSchema>
+export type CreateFloorMultipartRequest = z.infer<typeof createFloorMultipartRequestSchema>
 export type FloorIdParams = z.infer<typeof floorIdParamsSchema>
 export type FloorResponse = z.infer<typeof floorSchema>

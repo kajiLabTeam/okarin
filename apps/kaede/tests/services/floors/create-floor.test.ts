@@ -1,10 +1,31 @@
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RequestActor } from '../../../src/middleware/request-actor-context.js'
 import { createDb } from '../../../src/services/db/client.js'
-import { createFloor } from '../../../src/usecases/floors/create-floor.js'
+import type * as StorageService from '../../../src/services/storage/index.js'
+import { createFloor, floorMapImageMaxBytes } from '../../../src/usecases/floors/create-floor.js'
 import { resetDatabase } from '../../db/helpers.js'
 
+const { putFloorMapObjectMock, deleteFloorMapObjectMock, issueFloorMapDownloadUrlMock } =
+  vi.hoisted(() => ({
+    putFloorMapObjectMock: vi.fn(),
+    deleteFloorMapObjectMock: vi.fn(),
+    issueFloorMapDownloadUrlMock: vi.fn(),
+  }))
+
+vi.mock('../../../src/services/storage/index.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof StorageService>()
+
+  return {
+    ...actual,
+    deleteFloorMapObject: deleteFloorMapObjectMock,
+    issueFloorMapDownloadUrl: issueFloorMapDownloadUrlMock,
+    putFloorMapObject: putFloorMapObjectMock,
+  }
+})
+
 const db = createDb()
+const validSvg = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"></svg>')
+const validPng = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
 const serviceClientActor: RequestActor = {
   type: 'service_client',
@@ -52,6 +73,11 @@ const memberActor = (organizationId: string): RequestActor => ({
 
 describe('createFloor', () => {
   beforeEach(async () => {
+    vi.clearAllMocks()
+    issueFloorMapDownloadUrlMock.mockResolvedValue({
+      url: 'http://127.0.0.1:8333/okarin-test/floor-map',
+      expiresAt: '2026-05-13T01:00:00.000Z',
+    })
     await resetDatabase(db)
   })
 
@@ -72,12 +98,20 @@ describe('createFloor', () => {
       .returning(['id'])
       .executeTakeFirstOrThrow()
 
-    const result = await createFloor(adminActor, organization.id, building.id, {
-      level: 2,
-      name: '2F',
-      scale: 25,
-      map_image_extension: 'svg',
-    })
+    const result = await createFloor(
+      adminActor,
+      organization.id,
+      building.id,
+      {
+        level: 2,
+        name: '2F',
+        scale: 25,
+      },
+      {
+        bytes: validSvg,
+        contentType: 'image/svg+xml',
+      }
+    )
 
     expect(result.ok).toBe(true)
     if (!result.ok) {
@@ -93,13 +127,18 @@ describe('createFloor', () => {
       scale: 25,
     })
     expect(result.value.map_image.download_expires_at).toEqual(expect.any(String))
-    expect(result.value.map_upload.expires_at).toEqual(expect.any(String))
     const mapDownloadUrl = new URL(result.value.map_image.download_url)
-    const mapUploadUrl = new URL(result.value.map_upload.url)
     const expectedMapPath = `/okarin-test/maps/${building.id}/${result.value.floor_id}.svg`
-    expect(mapDownloadUrl.pathname).toBe(expectedMapPath)
-    expect(mapUploadUrl.pathname).toBe(expectedMapPath)
-    expect(mapUploadUrl.searchParams.get('X-Amz-SignedHeaders')).toBe('content-type;host')
+    expect(result.value.map_image).toMatchObject({
+      content_type: 'image/svg+xml',
+      extension: 'svg',
+    })
+    expect(mapDownloadUrl.pathname).toBe('/okarin-test/floor-map')
+    expect(putFloorMapObjectMock).toHaveBeenCalledWith(
+      expectedMapPath.slice('/okarin-test/'.length),
+      'svg',
+      validSvg
+    )
 
     const floor = await db
       .selectFrom('floors')
@@ -128,6 +167,10 @@ describe('createFloor', () => {
       {
         level: 1,
         name: '1F',
+      },
+      {
+        bytes: validPng,
+        contentType: 'image/png',
       }
     )
 
@@ -142,6 +185,7 @@ describe('createFloor', () => {
     const floors = await db.selectFrom('floors').select('id').execute()
 
     expect(floors).toEqual([])
+    expect(putFloorMapObjectMock).not.toHaveBeenCalled()
   })
 
   it('manager は所属 organization の building に floor を作成できる', async () => {
@@ -157,10 +201,19 @@ describe('createFloor', () => {
       .returning(['id'])
       .executeTakeFirstOrThrow()
 
-    const result = await createFloor(managerActor(organization.id), organization.id, building.id, {
-      level: 3,
-      name: '3F',
-    })
+    const result = await createFloor(
+      managerActor(organization.id),
+      organization.id,
+      building.id,
+      {
+        level: 3,
+        name: '3F',
+      },
+      {
+        bytes: validPng,
+        contentType: 'image/png',
+      }
+    )
 
     expect(result.ok).toBe(true)
     if (!result.ok) {
@@ -199,6 +252,10 @@ describe('createFloor', () => {
       {
         level: 1,
         name: '1F',
+      },
+      {
+        bytes: validPng,
+        contentType: 'image/png',
       }
     )
 
@@ -224,10 +281,19 @@ describe('createFloor', () => {
       .returning(['id'])
       .executeTakeFirstOrThrow()
 
-    const result = await createFloor(memberActor(organization.id), organization.id, building.id, {
-      level: 1,
-      name: '1F',
-    })
+    const result = await createFloor(
+      memberActor(organization.id),
+      organization.id,
+      building.id,
+      {
+        level: 1,
+        name: '1F',
+      },
+      {
+        bytes: validPng,
+        contentType: 'image/png',
+      }
+    )
 
     expect(result).toEqual({
       ok: false,
@@ -235,5 +301,142 @@ describe('createFloor', () => {
         type: 'AUTH_DASHBOARD_FORBIDDEN',
       },
     })
+  })
+
+  it('不正な floor map image は floor を作成しない', async () => {
+    const organization = await db
+      .insertInto('organizations')
+      .values({ name: 'Invalid Image Floor Organization' })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+    const building = await db
+      .insertInto('buildings')
+      .values({ organization_id: organization.id, name: 'Invalid Image Floor Building' })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+
+    const result = await createFloor(
+      adminActor,
+      organization.id,
+      building.id,
+      {
+        level: 1,
+        name: '1F',
+      },
+      {
+        bytes: new TextEncoder().encode('<svg><script>alert(1)</script></svg>'),
+        contentType: 'image/svg+xml',
+      }
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: { type: 'FLOOR_MAP_IMAGE_INVALID' },
+    })
+    expect(putFloorMapObjectMock).not.toHaveBeenCalled()
+    await expect(db.selectFrom('floors').select('id').execute()).resolves.toEqual([])
+  })
+
+  it('PNG magic number が不正な floor map image は floor を作成しない', async () => {
+    const organization = await db
+      .insertInto('organizations')
+      .values({ name: 'Invalid PNG Floor Organization' })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+    const building = await db
+      .insertInto('buildings')
+      .values({ organization_id: organization.id, name: 'Invalid PNG Floor Building' })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+
+    const result = await createFloor(
+      adminActor,
+      organization.id,
+      building.id,
+      {
+        level: 1,
+        name: '1F',
+      },
+      {
+        bytes: new Uint8Array([0x00, 0x01]),
+        contentType: 'image/png',
+      }
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: { type: 'FLOOR_MAP_IMAGE_INVALID' },
+    })
+    expect(putFloorMapObjectMock).not.toHaveBeenCalled()
+    await expect(db.selectFrom('floors').select('id').execute()).resolves.toEqual([])
+  })
+
+  it('10MB を超える floor map image は floor を作成しない', async () => {
+    const organization = await db
+      .insertInto('organizations')
+      .values({ name: 'Oversized Floor Organization' })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+    const building = await db
+      .insertInto('buildings')
+      .values({ organization_id: organization.id, name: 'Oversized Floor Building' })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+
+    const result = await createFloor(
+      adminActor,
+      organization.id,
+      building.id,
+      {
+        level: 1,
+        name: '1F',
+      },
+      {
+        bytes: new Uint8Array(floorMapImageMaxBytes + 1),
+        contentType: 'image/png',
+      }
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'FLOOR_MAP_IMAGE_TOO_LARGE',
+        maxBytes: floorMapImageMaxBytes,
+      },
+    })
+    expect(putFloorMapObjectMock).not.toHaveBeenCalled()
+    await expect(db.selectFrom('floors').select('id').execute()).resolves.toEqual([])
+  })
+
+  it('S3 保存に失敗した場合は floor を作成しない', async () => {
+    putFloorMapObjectMock.mockRejectedValueOnce(new Error('s3 put failed'))
+    const organization = await db
+      .insertInto('organizations')
+      .values({ name: 'S3 Failure Floor Organization' })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+    const building = await db
+      .insertInto('buildings')
+      .values({ organization_id: organization.id, name: 'S3 Failure Floor Building' })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+
+    await expect(
+      createFloor(
+        adminActor,
+        organization.id,
+        building.id,
+        {
+          level: 1,
+          name: '1F',
+        },
+        {
+          bytes: validPng,
+          contentType: 'image/png',
+        }
+      )
+    ).rejects.toThrow('s3 put failed')
+
+    await expect(db.selectFrom('floors').select('id').execute()).resolves.toEqual([])
   })
 })

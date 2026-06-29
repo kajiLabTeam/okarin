@@ -1,6 +1,8 @@
 export {
+  deleteFloorMapObject,
   doesTrajectoryAnalyzedResultObjectExist,
   listRecordingRawObjectKeys,
+  putFloorMapObject,
 } from './object-store.js'
 export {
   buildFloorMapObjectKey,
@@ -8,13 +10,15 @@ export {
   buildRecordingRawObjectPrefix,
   buildRecordingRawObjectKey,
   issueFloorMapDownloadUrl,
-  issueFloorMapUploadUrl,
+  getFloorMapContentType,
+  getFloorMapExtensionFromObjectKey,
   issueInternalRecordingRawDownloadUrls,
   issueInternalTrajectoryResultUploadUrl,
   issueRecordingUploadUrls,
 } from './presigned-url.js'
 export { resetS3ClientForTests } from './s3-client.js'
 export type {
+  FloorMapContentType,
   FloorMapImageExtension,
   RecordingRawDownloadUrls,
   RecordingUploadUrls,

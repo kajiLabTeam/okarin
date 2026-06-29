@@ -1,9 +1,44 @@
-import { HeadObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3'
+import {
+  DeleteObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+} from '@aws-sdk/client-s3'
 import {
   buildRecordingRawObjectPrefix,
   buildTrajectoryAnalyzedResultObjectKey,
+  getFloorMapContentType,
 } from './presigned-url.js'
+import type { FloorMapImageExtension } from './presigned-url.js'
 import { getS3Context } from './s3-client.js'
+
+export const putFloorMapObject = async (
+  objectKey: string,
+  extension: FloorMapImageExtension,
+  body: Uint8Array
+) => {
+  const { config, internalClient } = getS3Context()
+
+  await internalClient.send(
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: objectKey,
+      Body: body,
+      ContentType: getFloorMapContentType(extension),
+    })
+  )
+}
+
+export const deleteFloorMapObject = async (objectKey: string) => {
+  const { config, internalClient } = getS3Context()
+
+  await internalClient.send(
+    new DeleteObjectCommand({
+      Bucket: config.bucket,
+      Key: objectKey,
+    })
+  )
+}
 
 export const listRecordingRawObjectKeys = async (organizationId: string, recordingId: string) => {
   const { config, internalClient } = getS3Context()

@@ -50,7 +50,6 @@ export interface StorageRuntimeConfig {
   accessKeyId: string
   bucket: string
   floorMapDownloadUrlTtlSeconds: number
-  floorMapUploadUrlTtlSeconds: number
   internalEndpoint: string
   publicEndpoint: string
   region: string
@@ -73,7 +72,6 @@ const defaultPort = 8080
 const defaultCallbackTokenTtlSeconds = 24 * 60 * 60
 const defaultNozomiRequestTimeoutMs = 10 * 1000
 const defaultFloorMapDownloadUrlTtlSeconds = 60 * 60
-const defaultFloorMapUploadUrlTtlSeconds = 15 * 60
 const defaultRecordingUploadUrlTtlSeconds = 15 * 60
 const defaultTrajectoryPresignTtlSeconds = 24 * 60 * 60
 
@@ -226,10 +224,6 @@ export const getStorageRuntimeConfig = (): StorageRuntimeConfig => {
     floorMapDownloadUrlTtlSeconds: parsePositiveIntegerEnv(
       'S3_FLOOR_MAP_DOWNLOAD_URL_TTL_SECONDS',
       defaultFloorMapDownloadUrlTtlSeconds
-    ),
-    floorMapUploadUrlTtlSeconds: parsePositiveIntegerEnv(
-      'S3_FLOOR_MAP_UPLOAD_URL_TTL_SECONDS',
-      defaultFloorMapUploadUrlTtlSeconds
     ),
     internalEndpoint,
     publicEndpoint: normalizeBaseUrl(process.env.S3_PUBLIC_ENDPOINT ?? internalEndpoint),

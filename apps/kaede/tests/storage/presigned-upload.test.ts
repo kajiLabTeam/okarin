@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import {
+  putFloorMapObject,
   issueRecordingUploadUrls,
   resetS3ClientForTests,
 } from '../../src/services/storage/index.js'
@@ -40,7 +41,7 @@ describe('presigned upload integration', () => {
     await expect(
       readObjectText(s3, `organizations/${organizationId}/recordings/${recordingId}/raw/acce.csv`)
     ).resolves.toBe(csv)
-  })
+  }, 30000)
 
   it('発行した presigned URL に PUT した metadata.json を取得できる', async () => {
     const organizationId = '88888888-8888-4888-8888-888888888888'
@@ -69,5 +70,15 @@ describe('presigned upload integration', () => {
         `organizations/${organizationId}/recordings/${recordingId}/raw/metadata.json`
       )
     ).resolves.toBe(metadata)
-  })
+  }, 30000)
+
+  it('floor map object を API 内部用 helper で保存できる', async () => {
+    const objectKey =
+      'maps/22222222-2222-4222-8222-222222222222/33333333-3333-4333-8333-333333333333.svg'
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+
+    await putFloorMapObject(objectKey, 'svg', new TextEncoder().encode(svg))
+
+    await expect(readObjectText(s3, objectKey)).resolves.toBe(svg)
+  }, 30000)
 })

@@ -31,6 +31,8 @@ describe('GET /api/organizations/:organizationId/floors', () => {
             map_image: {
               download_url: 'https://storage.example.test/maps/floor.png',
               download_expires_at: '2026-06-11T01:00:00.000Z',
+              content_type: 'image/png',
+              extension: 'png',
             },
             created_at: '2026-06-11T00:00:00.000Z',
             updated_at: '2026-06-11T00:00:00.000Z',
@@ -63,6 +65,8 @@ describe('GET /api/organizations/:organizationId/floors', () => {
           map_image: {
             download_url: 'https://storage.example.test/maps/floor.png',
             download_expires_at: '2026-06-11T01:00:00.000Z',
+            content_type: 'image/png',
+            extension: 'png',
           },
           created_at: '2026-06-11T00:00:00.000Z',
           updated_at: '2026-06-11T00:00:00.000Z',

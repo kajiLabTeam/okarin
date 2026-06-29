@@ -39,6 +39,8 @@ describe('GET /api/actor/floors', () => {
           map_image: {
             download_url: 'https://storage.example.test/maps/floor.png',
             download_expires_at: '2026-05-13T01:00:00.000Z',
+            content_type: 'image/png',
+            extension: 'png',
           },
           created_at: '2026-05-13T00:00:00.000Z',
           updated_at: '2026-05-13T00:00:00.000Z',
@@ -65,6 +67,8 @@ describe('GET /api/actor/floors', () => {
           map_image: {
             download_url: 'https://storage.example.test/maps/floor.png',
             download_expires_at: '2026-05-13T01:00:00.000Z',
+            content_type: 'image/png',
+            extension: 'png',
           },
           created_at: '2026-05-13T00:00:00.000Z',
           updated_at: '2026-05-13T00:00:00.000Z',

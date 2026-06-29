@@ -1,5 +1,9 @@
 import type { FloorResponse } from '../../schemas/floors.js'
-import { issueFloorMapDownloadUrl } from '../../services/storage/index.js'
+import {
+  getFloorMapContentType,
+  getFloorMapExtensionFromObjectKey,
+  issueFloorMapDownloadUrl,
+} from '../../services/storage/index.js'
 
 interface FloorResponseRow {
   floor_id: string
@@ -23,6 +27,12 @@ const requireOrganizationId = (floorId: string, organizationId: string | null): 
 }
 
 export const toFloorResponse = async (floor: FloorResponseRow): Promise<FloorResponse> => {
+  const extension = getFloorMapExtensionFromObjectKey(floor.image_object_path)
+
+  if (!extension) {
+    throw new Error(`floor ${floor.floor_id} has invalid image_object_path`)
+  }
+
   const downloadUrl = await issueFloorMapDownloadUrl(floor.image_object_path)
 
   return {
@@ -36,6 +46,8 @@ export const toFloorResponse = async (floor: FloorResponseRow): Promise<FloorRes
     map_image: {
       download_url: downloadUrl.url,
       download_expires_at: downloadUrl.expiresAt,
+      content_type: getFloorMapContentType(extension),
+      extension,
     },
     created_at: floor.created_at.toISOString(),
     updated_at: floor.updated_at.toISOString(),

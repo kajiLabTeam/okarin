@@ -20,9 +20,29 @@ export interface RecordingRawDownloadUrls {
 
 export type FloorMapImageExtension = 'png' | 'svg'
 
-const floorMapContentTypes: Record<FloorMapImageExtension, string> = {
+export type FloorMapContentType = 'image/png' | 'image/svg+xml'
+
+const floorMapContentTypes: Record<FloorMapImageExtension, FloorMapContentType> = {
   png: 'image/png',
   svg: 'image/svg+xml',
+}
+
+export const getFloorMapContentType = (extension: FloorMapImageExtension) => {
+  return floorMapContentTypes[extension]
+}
+
+export const getFloorMapExtensionFromObjectKey = (
+  objectKey: string
+): FloorMapImageExtension | undefined => {
+  if (objectKey.endsWith('.png')) {
+    return 'png'
+  }
+
+  if (objectKey.endsWith('.svg')) {
+    return 'svg'
+  }
+
+  return undefined
 }
 
 export const buildFloorMapObjectKey = (
@@ -78,31 +98,6 @@ export const issueRecordingUploadUrls = async (
   return {
     expiresAt: new Date(now.getTime() + config.recordingUploadUrlTtlSeconds * 1000).toISOString(),
     uploadUrls,
-  }
-}
-
-export const issueFloorMapUploadUrl = async (
-  objectKey: string,
-  extension: FloorMapImageExtension,
-  now: Date = new Date()
-) => {
-  const { config, presignClient } = getS3Context()
-  const url = await getSignedUrl(
-    presignClient,
-    new PutObjectCommand({
-      Bucket: config.bucket,
-      Key: objectKey,
-      ContentType: floorMapContentTypes[extension],
-    }),
-    {
-      expiresIn: config.floorMapUploadUrlTtlSeconds,
-      signableHeaders: new Set(['content-type']),
-    }
-  )
-
-  return {
-    expiresAt: new Date(now.getTime() + config.floorMapUploadUrlTtlSeconds * 1000).toISOString(),
-    url,
   }
 }
 
