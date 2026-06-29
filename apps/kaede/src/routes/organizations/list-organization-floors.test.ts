@@ -28,6 +28,10 @@ describe('GET /api/organizations/:organizationId/floors', () => {
             level: 1,
             name: '1F',
             scale: null,
+            map_image: {
+              download_url: 'https://storage.example.test/maps/floor.png',
+              download_expires_at: '2026-06-11T01:00:00.000Z',
+            },
             created_at: '2026-06-11T00:00:00.000Z',
             updated_at: '2026-06-11T00:00:00.000Z',
           },
@@ -56,6 +60,10 @@ describe('GET /api/organizations/:organizationId/floors', () => {
           level: 1,
           name: '1F',
           scale: null,
+          map_image: {
+            download_url: 'https://storage.example.test/maps/floor.png',
+            download_expires_at: '2026-06-11T01:00:00.000Z',
+          },
           created_at: '2026-06-11T00:00:00.000Z',
           updated_at: '2026-06-11T00:00:00.000Z',
         },

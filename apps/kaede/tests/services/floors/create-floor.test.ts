@@ -92,6 +92,14 @@ describe('createFloor', () => {
       name: '2F',
       scale: 25,
     })
+    expect(result.value.map_image.download_expires_at).toEqual(expect.any(String))
+    expect(result.value.map_upload.expires_at).toEqual(expect.any(String))
+    const mapDownloadUrl = new URL(result.value.map_image.download_url)
+    const mapUploadUrl = new URL(result.value.map_upload.url)
+    const expectedMapPath = `/okarin-test/maps/${building.id}/${result.value.floor_id}.svg`
+    expect(mapDownloadUrl.pathname).toBe(expectedMapPath)
+    expect(mapUploadUrl.pathname).toBe(expectedMapPath)
+    expect(mapUploadUrl.searchParams.get('X-Amz-SignedHeaders')).toBe('content-type;host')
 
     const floor = await db
       .selectFrom('floors')

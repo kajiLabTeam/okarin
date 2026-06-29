@@ -5,6 +5,8 @@ interface StorageConfig {
   accessKeyId: string
   bucket: string
   endpoint: string
+  floorMapDownloadUrlTtlSeconds: number
+  floorMapUploadUrlTtlSeconds: number
   publicEndpoint: string
   region: string
   recordingUploadUrlTtlSeconds: number
@@ -34,6 +36,8 @@ const getStorageConfig = (): StorageConfig => {
     accessKeyId: storage.accessKeyId,
     bucket: storage.bucket,
     endpoint: storage.internalEndpoint,
+    floorMapDownloadUrlTtlSeconds: storage.floorMapDownloadUrlTtlSeconds,
+    floorMapUploadUrlTtlSeconds: storage.floorMapUploadUrlTtlSeconds,
     publicEndpoint: storage.publicEndpoint,
     region: storage.region,
     recordingUploadUrlTtlSeconds: storage.recordingUploadUrlTtlSeconds,

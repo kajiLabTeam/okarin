@@ -9,6 +9,6 @@ export const listFloors = async (actor: RequestActor) => {
   })
 
   return {
-    floors: floors.map(toFloorResponse),
+    floors: await Promise.all(floors.map(toFloorResponse)),
   }
 }

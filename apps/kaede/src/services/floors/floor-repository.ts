@@ -18,6 +18,7 @@ export interface FloorRow {
   building_name: string
   level: number
   name: string
+  image_object_path: string
   scale: number | null
   created_at: Date
   updated_at: Date
@@ -34,6 +35,7 @@ const floorRowsQuery = () =>
       'buildings.name as building_name',
       'floors.level',
       'floors.name',
+      'floors.image_object_path',
       'floors.scale',
       'floors.created_at',
       'floors.updated_at',

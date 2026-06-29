@@ -24,6 +24,18 @@ export const floorSchema = z.object({
   scale: z.number().nullable().openapi({
     description: '縮尺。未設定の場合は null',
   }),
+  map_image: z
+    .object({
+      download_url: z.string().url().openapi({
+        description: 'floor map 画像を取得するための署名付き URL',
+      }),
+      download_expires_at: isoDatetimeSchema.openapi({
+        description: 'download_url の有効期限',
+      }),
+    })
+    .openapi({
+      description: 'floor map 画像の表示用情報',
+    }),
   created_at: isoDatetimeSchema.openapi({
     description: 'floor の作成日時',
   }),
@@ -63,6 +75,22 @@ export const createFloorRequestSchema = z.object({
   }),
 })
 
+export const createFloorResponseSchema = floorSchema.extend({
+  map_upload: z
+    .object({
+      url: z.string().url().openapi({
+        description: 'floor map 画像をアップロードするための署名付き URL',
+      }),
+      expires_at: isoDatetimeSchema.openapi({
+        description: 'url の有効期限',
+      }),
+    })
+    .openapi({
+      description: 'floor map 画像のアップロード用情報',
+    }),
+})
+
 export type CreateFloorRequest = z.infer<typeof createFloorRequestSchema>
+export type CreateFloorResponse = z.infer<typeof createFloorResponseSchema>
 export type FloorIdParams = z.infer<typeof floorIdParamsSchema>
 export type FloorResponse = z.infer<typeof floorSchema>

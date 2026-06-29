@@ -4,7 +4,7 @@ import { requireRequestActor } from '../../middleware/request-actor-context.js'
 import type { RequestActorContext } from '../../middleware/request-actor-context.js'
 import { organizationBuildingIdParamsSchema } from '../../schemas/buildings.js'
 import { errorResponseSchema } from '../../schemas/common.js'
-import { createFloorRequestSchema, floorSchema } from '../../schemas/floors.js'
+import { createFloorRequestSchema, createFloorResponseSchema } from '../../schemas/floors.js'
 import { createFloor } from '../../usecases/floors/create-floor.js'
 import type { CreateFloorResult } from '../../usecases/floors/create-floor.js'
 import { toAuthorizationErrorResponse } from '../authorization-error.js'
@@ -51,7 +51,7 @@ export const registerCreateOrganizationBuildingFloorRoute = (app: OpenAPIHono) =
         description: 'floor created',
         content: {
           'application/json': {
-            schema: floorSchema,
+            schema: createFloorResponseSchema,
           },
         },
       },

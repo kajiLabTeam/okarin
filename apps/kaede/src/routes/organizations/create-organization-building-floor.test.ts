@@ -36,6 +36,14 @@ describe('POST /api/organizations/:organizationId/buildings/:buildingId/floors',
         level: 1,
         name: '1F',
         scale: null,
+        map_image: {
+          download_url: 'https://storage.example.test/maps/floor.png',
+          download_expires_at: '2026-05-13T01:00:00.000Z',
+        },
+        map_upload: {
+          url: 'https://storage.example.test/maps/floor.png?upload',
+          expires_at: '2026-05-13T00:15:00.000Z',
+        },
         created_at: '2026-05-13T00:00:00.000Z',
         updated_at: '2026-05-13T00:00:00.000Z',
       },
@@ -67,6 +75,14 @@ describe('POST /api/organizations/:organizationId/buildings/:buildingId/floors',
       level: 1,
       name: '1F',
       scale: null,
+      map_image: {
+        download_url: 'https://storage.example.test/maps/floor.png',
+        download_expires_at: '2026-05-13T01:00:00.000Z',
+      },
+      map_upload: {
+        url: 'https://storage.example.test/maps/floor.png?upload',
+        expires_at: '2026-05-13T00:15:00.000Z',
+      },
       created_at: '2026-05-13T00:00:00.000Z',
       updated_at: '2026-05-13T00:00:00.000Z',
     })
@@ -130,6 +146,29 @@ describe('POST /api/organizations/:organizationId/buildings/:buildingId/floors',
         },
         body: JSON.stringify({
           level: 1,
+        }),
+      }
+    )
+
+    expect(response.status).toBe(400)
+    expect(createFloorMock).not.toHaveBeenCalled()
+  })
+
+  it('map_image_extension が png/svg 以外なら 400 を返し usecase を呼ばない', async () => {
+    const app = createRouteTestApp('/organizations', registerCreateOrganizationBuildingFloorRoute, {
+      actor: managerActor,
+    })
+    const response = await app.request(
+      '/api/organizations/99999999-9999-4999-8999-999999999999/buildings/22222222-2222-4222-8222-222222222222/floors',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          level: 1,
+          name: '1F',
+          map_image_extension: 'jpg',
         }),
       }
     )

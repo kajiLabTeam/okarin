@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { StorageRuntimeConfig } from '../../config/runtime.js'
 import {
+  buildFloorMapObjectKey,
   buildRecordingRawObjectKey,
+  issueFloorMapDownloadUrl,
+  issueFloorMapUploadUrl,
   issueRecordingUploadUrls,
   resetS3ClientForTests,
 } from './index.js'
@@ -50,6 +53,8 @@ describe('storage presigned url service', () => {
       publicEndpoint: 'http://127.0.0.1:8333',
       region: 'us-east-1',
       bucket: 'okarin-local',
+      floorMapDownloadUrlTtlSeconds: 3600,
+      floorMapUploadUrlTtlSeconds: 900,
       recordingUploadUrlTtlSeconds: 900,
       trajectoryRawDownloadUrlTtlSeconds: 86400,
       trajectoryResultUploadUrlTtlSeconds: 86400,
@@ -95,5 +100,59 @@ describe('storage presigned url service', () => {
     expect(metadataUrl.pathname).toBe(
       `/okarin-local/organizations/${organizationId}/recordings/${recordingId}/raw/metadata.json`
     )
+  })
+
+  it('floor map object key を保存規約どおりに組み立てる', () => {
+    expect(
+      buildFloorMapObjectKey(
+        '22222222-2222-4222-8222-222222222222',
+        '33333333-3333-4333-8333-333333333333',
+        'png'
+      )
+    ).toBe('maps/22222222-2222-4222-8222-222222222222/33333333-3333-4333-8333-333333333333.png')
+  })
+
+  it('floor map の PUT/GET 用署名付き URL を生成できる', async () => {
+    getStorageRuntimeConfigMock.mockReturnValue({
+      accessKeyId: 'kaede-test',
+      secretAccessKey: 'kaede-secret',
+      internalEndpoint: 'http://seaweedfs:8333',
+      publicEndpoint: 'http://127.0.0.1:8333',
+      region: 'us-east-1',
+      bucket: 'okarin-local',
+      floorMapDownloadUrlTtlSeconds: 3600,
+      floorMapUploadUrlTtlSeconds: 900,
+      recordingUploadUrlTtlSeconds: 900,
+      trajectoryRawDownloadUrlTtlSeconds: 86400,
+      trajectoryResultUploadUrlTtlSeconds: 86400,
+    })
+    const objectKey = buildFloorMapObjectKey(
+      '22222222-2222-4222-8222-222222222222',
+      '33333333-3333-4333-8333-333333333333',
+      'svg'
+    )
+    const now = new Date('2026-05-13T00:00:00.000Z')
+
+    const [upload, download] = await Promise.all([
+      issueFloorMapUploadUrl(objectKey, 'svg', now),
+      issueFloorMapDownloadUrl(objectKey, now),
+    ])
+
+    expect(upload.expiresAt).toBe('2026-05-13T00:15:00.000Z')
+    expect(download.expiresAt).toBe('2026-05-13T01:00:00.000Z')
+
+    const uploadUrl = new URL(upload.url)
+    const downloadUrl = new URL(download.url)
+    const expectedPath =
+      '/okarin-local/maps/22222222-2222-4222-8222-222222222222/33333333-3333-4333-8333-333333333333.svg'
+
+    expect(uploadUrl.origin).toBe('http://127.0.0.1:8333')
+    expect(uploadUrl.pathname).toBe(expectedPath)
+    expect(uploadUrl.searchParams.get('X-Amz-Expires')).toBe('900')
+    expect(uploadUrl.searchParams.get('X-Amz-SignedHeaders')).toBe('content-type;host')
+
+    expect(downloadUrl.pathname).toBe(expectedPath)
+    expect(downloadUrl.searchParams.get('X-Amz-Expires')).toBe('3600')
+    expect(downloadUrl.searchParams.get('X-Amz-SignedHeaders')).toBe('host')
   })
 })
