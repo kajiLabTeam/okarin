@@ -174,6 +174,85 @@ describe('createTrajectory', () => {
     })
   })
 
+  it('manager は dashboard API から trajectory を作成できる', async () => {
+    const recordingId = '11111111-1111-4111-8111-111111111111'
+    const trajectoryId = '22222222-2222-4222-8222-222222222222'
+    const floorId = '33333333-3333-4333-8333-333333333333'
+    const organizationId = '99999999-9999-4999-8999-999999999999'
+
+    findRecordingByIdMock.mockResolvedValue({
+      id: recordingId,
+      floor_id: floorId,
+      organization_id: organizationId,
+      upload_status: 'ready',
+      upload_targets: ['acce', 'gyro'],
+    })
+    findFloorByIdMock.mockResolvedValue({
+      id: floorId,
+      organization_id: organizationId,
+    })
+    insertTrajectoryWithConstraintsMock.mockResolvedValue({
+      id: trajectoryId,
+      recording_id: recordingId,
+      floor_id: floorId,
+      organization_id: organizationId,
+      status: 'accepted',
+    })
+    markTrajectoryProcessingMock.mockResolvedValue({
+      id: trajectoryId,
+      recording_id: recordingId,
+      organization_id: organizationId,
+      status: 'processing',
+    })
+    issueInternalRecordingRawDownloadUrlsMock.mockResolvedValue({
+      expiresAt: '2026-05-17T00:15:00.000Z',
+      rawDataUrls: {
+        acce: 'http://seaweedfs:8333/acce',
+        gyro: 'http://seaweedfs:8333/gyro',
+      },
+    })
+    issueInternalTrajectoryResultUploadUrlMock.mockResolvedValue({
+      expiresAt: '2026-05-17T00:15:00.000Z',
+      uploadUrl: 'http://seaweedfs:8333/result',
+      objectKey: `trajectories/${trajectoryId}/analyzed/result.csv`,
+    })
+    generateCallbackTokenMock.mockReturnValue('signed-callback-token')
+    submitAnalyzeRequestMock.mockResolvedValue({
+      trajectory_id: trajectoryId,
+      status: 'accepted',
+    })
+
+    const result = await createTrajectory(
+      {
+        type: 'user',
+        user_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        email: 'manager@example.test',
+        global_role: 'none',
+        account_state: 'active',
+        memberships: [
+          {
+            organization_id: organizationId,
+            organization_name: 'Test Organization',
+            role: 'manager',
+          },
+        ],
+      },
+      { recordingId },
+      { constraints: [] }
+    )
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        trajectory_id: trajectoryId,
+        recording_id: recordingId,
+        organization_id: organizationId,
+        status: 'processing',
+      },
+    })
+    expect(submitAnalyzeRequestMock).toHaveBeenCalledOnce()
+  })
+
   it('member が自分の recording から trajectory を作成しようとすると AUTH_DASHBOARD_FORBIDDEN を返す', async () => {
     const recordingId = '11111111-1111-4111-8111-111111111111'
     const floorId = '33333333-3333-4333-8333-333333333333'

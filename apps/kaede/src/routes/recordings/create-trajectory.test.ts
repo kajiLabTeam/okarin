@@ -136,6 +136,42 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
     })
   })
 
+  it('recording の upload_targets が壊れている場合は 500 を返す', async () => {
+    const recordingId = '11111111-1111-4111-8111-111111111111'
+
+    createTrajectoryMock.mockResolvedValue({
+      ok: false,
+      error: {
+        type: 'RECORDING_UPLOAD_TARGETS_INVALID',
+        recordingId,
+        invalidTargets: ['acce'],
+      },
+    })
+
+    const app = createRouteTestApp('/recordings', registerCreateTrajectoryRoute, {
+      actor: serviceClientActor,
+    })
+    const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        constraints: [],
+      }),
+    })
+
+    expect(response.status).toBe(500)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'RECORDING_UPLOAD_TARGETS_INVALID',
+      error_message: 'recording upload_targets contains invalid values',
+      details: {
+        recording_id: recordingId,
+        invalid_targets: ['acce'],
+      },
+    })
+  })
+
   it('recording の floor が存在しない場合は 404 を返す', async () => {
     const recordingId = '11111111-1111-4111-8111-111111111111'
     const floorId = '33333333-3333-4333-8333-333333333333'
