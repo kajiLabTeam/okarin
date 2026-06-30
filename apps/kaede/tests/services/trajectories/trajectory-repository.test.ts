@@ -2,6 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { createDb } from '../../../src/services/db/client.js'
 import {
   insertTrajectory,
+  listTrajectoriesByRecordingId,
   markTrajectoryFailed,
   markTrajectoryProcessing,
 } from '../../../src/services/trajectories/index.js'
@@ -69,5 +70,49 @@ describe('trajectory repository', () => {
     )
 
     expect(updated).toBeUndefined()
+  })
+
+  it('recording_id に紐づく未削除 trajectory を作成日時降順で取得できる', async () => {
+    const { floor, organization, recording } = await createRecordingFixture(db, {
+      uploadTargets: ['acce', 'gyro'],
+      floorLevel: 1,
+      floorName: '1F',
+      buildingName: 'Trajectory Building',
+    })
+
+    const older = await insertTrajectory(
+      {
+        recording_id: recording.id,
+        floor_id: floor.id,
+        organization_id: organization.id,
+        status: 'completed',
+        created_at: new Date('2026-06-11T00:00:00.000Z'),
+      },
+      db
+    )
+    const newer = await insertTrajectory(
+      {
+        recording_id: recording.id,
+        floor_id: floor.id,
+        organization_id: organization.id,
+        status: 'processing',
+        created_at: new Date('2026-06-12T00:00:00.000Z'),
+      },
+      db
+    )
+    await insertTrajectory(
+      {
+        recording_id: recording.id,
+        floor_id: floor.id,
+        organization_id: organization.id,
+        status: 'completed',
+        deleted_at: new Date('2026-06-13T00:00:00.000Z'),
+      },
+      db
+    )
+
+    const trajectories = await listTrajectoriesByRecordingId(recording.id, db)
+
+    expect(trajectories.map((trajectory) => trajectory.id)).toEqual([newer.id, older.id])
   })
 })

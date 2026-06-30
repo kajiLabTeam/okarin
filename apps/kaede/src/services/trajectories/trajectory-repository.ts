@@ -4,7 +4,7 @@ import { db } from '../db/index.js'
 import type { DB } from '../db/index.js'
 
 type DbExecutor = Kysely<DB> | Transaction<DB>
-type Trajectory = Selectable<Trajectories>
+export type Trajectory = Selectable<Trajectories>
 type NewTrajectory = Insertable<Trajectories>
 type TrajectoryUpdate = Updateable<Trajectories>
 type NewTrajectoryConstraint = Insertable<TrajectoryConstraints>
@@ -20,6 +20,18 @@ export const findTrajectoryById = async (
     .selectAll()
     .where('id', '=', trajectoryId)
     .executeTakeFirst()
+}
+
+export const listTrajectoriesByRecordingId = async (
+  recordingId: string,
+  executor: DbExecutor = db
+): Promise<Trajectory[]> => {
+  return activeTrajectoriesQuery(executor)
+    .selectAll()
+    .where('recording_id', '=', recordingId)
+    .orderBy('created_at', 'desc')
+    .orderBy('id', 'desc')
+    .execute()
 }
 
 export const insertTrajectory = async (

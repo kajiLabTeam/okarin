@@ -268,6 +268,7 @@ describe('createApp auth wiring', { timeout: 60_000 }, () => {
       ['/api/pedestrians', 'get', '403'],
       ['/api/pedestrians', 'post', '403'],
       ['/api/recordings/{recordingId}', 'get', '403'],
+      ['/api/recordings/{recordingId}/trajectories', 'get', '403'],
       ['/api/recordings/init', 'post', '403'],
       ['/api/recordings/{recordingId}/complete-upload', 'post', '403'],
       ['/api/recordings/{recordingId}/refresh-upload-urls', 'post', '403'],

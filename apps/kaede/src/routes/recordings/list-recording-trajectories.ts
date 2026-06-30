@@ -1,12 +1,14 @@
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
+import { requireRequestActor } from '../../middleware/request-actor-context.js'
 import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
-import { notImplementedResponseSchema } from '../../schemas/common.js'
+import { errorResponseSchema } from '../../schemas/common.js'
 import {
   recordingIdParamsSchema,
   recordingTrajectoriesResponseSchema,
 } from '../../schemas/recordings.js'
-import { notImplemented } from '../../utils/not-implemented.js'
+import { listRecordingTrajectories } from '../../usecases/recordings/list-recording-trajectories.js'
+import { toListRecordingTrajectoriesErrorResponse } from './error.js'
 
 export const registerListRecordingTrajectoriesRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => {
   const route = createRoute({
@@ -26,24 +28,35 @@ export const registerListRecordingTrajectoriesRoute = (app: OpenAPIHono<RequestA
           },
         },
       },
-      501: {
-        description: 'not implemented',
+      403: {
+        description: 'permission denied',
         content: {
           'application/json': {
-            schema: notImplementedResponseSchema,
+            schema: errorResponseSchema,
+          },
+        },
+      },
+      404: {
+        description: 'recording not found',
+        content: {
+          'application/json': {
+            schema: errorResponseSchema,
           },
         },
       },
     },
   })
 
-  app.openapi(route, (c) => {
-    c.req.valid('param')
+  app.openapi(route, async (c) => {
+    const params = c.req.valid('param')
+    const actor = requireRequestActor(c)
+    const result = await listRecordingTrajectories(actor, params)
 
-    return notImplemented(
-      c,
-      'GET /api/recordings/:recordingId/trajectories',
-      'recording 配下の trajectory 一覧を取得する'
-    )
+    if (!result.ok) {
+      const error = toListRecordingTrajectoriesErrorResponse(result.error)
+      return c.json(error.body, error.status)
+    }
+
+    return c.json(result.value, 200)
   })
 }
