@@ -49,6 +49,7 @@ export interface OidcRuntimeConfig {
 export interface StorageRuntimeConfig {
   accessKeyId: string
   bucket: string
+  floorMapDownloadUrlTtlSeconds: number
   internalEndpoint: string
   publicEndpoint: string
   region: string
@@ -70,6 +71,7 @@ export interface RuntimeConfig {
 const defaultPort = 8080
 const defaultCallbackTokenTtlSeconds = 24 * 60 * 60
 const defaultNozomiRequestTimeoutMs = 10 * 1000
+const defaultFloorMapDownloadUrlTtlSeconds = 60 * 60
 const defaultRecordingUploadUrlTtlSeconds = 15 * 60
 const defaultTrajectoryPresignTtlSeconds = 24 * 60 * 60
 
@@ -219,6 +221,10 @@ export const getStorageRuntimeConfig = (): StorageRuntimeConfig => {
   storageRuntimeConfig = {
     accessKeyId: getRequiredEnv('S3_ACCESS_KEY_ID'),
     bucket: getRequiredEnv('S3_BUCKET'),
+    floorMapDownloadUrlTtlSeconds: parsePositiveIntegerEnv(
+      'S3_FLOOR_MAP_DOWNLOAD_URL_TTL_SECONDS',
+      defaultFloorMapDownloadUrlTtlSeconds
+    ),
     internalEndpoint,
     publicEndpoint: normalizeBaseUrl(process.env.S3_PUBLIC_ENDPOINT ?? internalEndpoint),
     region: getRequiredEnv('S3_REGION'),

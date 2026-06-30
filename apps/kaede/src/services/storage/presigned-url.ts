@@ -18,6 +18,41 @@ export interface RecordingRawDownloadUrls {
   wifi?: string
 }
 
+export type FloorMapImageExtension = 'png' | 'svg'
+
+export type FloorMapContentType = 'image/png' | 'image/svg+xml'
+
+const floorMapContentTypes: Record<FloorMapImageExtension, FloorMapContentType> = {
+  png: 'image/png',
+  svg: 'image/svg+xml',
+}
+
+export const getFloorMapContentType = (extension: FloorMapImageExtension) => {
+  return floorMapContentTypes[extension]
+}
+
+export const getFloorMapExtensionFromObjectKey = (
+  objectKey: string
+): FloorMapImageExtension | undefined => {
+  if (objectKey.endsWith('.png')) {
+    return 'png'
+  }
+
+  if (objectKey.endsWith('.svg')) {
+    return 'svg'
+  }
+
+  return undefined
+}
+
+export const buildFloorMapObjectKey = (
+  buildingId: string,
+  floorId: string,
+  extension: FloorMapImageExtension
+) => {
+  return `maps/${buildingId}/${floorId}.${extension}`
+}
+
 export const buildRecordingRawObjectKey = (
   organizationId: string,
   recordingId: string,
@@ -63,6 +98,23 @@ export const issueRecordingUploadUrls = async (
   return {
     expiresAt: new Date(now.getTime() + config.recordingUploadUrlTtlSeconds * 1000).toISOString(),
     uploadUrls,
+  }
+}
+
+export const issueFloorMapDownloadUrl = async (objectKey: string, now: Date = new Date()) => {
+  const { config, presignClient } = getS3Context()
+  const url = await getSignedUrl(
+    presignClient,
+    new GetObjectCommand({
+      Bucket: config.bucket,
+      Key: objectKey,
+    }),
+    { expiresIn: config.floorMapDownloadUrlTtlSeconds }
+  )
+
+  return {
+    expiresAt: new Date(now.getTime() + config.floorMapDownloadUrlTtlSeconds * 1000).toISOString(),
+    url,
   }
 }
 export const issueInternalRecordingRawDownloadUrls = async (

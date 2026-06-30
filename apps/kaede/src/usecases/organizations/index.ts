@@ -430,7 +430,7 @@ export const listOrganizationFloorsForSession = async (
   return {
     ok: true,
     value: {
-      floors: floors.map(toFloorResponse),
+      floors: await Promise.all(floors.map(toFloorResponse)),
     },
   }
 }
@@ -468,7 +468,7 @@ export const listOrganizationBuildingFloorsForSession = async (
   return {
     ok: true,
     value: {
-      floors: floors.map(toFloorResponse),
+      floors: await Promise.all(floors.map(toFloorResponse)),
     },
   }
 }

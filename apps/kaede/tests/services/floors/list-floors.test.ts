@@ -98,6 +98,11 @@ describe('listFloors', () => {
       name: '1F',
       scale: 25,
     })
+    const mapDownloadUrl = new URL(result.floors[0].map_image.download_url)
+    expect(mapDownloadUrl.pathname).toBe(
+      `/okarin-test/maps/${building.id}/11111111-1111-4111-8111-111111111111.png`
+    )
+    expect(result.floors[0].map_image.download_expires_at).toEqual(expect.any(String))
   })
 
   it('building 名、level、floor 名の順で並ぶ', async () => {
@@ -348,6 +353,14 @@ describe('getFloor', () => {
         scale: 25,
       },
     })
+    if (!result.ok) {
+      throw new Error('expected getFloor to succeed')
+    }
+    const mapDownloadUrl = new URL(result.value.map_image.download_url)
+    expect(mapDownloadUrl.pathname).toBe(
+      `/okarin-test/maps/${building.id}/11111111-1111-4111-8111-111111111111.png`
+    )
+    expect(result.value.map_image.download_expires_at).toEqual(expect.any(String))
   })
 
   it('member は所属外 organization の floor を取得できない', async () => {

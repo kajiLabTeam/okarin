@@ -37,6 +37,6 @@ export const getFloor = async (
 
   return {
     ok: true,
-    value: toFloorResponse(floor),
+    value: await toFloorResponse(floor),
   }
 }
