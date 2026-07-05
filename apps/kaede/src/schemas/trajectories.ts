@@ -412,3 +412,4 @@ export const trajectoryCompletionResponseSchema = z.object({
 
 export type CreateTrajectoryRequest = z.infer<typeof createTrajectoryRequestSchema>
 export type CallbackRequest = z.infer<typeof callbackRequestSchema>
+export type TrajectoryStatusResponse = z.infer<typeof trajectoryStatusResponseSchema>
