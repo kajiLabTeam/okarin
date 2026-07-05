@@ -1,8 +1,25 @@
+import pytest
 from fastapi.testclient import TestClient
 
+from src.schemas.analysis import AnalyzeRequest
 from src.server import app
 
 client = TestClient(app)
+
+
+class StubStrategy:
+    name = "stub"
+
+    def run(self, request: AnalyzeRequest) -> None:
+        _ = request
+
+
+@pytest.fixture
+def stub_analysis_strategy(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "src.usecases.submit_analysis.get_analysis_strategy",
+        lambda: StubStrategy(),
+    )
 
 
 def test_root() -> None:
@@ -21,7 +38,9 @@ def test_root() -> None:
 #     assert isinstance(response.text, str)
 
 
-def test_analyze_accepts_valid_request() -> None:
+def test_analyze_accepts_valid_request(stub_analysis_strategy: None) -> None:
+    _ = stub_analysis_strategy
+
     response = client.post(
         "/analyze",
         json={
@@ -61,7 +80,11 @@ def test_analyze_accepts_valid_request() -> None:
     }
 
 
-def test_analyze_accepts_request_without_constraints() -> None:
+def test_analyze_accepts_request_without_constraints(
+    stub_analysis_strategy: None,
+) -> None:
+    _ = stub_analysis_strategy
+
     response = client.post(
         "/analyze",
         json={
