@@ -414,3 +414,5 @@ export type CreateTrajectoryRequest = z.infer<typeof createTrajectoryRequestSche
 export type CallbackRequest = z.infer<typeof callbackRequestSchema>
 export type TrajectoryStatusResponse = z.infer<typeof trajectoryStatusResponseSchema>
 export type TrajectoryResultResponse = z.infer<typeof trajectoryResultResponseSchema>
+export type TrajectoryMapDataQuery = z.infer<typeof trajectoryMapDataQuerySchema>
+export type TrajectoryMapDataResponse = z.infer<typeof trajectoryMapDataResponseSchema>

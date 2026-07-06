@@ -11,6 +11,7 @@ import {
   trajectoryResultResponseSchema,
   trajectoryStatusResponseSchema,
   trajectoryMapDataQuerySchema,
+  trajectoryMapDataResponseSchema,
   trajectoryIdParamsSchema,
   batchTrajectoryMapDataRequestSchema,
 } from './trajectories.js'
@@ -293,6 +294,23 @@ describe('trajectory schemas', () => {
   it('trajectoryMapDataQuerySchema は data_type を必須とする', () => {
     const result = trajectoryMapDataQuerySchema.safeParse({
       data_type: 'analyzed',
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('trajectoryMapDataResponseSchema は描画用pointsを受け入れる', () => {
+    const result = trajectoryMapDataResponseSchema.safeParse({
+      trajectory_id: '33333333-3333-4333-8333-333333333333',
+      floor_id: '11111111-1111-4111-8111-111111111111',
+      data_type: 'analyzed',
+      points: [
+        {
+          timestamp: 0,
+          x: 10,
+          y: 20,
+        },
+      ],
     })
 
     expect(result.success).toBe(true)
