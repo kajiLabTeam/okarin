@@ -274,6 +274,9 @@ describe('createApp auth wiring', { timeout: 60_000 }, () => {
       ['/api/recordings/{recordingId}/refresh-upload-urls', 'post', '403'],
       ['/api/recordings/{recordingId}/trajectories', 'post', '403'],
       ['/api/trajectories/{trajectoryId}', 'get', '403'],
+      ['/api/trajectories/{trajectoryId}/result', 'get', '403'],
+      ['/api/trajectories/{trajectoryId}/result', 'get', '404'],
+      ['/api/trajectories/{trajectoryId}/result', 'get', '409'],
     ] as const
 
     for (const [path, method, status] of expectedErrorResponses) {

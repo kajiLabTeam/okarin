@@ -1,11 +1,14 @@
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
-import { errorResponseSchema, notImplementedResponseSchema } from '../../schemas/common.js'
+import { requireRequestActor } from '../../middleware/request-actor-context.js'
+import type { RequestActorContext } from '../../middleware/request-actor-context.js'
+import { errorResponseSchema } from '../../schemas/common.js'
 import {
   trajectoryIdParamsSchema,
   trajectoryResultResponseSchema,
 } from '../../schemas/trajectories.js'
-import { notImplemented } from '../../utils/not-implemented.js'
+import { getTrajectoryResult } from '../../usecases/trajectories/get-trajectory-result.js'
+import { toGetTrajectoryResultErrorResponse } from './error.js'
 
 export const registerGetTrajectoryResultRoute = (app: OpenAPIHono) => {
   const route = createRoute({
@@ -41,24 +44,27 @@ export const registerGetTrajectoryResultRoute = (app: OpenAPIHono) => {
           },
         },
       },
-      501: {
-        description: 'not implemented',
+      403: {
+        description: 'permission denied',
         content: {
           'application/json': {
-            schema: notImplementedResponseSchema,
+            schema: errorResponseSchema,
           },
         },
       },
     },
   })
 
-  app.openapi(route, (c) => {
-    c.req.valid('param')
+  app.openapi(route, async (c) => {
+    const params = c.req.valid('param')
+    const actor = requireRequestActor(c as unknown as RequestActorContext)
+    const result = await getTrajectoryResult(actor, params)
 
-    return notImplemented(
-      c,
-      'GET /api/trajectories/:trajectoryId/result',
-      'trajectory の解析結果を取得する'
-    )
+    if (!result.ok) {
+      const error = toGetTrajectoryResultErrorResponse(result.error)
+      return c.json(error.body, error.status)
+    }
+
+    return c.json(result.value, 200)
   })
 }

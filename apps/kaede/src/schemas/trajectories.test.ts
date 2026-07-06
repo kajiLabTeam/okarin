@@ -8,6 +8,7 @@ import {
   createTrajectoryResponseSchema,
   createTrajectoryRequestSchema,
   retriedTrajectoryResponseSchema,
+  trajectoryResultResponseSchema,
   trajectoryStatusResponseSchema,
   trajectoryMapDataQuerySchema,
   trajectoryIdParamsSchema,
@@ -41,6 +42,16 @@ describe('trajectory schemas', () => {
       error_code: 'NOZOMI_REQUEST_FAILED',
       error_message: 'failed to submit analyze request to nozomi',
       failed_at: '2026-05-13T00:00:00.000Z',
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('trajectoryResultResponseSchema は download_url を含むレスポンスを受け入れる', () => {
+    const result = trajectoryResultResponseSchema.safeParse({
+      trajectory_id: '33333333-3333-4333-8333-333333333333',
+      download_url: 'https://storage.example.test/result.csv',
+      expires_at: '2026-05-13T00:00:00.000Z',
     })
 
     expect(result.success).toBe(true)

@@ -15,6 +15,7 @@ export {
   issueInternalRecordingRawDownloadUrls,
   issueInternalTrajectoryResultUploadUrl,
   issueRecordingUploadUrls,
+  issueTrajectoryResultDownloadUrl,
 } from './presigned-url.js'
 export { resetS3ClientForTests } from './s3-client.js'
 export type {

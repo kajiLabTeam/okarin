@@ -11,6 +11,7 @@ interface StorageConfig {
   recordingUploadUrlTtlSeconds: number
   secretAccessKey: string
   trajectoryRawDownloadUrlTtlSeconds: number
+  trajectoryResultDownloadUrlTtlSeconds: number
   trajectoryResultUploadUrlTtlSeconds: number
 }
 
@@ -41,6 +42,7 @@ const getStorageConfig = (): StorageConfig => {
     recordingUploadUrlTtlSeconds: storage.recordingUploadUrlTtlSeconds,
     secretAccessKey: storage.secretAccessKey,
     trajectoryRawDownloadUrlTtlSeconds: storage.trajectoryRawDownloadUrlTtlSeconds,
+    trajectoryResultDownloadUrlTtlSeconds: storage.trajectoryResultDownloadUrlTtlSeconds,
     trajectoryResultUploadUrlTtlSeconds: storage.trajectoryResultUploadUrlTtlSeconds,
   }
 

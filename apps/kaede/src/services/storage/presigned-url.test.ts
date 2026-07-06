@@ -3,10 +3,12 @@ import type { StorageRuntimeConfig } from '../../config/runtime.js'
 import {
   buildFloorMapObjectKey,
   buildRecordingRawObjectKey,
+  buildTrajectoryAnalyzedResultObjectKey,
   getFloorMapContentType,
   getFloorMapExtensionFromObjectKey,
   issueFloorMapDownloadUrl,
   issueRecordingUploadUrls,
+  issueTrajectoryResultDownloadUrl,
   resetS3ClientForTests,
 } from './index.js'
 
@@ -57,6 +59,7 @@ describe('storage presigned url service', () => {
       floorMapDownloadUrlTtlSeconds: 3600,
       recordingUploadUrlTtlSeconds: 900,
       trajectoryRawDownloadUrlTtlSeconds: 86400,
+      trajectoryResultDownloadUrlTtlSeconds: 3600,
       trajectoryResultUploadUrlTtlSeconds: 86400,
     })
 
@@ -127,6 +130,7 @@ describe('storage presigned url service', () => {
       floorMapDownloadUrlTtlSeconds: 3600,
       recordingUploadUrlTtlSeconds: 900,
       trajectoryRawDownloadUrlTtlSeconds: 86400,
+      trajectoryResultDownloadUrlTtlSeconds: 3600,
       trajectoryResultUploadUrlTtlSeconds: 86400,
     })
     const objectKey = buildFloorMapObjectKey(
@@ -147,6 +151,38 @@ describe('storage presigned url service', () => {
     expect(downloadUrl.origin).toBe('http://127.0.0.1:8333')
     expect(downloadUrl.pathname).toBe(expectedPath)
     expect(downloadUrl.searchParams.get('X-Amz-Expires')).toBe('3600')
+    expect(downloadUrl.searchParams.get('X-Amz-SignedHeaders')).toBe('host')
+  })
+
+  it('trajectory result の GET 用署名付き URL を生成できる', async () => {
+    getStorageRuntimeConfigMock.mockReturnValue({
+      accessKeyId: 'kaede-test',
+      secretAccessKey: 'kaede-secret',
+      internalEndpoint: 'http://seaweedfs:8333',
+      publicEndpoint: 'http://127.0.0.1:8333',
+      region: 'us-east-1',
+      bucket: 'okarin-local',
+      floorMapDownloadUrlTtlSeconds: 3600,
+      recordingUploadUrlTtlSeconds: 900,
+      trajectoryRawDownloadUrlTtlSeconds: 86400,
+      trajectoryResultDownloadUrlTtlSeconds: 1800,
+      trajectoryResultUploadUrlTtlSeconds: 86400,
+    })
+    const trajectoryId = '44444444-4444-4444-8444-444444444444'
+    const now = new Date('2026-05-13T00:00:00.000Z')
+
+    const download = await issueTrajectoryResultDownloadUrl(trajectoryId, now)
+
+    expect(download.expiresAt).toBe('2026-05-13T00:30:00.000Z')
+    expect(download.objectKey).toBe(buildTrajectoryAnalyzedResultObjectKey(trajectoryId))
+
+    const downloadUrl = new URL(download.downloadUrl)
+
+    expect(downloadUrl.origin).toBe('http://127.0.0.1:8333')
+    expect(downloadUrl.pathname).toBe(
+      `/okarin-local/trajectories/${trajectoryId}/analyzed/result.csv`
+    )
+    expect(downloadUrl.searchParams.get('X-Amz-Expires')).toBe('1800')
     expect(downloadUrl.searchParams.get('X-Amz-SignedHeaders')).toBe('host')
   })
 })
