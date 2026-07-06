@@ -13,6 +13,21 @@ from src.schemas.analysis import AnalyzeRequest
 SensorKind = Literal["acce", "gyro"]
 DEFAULT_HTTP_TIMEOUT_SECONDS = 120
 
+SENSOR_COLUMN_ALIASES: dict[SensorKind, dict[str, tuple[str, ...]]] = {
+    "acce": {
+        "t": ("t", "Time (s)", "time_s", "time_seconds"),
+        "x": ("x", "Acceleration x (m/s^2)", "X (m/s^2)", "x(m/s^2)"),
+        "y": ("y", "Acceleration y (m/s^2)", "Y (m/s^2)", "y(m/s^2)"),
+        "z": ("z", "Acceleration z (m/s^2)", "Z (m/s^2)", "z(m/s^2)"),
+    },
+    "gyro": {
+        "t": ("t", "Time (s)", "time_s", "time_seconds"),
+        "x": ("x", "Gyroscope x (rad/s)", "X (rad/s)", "x(rad/s)"),
+        "y": ("y", "Gyroscope y (rad/s)", "Y (rad/s)", "y(rad/s)"),
+        "z": ("z", "Gyroscope z (rad/s)", "Z (rad/s)", "z(rad/s)"),
+    },
+}
+
 
 class DefaultRikkaStrategy:
     name = "default_rikka"
@@ -56,17 +71,61 @@ class DefaultRikkaStrategy:
             csv_bytes = response.read()
 
         df = pd.read_csv(BytesIO(csv_bytes))
-        rename_map = pdr.ACC_COLUMNS if sensor_kind == "acce" else pdr.GYRO_COLUMNS
-        df = df.rename(columns=rename_map)
+        df = self._normalize_sensor_csv(df, sensor_kind)
 
         required_columns = {"x", "y", "z"}
         missing_columns = required_columns - set(df.columns)
         if missing_columns:
             missing = ", ".join(sorted(missing_columns))
-            msg = f"{sensor_kind} csv missing required columns: {missing}"
+            available = ", ".join(str(column) for column in df.columns)
+            msg = (
+                f"{sensor_kind} csv missing required columns: {missing}; "
+                f"available columns: {available}"
+            )
             raise ValueError(msg)
 
         return df
+
+    def _normalize_sensor_csv(
+        self,
+        df: pd.DataFrame,
+        sensor_kind: SensorKind,
+    ) -> pd.DataFrame:
+        df = df.rename(columns=lambda column: str(column).strip())
+        normalized = pd.DataFrame()
+
+        time_column = self._find_column(df, SENSOR_COLUMN_ALIASES[sensor_kind]["t"])
+        if time_column is not None:
+            normalized["t"] = pd.to_numeric(df[time_column], errors="coerce")
+        elif "timestamp_ns" in df.columns:
+            timestamp_ns = pd.to_numeric(df["timestamp_ns"], errors="coerce")
+            normalized["t"] = (timestamp_ns - timestamp_ns.iloc[0]) / 1_000_000_000
+        elif "wall_time_ms" in df.columns:
+            wall_time_ms = pd.to_numeric(df["wall_time_ms"], errors="coerce")
+            normalized["t"] = (wall_time_ms - wall_time_ms.iloc[0]) / 1_000
+
+        for column_name in ("x", "y", "z"):
+            source_column = self._find_column(
+                df,
+                SENSOR_COLUMN_ALIASES[sensor_kind][column_name],
+            )
+            if source_column is not None:
+                normalized[column_name] = pd.to_numeric(
+                    df[source_column],
+                    errors="coerce",
+                )
+
+        return normalized
+
+    def _find_column(
+        self,
+        df: pd.DataFrame,
+        candidates: tuple[str, ...],
+    ) -> str | None:
+        for candidate in candidates:
+            if candidate in df.columns:
+                return candidate
+        return None
 
     def _analyze_to_csv(
         self,

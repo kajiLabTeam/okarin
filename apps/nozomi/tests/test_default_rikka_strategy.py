@@ -126,3 +126,43 @@ def test_default_rikka_strategy_runs_pdr_uploads_result_and_marks_completed(
     }
     assert list(process_sensor_data_calls[0][0].columns) == ["t", "x", "y", "z"]
     assert list(process_sensor_data_calls[0][1].columns) == ["t", "x", "y", "z"]
+
+
+def test_default_rikka_strategy_normalizes_mobile_sensor_headers() -> None:
+    strategy = DefaultRikkaStrategy()
+    acce_df = pd.DataFrame(
+        {
+            "timestamp_ns": [1_000_000_000, 1_020_000_000],
+            "wall_time_ms": [10_000, 10_020],
+            "x(m/s^2)": [1.0, 1.1],
+            "y(m/s^2)": [2.0, 2.1],
+            "z(m/s^2)": [3.0, 3.1],
+        }
+    )
+    gyro_df = pd.DataFrame(
+        {
+            "timestamp_ns": [1_000_000_000, 1_020_000_000],
+            "wall_time_ms": [10_000, 10_020],
+            "x(rad/s)": [0.1, 0.11],
+            "y(rad/s)": [0.2, 0.21],
+            "z(rad/s)": [0.3, 0.31],
+        }
+    )
+
+    normalized_acce = strategy._normalize_sensor_csv(acce_df, "acce")
+    normalized_gyro = strategy._normalize_sensor_csv(gyro_df, "gyro")
+
+    assert list(normalized_acce.columns) == ["t", "x", "y", "z"]
+    assert list(normalized_gyro.columns) == ["t", "x", "y", "z"]
+    assert normalized_acce.to_dict("list") == {
+        "t": [0.0, 0.02],
+        "x": [1.0, 1.1],
+        "y": [2.0, 2.1],
+        "z": [3.0, 3.1],
+    }
+    assert normalized_gyro.to_dict("list") == {
+        "t": [0.0, 0.02],
+        "x": [0.1, 0.11],
+        "y": [0.2, 0.21],
+        "z": [0.3, 0.31],
+    }
