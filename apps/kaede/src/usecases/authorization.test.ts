@@ -5,6 +5,7 @@ import {
   requireOrganizationManager,
   requireOrganizationOwner,
   requireRecordingAccess,
+  requireUserDashboardWriteAccess,
 } from './authorization.js'
 
 const organizationId = '99999999-9999-4999-8999-999999999999'
@@ -142,6 +143,43 @@ describe('requireRecordingAccess', () => {
 })
 
 describe('organization role helpers', () => {
+  it('user dashboard write は service client と member を拒否し manager/owner/admin を許可する', () => {
+    expect(
+      requireUserDashboardWriteAccess(
+        { type: 'service_client', name: 'shared_token' },
+        organizationId
+      )
+    ).toEqual({ ok: false, error: { type: 'AUTH_DASHBOARD_FORBIDDEN' } })
+    expect(requireUserDashboardWriteAccess(userActor(), organizationId)).toEqual({
+      ok: false,
+      error: { type: 'AUTH_DASHBOARD_FORBIDDEN' },
+    })
+
+    for (const role of ['manager', 'owner'] as const) {
+      expect(
+        requireUserDashboardWriteAccess(
+          userActor({
+            memberships: [
+              {
+                organization_id: organizationId,
+                organization_name: 'Test Organization',
+                role,
+              },
+            ],
+          }),
+          organizationId
+        )
+      ).toEqual({ ok: true })
+    }
+
+    expect(
+      requireUserDashboardWriteAccess(
+        userActor({ global_role: 'admin', memberships: [] }),
+        otherOrganizationId
+      )
+    ).toEqual({ ok: true })
+  })
+
   it('owner は manager 以上の権限を通過する', () => {
     expect(
       requireOrganizationManager(

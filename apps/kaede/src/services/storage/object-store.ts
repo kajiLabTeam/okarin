@@ -1,5 +1,6 @@
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
@@ -88,6 +89,39 @@ export const doesTrajectoryAnalyzedResultObjectExist = async (trajectoryId: stri
       (error.name === 'NotFound' || error.name === 'NoSuchKey')
     ) {
       return false
+    }
+
+    throw error
+  }
+}
+
+export const getTrajectoryAnalyzedResultObjectText = async (
+  trajectoryId: string
+): Promise<string | undefined> => {
+  const expectedKey = buildTrajectoryAnalyzedResultObjectKey(trajectoryId)
+  const { config, internalClient } = getS3Context()
+
+  try {
+    const response = await internalClient.send(
+      new GetObjectCommand({
+        Bucket: config.bucket,
+        Key: expectedKey,
+      })
+    )
+
+    if (!response.Body) {
+      return ''
+    }
+
+    return await response.Body.transformToString()
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      (error.name === 'NotFound' || error.name === 'NoSuchKey')
+    ) {
+      return undefined
     }
 
     throw error

@@ -221,6 +221,8 @@ describe('createApp auth wiring', { timeout: 60_000 }, () => {
       ['/api/pedestrians/me', 'get'],
       ['/api/pedestrians/me/recordings', 'get'],
       ['/api/recordings/{recordingId}', 'get'],
+      ['/api/recordings/{recordingId}/constraints', 'get'],
+      ['/api/recordings/{recordingId}/constraints', 'put'],
     ] as const
 
     for (const [path, method] of expectedPaths) {
@@ -268,10 +270,20 @@ describe('createApp auth wiring', { timeout: 60_000 }, () => {
       ['/api/pedestrians', 'get', '403'],
       ['/api/pedestrians', 'post', '403'],
       ['/api/recordings/{recordingId}', 'get', '403'],
+      ['/api/recordings/{recordingId}/trajectories', 'get', '403'],
       ['/api/recordings/init', 'post', '403'],
       ['/api/recordings/{recordingId}/complete-upload', 'post', '403'],
       ['/api/recordings/{recordingId}/refresh-upload-urls', 'post', '403'],
       ['/api/recordings/{recordingId}/trajectories', 'post', '403'],
+      ['/api/trajectories/{trajectoryId}', 'get', '403'],
+      ['/api/trajectories/{trajectoryId}/map-data', 'get', '400'],
+      ['/api/trajectories/{trajectoryId}/map-data', 'get', '403'],
+      ['/api/trajectories/{trajectoryId}/map-data', 'get', '404'],
+      ['/api/trajectories/{trajectoryId}/map-data', 'get', '409'],
+      ['/api/trajectories/{trajectoryId}/map-data', 'get', '422'],
+      ['/api/trajectories/{trajectoryId}/result', 'get', '403'],
+      ['/api/trajectories/{trajectoryId}/result', 'get', '404'],
+      ['/api/trajectories/{trajectoryId}/result', 'get', '409'],
     ] as const
 
     for (const [path, method, status] of expectedErrorResponses) {

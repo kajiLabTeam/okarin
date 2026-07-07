@@ -8,6 +8,7 @@ import {
   uploadTargetsSchema,
   uuidSchema,
 } from './common.js'
+import { trajectoryConstraintsSchema } from './trajectories.js'
 
 const uploadUrlsSchema = z.object({
   acce: z.string().url().optional().openapi({ description: '加速度センサ用のアップロード URL' }),
@@ -44,6 +45,9 @@ export const initRecordingRequestSchema = z.object({
   upload_targets: uploadTargetsSchema.openapi({
     description: '初回アップロードで要求するセンサデータの一覧',
   }),
+  constraints: trajectoryConstraintsSchema.optional().openapi({
+    description: 'recording のデフォルト解析条件',
+  }),
 })
 
 export const initRecordingResponseSchema = z.object({
@@ -60,6 +64,17 @@ export const initRecordingResponseSchema = z.object({
   expires_at: isoDatetimeSchema.openapi({
     description: 'アップロード URL の有効期限',
   }),
+})
+
+export const updateRecordingConstraintsRequestSchema = z.object({
+  constraints: trajectoryConstraintsSchema,
+})
+
+export const recordingConstraintsResponseSchema = z.object({
+  recording_id: uuidSchema.openapi({
+    description: 'recording の ID',
+  }),
+  constraints: trajectoryConstraintsSchema,
 })
 
 export const completeUploadResponseSchema = z.object({
@@ -188,5 +203,10 @@ export const recordingGroundTruthCompleteResponseSchema = z.object({
 
 export type InitRecordingRequest = z.infer<typeof initRecordingRequestSchema>
 export type RecordingIdParams = z.infer<typeof recordingIdParamsSchema>
+export type RecordingConstraintsResponse = z.infer<typeof recordingConstraintsResponseSchema>
+export type UpdateRecordingConstraintsRequest = z.infer<
+  typeof updateRecordingConstraintsRequestSchema
+>
 export type RecordingDetailResponse = z.infer<typeof recordingDetailResponseSchema>
+export type RecordingTrajectoriesResponse = z.infer<typeof recordingTrajectoriesResponseSchema>
 export type RefreshUploadUrlsRequest = z.infer<typeof refreshUploadUrlsRequestSchema>

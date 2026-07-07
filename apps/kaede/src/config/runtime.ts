@@ -56,6 +56,7 @@ export interface StorageRuntimeConfig {
   recordingUploadUrlTtlSeconds: number
   secretAccessKey: string
   trajectoryRawDownloadUrlTtlSeconds: number
+  trajectoryResultDownloadUrlTtlSeconds: number
   trajectoryResultUploadUrlTtlSeconds: number
 }
 
@@ -235,6 +236,10 @@ export const getStorageRuntimeConfig = (): StorageRuntimeConfig => {
     secretAccessKey: getRequiredEnv('S3_SECRET_ACCESS_KEY'),
     trajectoryRawDownloadUrlTtlSeconds: parsePositiveIntegerEnv(
       'S3_TRAJECTORY_RAW_DOWNLOAD_URL_TTL_SECONDS',
+      defaultTrajectoryPresignTtlSeconds
+    ),
+    trajectoryResultDownloadUrlTtlSeconds: parsePositiveIntegerEnv(
+      'S3_TRAJECTORY_RESULT_DOWNLOAD_URL_TTL_SECONDS',
       defaultTrajectoryPresignTtlSeconds
     ),
     trajectoryResultUploadUrlTtlSeconds: parsePositiveIntegerEnv(

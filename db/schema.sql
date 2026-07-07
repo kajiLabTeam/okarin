@@ -47,7 +47,7 @@ CREATE TABLE public.auth_identities (
     hosted_domain text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT auth_identities_provider_chk CHECK ((provider = ANY (ARRAY['google'::text])))
+    CONSTRAINT auth_identities_provider_chk CHECK ((provider = 'google'::text))
 );
 
 
@@ -85,36 +85,6 @@ CREATE TABLE public.floors (
 
 
 --
--- Name: organization_memberships; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.organization_memberships (
-    organization_id uuid NOT NULL,
-    user_id uuid NOT NULL,
-    role text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT organization_memberships_role_chk CHECK ((role = ANY (ARRAY['member'::text, 'manager'::text, 'owner'::text])))
-);
-
-
---
--- Name: organizations; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.organizations (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    name text NOT NULL,
-    slug text DEFAULT ('org-'::text || replace((gen_random_uuid())::text, '-'::text, ''::text)) NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT organizations_name_nonempty_chk CHECK ((length(btrim(name)) > 0)),
-    CONSTRAINT organizations_slug_format_chk CHECK (((slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text) AND (length(slug) >= 3) AND (length(slug) <= 63))),
-    CONSTRAINT organizations_slug_reserved_chk CHECK ((slug <> ALL (ARRAY['admin'::text, 'api'::text, 'auth'::text, 'platform'::text, 'new'::text, 'settings'::text])))
-);
-
-
---
 -- Name: organization_creation_requests; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -132,7 +102,7 @@ CREATE TABLE public.organization_creation_requests (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT organization_creation_requests_approved_organization_chk CHECK ((((status = 'approved'::text) AND (created_organization_id IS NOT NULL)) OR ((status <> 'approved'::text) AND (created_organization_id IS NULL)))),
     CONSTRAINT organization_creation_requests_name_nonempty_chk CHECK ((length(btrim(requested_organization_name)) > 0)),
-    CONSTRAINT organization_creation_requests_requested_slug_format_chk CHECK (((requested_slug IS NULL) OR ((requested_slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text) AND (length(requested_slug) >= 3) AND (length(requested_slug) <= 63) AND (requested_slug <> ALL (ARRAY['admin'::text, 'api'::text, 'auth'::text, 'platform'::text, 'new'::text, 'settings'::text]))))),
+    CONSTRAINT organization_creation_requests_requested_slug_format_chk CHECK (((requested_slug IS NULL) OR ((requested_slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text) AND ((length(requested_slug) >= 3) AND (length(requested_slug) <= 63)) AND (requested_slug <> ALL (ARRAY['admin'::text, 'api'::text, 'auth'::text, 'platform'::text, 'new'::text, 'settings'::text]))))),
     CONSTRAINT organization_creation_requests_reviewed_state_chk CHECK ((((status = 'pending'::text) AND (reviewed_by_user_id IS NULL) AND (reviewed_at IS NULL)) OR ((status = ANY (ARRAY['approved'::text, 'rejected'::text])) AND (reviewed_by_user_id IS NOT NULL) AND (reviewed_at IS NOT NULL)))),
     CONSTRAINT organization_creation_requests_status_chk CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])))
 );
@@ -181,6 +151,36 @@ CREATE TABLE public.organization_invites (
 
 
 --
+-- Name: organization_memberships; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_memberships (
+    organization_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    role text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organization_memberships_role_chk CHECK ((role = ANY (ARRAY['member'::text, 'manager'::text, 'owner'::text])))
+);
+
+
+--
+-- Name: organizations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organizations (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    slug text DEFAULT ('org-'::text || replace((gen_random_uuid())::text, '-'::text, ''::text)) NOT NULL,
+    CONSTRAINT organizations_name_nonempty_chk CHECK ((length(btrim(name)) > 0)),
+    CONSTRAINT organizations_slug_format_chk CHECK (((slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text) AND ((length(slug) >= 3) AND (length(slug) <= 63)))),
+    CONSTRAINT organizations_slug_reserved_chk CHECK ((slug <> ALL (ARRAY['admin'::text, 'api'::text, 'auth'::text, 'platform'::text, 'new'::text, 'settings'::text])))
+);
+
+
+--
 -- Name: pedestrians; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -212,6 +212,8 @@ CREATE TABLE public.recordings (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     deleted_at timestamp with time zone,
     organization_id uuid NOT NULL,
+    constraints jsonb DEFAULT '[]'::jsonb NOT NULL,
+    CONSTRAINT recordings_constraints_array_check CHECK ((jsonb_typeof(constraints) = 'array'::text)),
     CONSTRAINT recordings_upload_status_chk CHECK ((upload_status = ANY (ARRAY['accepted'::text, 'ready'::text, 'failed'::text]))),
     CONSTRAINT recordings_upload_targets_nonempty_chk CHECK ((cardinality(upload_targets) >= 1))
 );
@@ -234,11 +236,11 @@ CREATE TABLE public.sessions (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     user_id uuid NOT NULL,
     session_hash text NOT NULL,
-    auth_method text DEFAULT 'password'::text NOT NULL,
     expires_at timestamp with time zone NOT NULL,
     revoked_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     last_seen_at timestamp with time zone,
+    auth_method text DEFAULT 'password'::text NOT NULL,
     CONSTRAINT sessions_auth_method_chk CHECK ((auth_method = ANY (ARRAY['password'::text, 'oidc'::text]))),
     CONSTRAINT sessions_session_hash_nonempty_chk CHECK ((length(btrim(session_hash)) > 0))
 );
@@ -260,29 +262,28 @@ CREATE TABLE public.trajectories (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     deleted_at timestamp with time zone,
     organization_id uuid NOT NULL,
+    constraints jsonb DEFAULT '[]'::jsonb NOT NULL,
+    CONSTRAINT trajectories_constraints_array_check CHECK ((jsonb_typeof(constraints) = 'array'::text)),
     CONSTRAINT trajectories_failed_at_chk CHECK ((((status = 'failed'::text) AND (failed_at IS NOT NULL)) OR ((status <> 'failed'::text) AND (failed_at IS NULL)))),
     CONSTRAINT trajectories_status_chk CHECK ((status = ANY (ARRAY['accepted'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
 );
 
 
 --
--- Name: trajectory_constraints; Type: TABLE; Schema: public; Owner: -
+-- Name: user_activation_tokens; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.trajectory_constraints (
-    trajectory_id uuid NOT NULL,
-    seq integer NOT NULL,
-    point_type text NOT NULL,
-    x double precision NOT NULL,
-    y double precision NOT NULL,
-    direction double precision,
-    relative_timestamp integer,
+CREATE TABLE public.user_activation_tokens (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    token_hash text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    used_at timestamp with time zone,
+    revoked_at timestamp with time zone,
+    created_by_user_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT trajectory_constraints_point_type_chk CHECK ((point_type = ANY (ARRAY['start'::text, 'waypoint'::text, 'goal'::text]))),
-    CONSTRAINT trajectory_constraints_point_type_timestamp_chk CHECK ((((point_type = 'waypoint'::text) AND (relative_timestamp IS NOT NULL)) OR ((point_type = ANY (ARRAY['start'::text, 'goal'::text])) AND (relative_timestamp IS NULL)))),
-    CONSTRAINT trajectory_constraints_relative_timestamp_chk CHECK (((relative_timestamp IS NULL) OR (relative_timestamp >= 0))),
-    CONSTRAINT trajectory_constraints_seq_chk CHECK ((seq >= 0))
+    CONSTRAINT user_activation_tokens_token_hash_nonempty_chk CHECK ((length(btrim(token_hash)) > 0))
 );
 
 
@@ -304,27 +305,9 @@ CREATE TABLE public.users (
     status text NOT NULL,
     CONSTRAINT users_display_name_nonempty_chk CHECK ((length(btrim(display_name)) > 0)),
     CONSTRAINT users_email_nonempty_chk CHECK ((length(btrim(email)) > 0)),
-    CONSTRAINT users_password_hash_nonempty_chk CHECK (((password_hash IS NULL) OR (length(btrim(password_hash)) > 0))),
     CONSTRAINT users_global_role_chk CHECK ((global_role = ANY (ARRAY['none'::text, 'admin'::text]))),
+    CONSTRAINT users_password_hash_nonempty_chk CHECK (((password_hash IS NULL) OR (length(btrim(password_hash)) > 0))),
     CONSTRAINT users_status_chk CHECK ((status = ANY (ARRAY['pending_activation'::text, 'active'::text, 'disabled'::text])))
-);
-
-
---
--- Name: user_activation_tokens; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.user_activation_tokens (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    user_id uuid NOT NULL,
-    organization_id uuid NOT NULL,
-    token_hash text NOT NULL,
-    expires_at timestamp with time zone NOT NULL,
-    used_at timestamp with time zone,
-    revoked_at timestamp with time zone,
-    created_by_user_id uuid NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT user_activation_tokens_token_hash_nonempty_chk CHECK ((length(btrim(token_hash)) > 0))
 );
 
 
@@ -358,14 +341,6 @@ ALTER TABLE ONLY public.buildings
 
 ALTER TABLE ONLY public.floors
     ADD CONSTRAINT floors_pkey PRIMARY KEY (id);
-
-
---
--- Name: organization_memberships organization_memberships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_memberships
-    ADD CONSTRAINT organization_memberships_pkey PRIMARY KEY (organization_id, user_id);
 
 
 --
@@ -409,19 +384,11 @@ ALTER TABLE ONLY public.organization_invites
 
 
 --
--- Name: user_activation_tokens user_activation_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: organization_memberships organization_memberships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.user_activation_tokens
-    ADD CONSTRAINT user_activation_tokens_pkey PRIMARY KEY (id);
-
-
---
--- Name: user_activation_tokens user_activation_tokens_token_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.user_activation_tokens
-    ADD CONSTRAINT user_activation_tokens_token_hash_key UNIQUE (token_hash);
+ALTER TABLE ONLY public.organization_memberships
+    ADD CONSTRAINT organization_memberships_pkey PRIMARY KEY (organization_id, user_id);
 
 
 --
@@ -497,11 +464,19 @@ ALTER TABLE ONLY public.trajectories
 
 
 --
--- Name: trajectory_constraints trajectory_constraints_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: user_activation_tokens user_activation_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trajectory_constraints
-    ADD CONSTRAINT trajectory_constraints_pkey PRIMARY KEY (trajectory_id, seq);
+ALTER TABLE ONLY public.user_activation_tokens
+    ADD CONSTRAINT user_activation_tokens_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: user_activation_tokens user_activation_tokens_token_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_activation_tokens
+    ADD CONSTRAINT user_activation_tokens_token_hash_key UNIQUE (token_hash);
 
 
 --
@@ -553,13 +528,6 @@ CREATE INDEX floors_building_id_idx ON public.floors USING btree (building_id);
 --
 
 CREATE INDEX floors_organization_id_idx ON public.floors USING btree (organization_id);
-
-
---
--- Name: organization_memberships_user_id_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX organization_memberships_user_id_idx ON public.organization_memberships USING btree (user_id);
 
 
 --
@@ -619,38 +587,10 @@ CREATE INDEX organization_invites_organization_id_idx ON public.organization_inv
 
 
 --
--- Name: user_activation_tokens_created_by_user_id_idx; Type: INDEX; Schema: public; Owner: -
+-- Name: organization_memberships_user_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX user_activation_tokens_created_by_user_id_idx ON public.user_activation_tokens USING btree (created_by_user_id);
-
-
---
--- Name: user_activation_tokens_expires_at_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX user_activation_tokens_expires_at_idx ON public.user_activation_tokens USING btree (expires_at);
-
-
---
--- Name: user_activation_tokens_one_active_per_user; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX user_activation_tokens_one_active_per_user ON public.user_activation_tokens USING btree (user_id) WHERE ((used_at IS NULL) AND (revoked_at IS NULL));
-
-
---
--- Name: user_activation_tokens_organization_id_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX user_activation_tokens_organization_id_idx ON public.user_activation_tokens USING btree (organization_id);
-
-
---
--- Name: user_activation_tokens_user_id_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX user_activation_tokens_user_id_idx ON public.user_activation_tokens USING btree (user_id);
+CREATE INDEX organization_memberships_user_id_idx ON public.organization_memberships USING btree (user_id);
 
 
 --
@@ -724,14 +664,42 @@ CREATE INDEX trajectories_status_created_at_active_idx ON public.trajectories US
 
 
 --
--- Name: trajectory_constraints_trajectory_id_seq_idx; Type: INDEX; Schema: public; Owner: -
+-- Name: user_activation_tokens_created_by_user_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX trajectory_constraints_trajectory_id_seq_idx ON public.trajectory_constraints USING btree (trajectory_id, seq);
+CREATE INDEX user_activation_tokens_created_by_user_id_idx ON public.user_activation_tokens USING btree (created_by_user_id);
 
 
 --
--- Name: buildings set_updated_at_buildings; Type: TRIGGER; Schema: public; Owner: -
+-- Name: user_activation_tokens_expires_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX user_activation_tokens_expires_at_idx ON public.user_activation_tokens USING btree (expires_at);
+
+
+--
+-- Name: user_activation_tokens_one_active_per_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX user_activation_tokens_one_active_per_user ON public.user_activation_tokens USING btree (user_id) WHERE ((used_at IS NULL) AND (revoked_at IS NULL));
+
+
+--
+-- Name: user_activation_tokens_organization_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX user_activation_tokens_organization_id_idx ON public.user_activation_tokens USING btree (organization_id);
+
+
+--
+-- Name: user_activation_tokens_user_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX user_activation_tokens_user_id_idx ON public.user_activation_tokens USING btree (user_id);
+
+
+--
+-- Name: auth_identities set_updated_at_auth_identities; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER set_updated_at_auth_identities BEFORE UPDATE ON public.auth_identities FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
@@ -752,13 +720,6 @@ CREATE TRIGGER set_updated_at_floors BEFORE UPDATE ON public.floors FOR EACH ROW
 
 
 --
--- Name: organization_memberships set_updated_at_organization_memberships; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER set_updated_at_organization_memberships BEFORE UPDATE ON public.organization_memberships FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
-
-
---
 -- Name: organization_creation_requests set_updated_at_organization_creation_requests; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -770,6 +731,13 @@ CREATE TRIGGER set_updated_at_organization_creation_requests BEFORE UPDATE ON pu
 --
 
 CREATE TRIGGER set_updated_at_organization_invites BEFORE UPDATE ON public.organization_invites FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: organization_memberships set_updated_at_organization_memberships; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER set_updated_at_organization_memberships BEFORE UPDATE ON public.organization_memberships FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 
 --
@@ -801,13 +769,6 @@ CREATE TRIGGER set_updated_at_trajectories BEFORE UPDATE ON public.trajectories 
 
 
 --
--- Name: trajectory_constraints set_updated_at_trajectory_constraints; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER set_updated_at_trajectory_constraints BEFORE UPDATE ON public.trajectory_constraints FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
-
-
---
 -- Name: users set_updated_at_users; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -815,7 +776,7 @@ CREATE TRIGGER set_updated_at_users BEFORE UPDATE ON public.users FOR EACH ROW E
 
 
 --
--- Name: buildings buildings_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: auth_identities auth_identities_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.auth_identities
@@ -844,22 +805,6 @@ ALTER TABLE ONLY public.floors
 
 ALTER TABLE ONLY public.floors
     ADD CONSTRAINT floors_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
-
-
---
--- Name: organization_memberships organization_memberships_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_memberships
-    ADD CONSTRAINT organization_memberships_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
-
-
---
--- Name: organization_memberships organization_memberships_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_memberships
-    ADD CONSTRAINT organization_memberships_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
 
 
 --
@@ -919,27 +864,19 @@ ALTER TABLE ONLY public.organization_invites
 
 
 --
--- Name: user_activation_tokens user_activation_tokens_created_by_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: organization_memberships organization_memberships_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.user_activation_tokens
-    ADD CONSTRAINT user_activation_tokens_created_by_user_id_fkey FOREIGN KEY (created_by_user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
-
-
---
--- Name: user_activation_tokens user_activation_tokens_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.user_activation_tokens
-    ADD CONSTRAINT user_activation_tokens_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
+ALTER TABLE ONLY public.organization_memberships
+    ADD CONSTRAINT organization_memberships_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
 
 
 --
--- Name: user_activation_tokens user_activation_tokens_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: organization_memberships organization_memberships_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.user_activation_tokens
-    ADD CONSTRAINT user_activation_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
+ALTER TABLE ONLY public.organization_memberships
+    ADD CONSTRAINT organization_memberships_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
 
 
 --
@@ -1015,11 +952,27 @@ ALTER TABLE ONLY public.trajectories
 
 
 --
--- Name: trajectory_constraints trajectory_constraints_trajectory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: user_activation_tokens user_activation_tokens_created_by_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trajectory_constraints
-    ADD CONSTRAINT trajectory_constraints_trajectory_id_fkey FOREIGN KEY (trajectory_id) REFERENCES public.trajectories(id) ON DELETE RESTRICT;
+ALTER TABLE ONLY public.user_activation_tokens
+    ADD CONSTRAINT user_activation_tokens_created_by_user_id_fkey FOREIGN KEY (created_by_user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: user_activation_tokens user_activation_tokens_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_activation_tokens
+    ADD CONSTRAINT user_activation_tokens_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: user_activation_tokens user_activation_tokens_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_activation_tokens
+    ADD CONSTRAINT user_activation_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
 
 
 --
@@ -1039,4 +992,10 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20260531160000'),
     ('20260610050000'),
     ('20260610060000'),
-    ('20260610070000');
+    ('20260610070000'),
+    ('20260610080000'),
+    ('20260616090000'),
+    ('20260616100000'),
+    ('20260623010000'),
+    ('20260626010000'),
+    ('20260708010000');

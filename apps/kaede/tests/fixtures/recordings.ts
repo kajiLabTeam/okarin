@@ -1,4 +1,5 @@
 import type { Kysely } from 'kysely'
+import type { TrajectoryConstraints } from '../../src/schemas/trajectories.js'
 import type { DB } from '../../src/services/db/generated.js'
 import { insertRecording } from '../../src/services/recordings/index.js'
 import type { RecordingStatus, UploadTarget } from '../../src/services/recordings/types.js'
@@ -10,6 +11,7 @@ export interface CreateRecordingFixtureParams {
   floorLevel?: number
   floorName?: string
   organizationName?: string
+  constraints?: TrajectoryConstraints
 }
 
 export const createRecordingFixture = async (
@@ -23,6 +25,7 @@ export const createRecordingFixture = async (
     floorLevel = 3,
     floorName = `${floorLevel}F`,
     organizationName = 'Fixture Organization',
+    constraints = [],
   } = params
 
   const organization = await db
@@ -66,6 +69,7 @@ export const createRecordingFixture = async (
       organization_id: organization.id,
       upload_status: uploadStatus,
       upload_targets: uploadTargets,
+      constraints,
     },
     db
   )

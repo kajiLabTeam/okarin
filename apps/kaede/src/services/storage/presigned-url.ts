@@ -207,3 +207,28 @@ export const issueInternalTrajectoryResultUploadUrl = async (
     objectKey,
   }
 }
+
+export const issueTrajectoryResultDownloadUrl = async (
+  trajectoryId: string,
+  now: Date = new Date()
+) => {
+  const { config, presignClient } = getS3Context()
+  const objectKey = buildTrajectoryAnalyzedResultObjectKey(trajectoryId)
+
+  const downloadUrl = await getSignedUrl(
+    presignClient,
+    new GetObjectCommand({
+      Bucket: config.bucket,
+      Key: objectKey,
+    }),
+    { expiresIn: config.trajectoryResultDownloadUrlTtlSeconds }
+  )
+
+  return {
+    downloadUrl,
+    expiresAt: new Date(
+      now.getTime() + config.trajectoryResultDownloadUrlTtlSeconds * 1000
+    ).toISOString(),
+    objectKey,
+  }
+}

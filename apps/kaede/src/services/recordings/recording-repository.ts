@@ -1,4 +1,5 @@
 import type { Insertable, Kysely, Selectable, Transaction, Updateable } from 'kysely'
+import type { TrajectoryConstraints } from '../../schemas/trajectories.js'
 import type { Recordings } from '../db/generated.js'
 import { db } from '../db/index.js'
 import type { DB } from '../db/index.js'
@@ -6,6 +7,9 @@ import type { DB } from '../db/index.js'
 type DbExecutor = Kysely<DB> | Transaction<DB>
 type Recording = Selectable<Recordings>
 type NewRecording = Insertable<Recordings>
+type NewRecordingInput = Omit<NewRecording, 'constraints'> & {
+  constraints?: TrajectoryConstraints
+}
 type RecordingUpdate = Updateable<Recordings>
 export type { Recording }
 
@@ -68,14 +72,15 @@ export const findRecordingAuthorizationById = async (
 }
 
 export const insertRecording = async (
-  newRecording: NewRecording,
+  newRecording: NewRecordingInput,
   executor: DbExecutor = db
 ): Promise<Recording> => {
-  return executor
-    .insertInto('recordings')
-    .values(newRecording)
-    .returningAll()
-    .executeTakeFirstOrThrow()
+  const values: NewRecording =
+    newRecording.constraints === undefined
+      ? newRecording
+      : { ...newRecording, constraints: JSON.stringify(newRecording.constraints) }
+
+  return executor.insertInto('recordings').values(values).returningAll().executeTakeFirstOrThrow()
 }
 
 export const updateRecording = async (
@@ -90,6 +95,14 @@ export const updateRecording = async (
     .where('deleted_at', 'is', null)
     .returningAll()
     .executeTakeFirst()
+}
+
+export const updateRecordingConstraints = async (
+  recordingId: string,
+  constraints: TrajectoryConstraints,
+  executor: DbExecutor = db
+): Promise<Recording | undefined> => {
+  return updateRecording(recordingId, { constraints: JSON.stringify(constraints) }, executor)
 }
 
 export const markRecordingUploadReady = async (

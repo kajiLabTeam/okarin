@@ -1,11 +1,11 @@
 export {
   findTrajectoryById,
   insertTrajectory,
-  insertTrajectoryConstraints,
-  insertTrajectoryWithConstraints,
+  listTrajectoriesByRecordingId,
   markTrajectoryCompleted,
   markTrajectoryFailed,
   markTrajectoryProcessing,
   updateTrajectory,
 } from './trajectory-repository.js'
+export type { Trajectory } from './trajectory-repository.js'
 export { generateCallbackToken, verifyCallbackToken } from './callback-token.js'

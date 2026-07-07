@@ -11,7 +11,6 @@ export const resetDatabase = async (db: Kysely<DB>) => {
       organization_creation_requests,
       auth_identities,
       organization_memberships,
-      trajectory_constraints,
       trajectories,
       recordings,
       pedestrians,

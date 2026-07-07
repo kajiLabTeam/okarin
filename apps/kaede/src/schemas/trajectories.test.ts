@@ -8,9 +8,12 @@ import {
   createTrajectoryResponseSchema,
   createTrajectoryRequestSchema,
   retriedTrajectoryResponseSchema,
+  trajectoryResultResponseSchema,
   trajectoryStatusResponseSchema,
   trajectoryMapDataQuerySchema,
+  trajectoryMapDataResponseSchema,
   trajectoryIdParamsSchema,
+  trajectoryConstraintsSchema,
   batchTrajectoryMapDataRequestSchema,
 } from './trajectories.js'
 
@@ -19,6 +22,19 @@ describe('trajectory schemas', () => {
     const result = createTrajectoryRequestSchema.safeParse({})
 
     expect(result.success).toBe(true)
+    expect(result.data?.constraints).toBeUndefined()
+  })
+
+  it('createTrajectoryRequestSchema は null の constraints を拒否する', () => {
+    const result = createTrajectoryRequestSchema.safeParse({ constraints: null })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('trajectoryConstraintsSchema は空配列を受け入れる', () => {
+    const result = trajectoryConstraintsSchema.safeParse([])
+
+    expect(result).toEqual({ success: true, data: [] })
   })
 
   it('createTrajectoryResponseSchema は organization_id を含むレスポンスを受け入れる', () => {
@@ -46,6 +62,16 @@ describe('trajectory schemas', () => {
     expect(result.success).toBe(true)
   })
 
+  it('trajectoryResultResponseSchema は download_url を含むレスポンスを受け入れる', () => {
+    const result = trajectoryResultResponseSchema.safeParse({
+      trajectory_id: '33333333-3333-4333-8333-333333333333',
+      download_url: 'https://storage.example.test/result.csv',
+      expires_at: '2026-05-13T00:00:00.000Z',
+    })
+
+    expect(result.success).toBe(true)
+  })
+
   it('retriedTrajectoryResponseSchema は organization_id を含むレスポンスを受け入れる', () => {
     const result = retriedTrajectoryResponseSchema.safeParse({
       source_trajectory_id: '33333333-3333-4333-8333-333333333333',
@@ -63,7 +89,7 @@ describe('trajectory schemas', () => {
       constraints: [],
     })
 
-    expect(result.success).toBe(true)
+    expect(result).toEqual({ success: true, data: { constraints: [] } })
   })
 
   it('cloneAndReanalyzeRequestSchema は空の constraints を拒否する', () => {
@@ -282,6 +308,23 @@ describe('trajectory schemas', () => {
   it('trajectoryMapDataQuerySchema は data_type を必須とする', () => {
     const result = trajectoryMapDataQuerySchema.safeParse({
       data_type: 'analyzed',
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('trajectoryMapDataResponseSchema は描画用pointsを受け入れる', () => {
+    const result = trajectoryMapDataResponseSchema.safeParse({
+      trajectory_id: '33333333-3333-4333-8333-333333333333',
+      floor_id: '11111111-1111-4111-8111-111111111111',
+      data_type: 'analyzed',
+      points: [
+        {
+          timestamp: 0,
+          x: 10,
+          y: 20,
+        },
+      ],
     })
 
     expect(result.success).toBe(true)
