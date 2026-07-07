@@ -123,31 +123,117 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
     expect(created.error_code).toBeNull()
     expect(created.error_message).toBeNull()
 
-    const constraints = await db
-      .selectFrom('trajectory_constraints')
-      .selectAll()
-      .where('trajectory_id', '=', body.trajectory_id)
-      .orderBy('seq', 'asc')
-      .execute()
-
-    expect(constraints).toHaveLength(2)
-    expect(constraints[0]).toMatchObject({
-      point_type: 'start',
-      seq: 0,
-      x: 12.34,
-      y: 56.78,
-      direction: 90,
-      relative_timestamp: null,
-    })
-    expect(constraints[1]).toMatchObject({
-      point_type: 'waypoint',
-      seq: 1,
-      x: 18.2,
-      y: 60.1,
-      relative_timestamp: 12000,
-    })
+    expect(created.constraints).toEqual([
+      {
+        point_type: 'start',
+        seq: 0,
+        x: 12.34,
+        y: 56.78,
+        direction: 90,
+      },
+      {
+        point_type: 'waypoint',
+        seq: 1,
+        x: 18.2,
+        y: 60.1,
+        relative_timestamp: 12000,
+      },
+    ])
 
     expect(submitAnalyzeRequestMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('body constraints 省略時は recording constraints を snapshot に使う', async () => {
+    const constraints = [{ seq: 0, point_type: 'start' as const, x: 10, y: 20, direction: 45 }]
+    const { recordingId } = await createRecordingFixture(db, {
+      uploadStatus: 'ready',
+      uploadTargets: ['acce', 'gyro'],
+      constraints,
+    })
+    submitAnalyzeRequestMock.mockImplementation((payload: { trajectory_id: string }) => ({
+      trajectory_id: payload.trajectory_id,
+      status: 'accepted',
+    }))
+
+    const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
+      method: 'POST',
+      headers: { ...authHeaders, 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+
+    expect(response.status).toBe(201)
+    const body = createTrajectoryResponseSchema.parse(await response.json())
+    const created = await db
+      .selectFrom('trajectories')
+      .select(['constraints'])
+      .where('id', '=', body.trajectory_id)
+      .executeTakeFirstOrThrow()
+    expect(created.constraints).toEqual(constraints)
+    expect(submitAnalyzeRequestMock).toHaveBeenCalledWith(expect.objectContaining({ constraints }))
+  })
+
+  it('body constraints が空配列なら recording constraints を使用しない', async () => {
+    const { recordingId } = await createRecordingFixture(db, {
+      uploadStatus: 'ready',
+      uploadTargets: ['acce', 'gyro'],
+      constraints: [{ seq: 0, point_type: 'start', x: 10, y: 20 }],
+    })
+    submitAnalyzeRequestMock.mockImplementation((payload: { trajectory_id: string }) => ({
+      trajectory_id: payload.trajectory_id,
+      status: 'accepted',
+    }))
+
+    const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
+      method: 'POST',
+      headers: { ...authHeaders, 'content-type': 'application/json' },
+      body: JSON.stringify({ constraints: [] }),
+    })
+
+    expect(response.status).toBe(201)
+    const body = createTrajectoryResponseSchema.parse(await response.json())
+    const created = await db
+      .selectFrom('trajectories')
+      .select(['constraints'])
+      .where('id', '=', body.trajectory_id)
+      .executeTakeFirstOrThrow()
+    expect(created.constraints).toEqual([])
+    expect(submitAnalyzeRequestMock).toHaveBeenCalledWith(
+      expect.objectContaining({ constraints: [] })
+    )
+  })
+
+  it('fallback の recording constraints が不正なら 500 を返して Nozomi を呼ばない', async () => {
+    const { recordingId } = await createRecordingFixture(db, {
+      uploadStatus: 'ready',
+      uploadTargets: ['acce', 'gyro'],
+    })
+    await db
+      .updateTable('recordings')
+      .set({
+        constraints: JSON.stringify([{ seq: 1, point_type: 'start', x: 10, y: 20 }]),
+      })
+      .where('id', '=', recordingId)
+      .execute()
+
+    const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
+      method: 'POST',
+      headers: { ...authHeaders, 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+
+    expect(response.status).toBe(500)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'RECORDING_CONSTRAINTS_INVALID',
+      error_message: 'recording constraints contain invalid values',
+      details: { recording_id: recordingId },
+    })
+    expect(submitAnalyzeRequestMock).not.toHaveBeenCalled()
+    const trajectories = await db
+      .selectFrom('trajectories')
+      .select(['id'])
+      .where('recording_id', '=', recordingId)
+      .execute()
+    expect(trajectories).toEqual([])
   })
 
   it('ready でない recording は 409 を返す', async () => {

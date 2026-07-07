@@ -98,12 +98,44 @@ describe('initRecording', () => {
       floor_id: floorId,
       organization_id: organizationId,
       upload_targets: ['acce', 'gyro', 'metadata'],
+      constraints: [],
     })
     expect(issueRecordingUploadUrlsMock).toHaveBeenCalledWith(organizationId, recordingId, [
       'acce',
       'gyro',
       'metadata',
     ])
+  })
+
+  it('指定された constraints を recording に保存する', async () => {
+    const pedestrianId = '11111111-1111-4111-8111-111111111111'
+    const floorId = '22222222-2222-4222-8222-222222222222'
+    const recordingId = '33333333-3333-4333-8333-333333333333'
+    const organizationId = '99999999-9999-4999-8999-999999999999'
+    const constraints = [{ seq: 0, point_type: 'start' as const, x: 12, y: 34, direction: 90 }]
+
+    mockEntityLookups({
+      pedestrian: { id: pedestrianId, organization_id: organizationId },
+      floor: { id: floorId, organization_id: organizationId },
+    })
+    insertRecordingMock.mockResolvedValue({
+      id: recordingId,
+      organization_id: organizationId,
+      upload_status: 'accepted',
+    })
+    issueRecordingUploadUrlsMock.mockResolvedValue({
+      expiresAt: '2026-05-13T00:15:00.000Z',
+      uploadUrls: {},
+    })
+
+    await initRecording(serviceClientActor, {
+      pedestrian_id: pedestrianId,
+      floor_id: floorId,
+      upload_targets: ['acce', 'gyro'],
+      constraints,
+    })
+
+    expect(insertRecordingMock).toHaveBeenCalledWith(expect.objectContaining({ constraints }))
   })
 
   it('pedestrian が存在しなければ PEDESTRIAN_NOT_FOUND を返す', async () => {

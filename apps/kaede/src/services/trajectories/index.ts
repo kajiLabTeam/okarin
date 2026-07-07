@@ -1,8 +1,6 @@
 export {
   findTrajectoryById,
   insertTrajectory,
-  insertTrajectoryConstraints,
-  insertTrajectoryWithConstraints,
   listTrajectoriesByRecordingId,
   markTrajectoryCompleted,
   markTrajectoryFailed,

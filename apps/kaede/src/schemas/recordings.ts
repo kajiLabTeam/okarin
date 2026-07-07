@@ -8,6 +8,7 @@ import {
   uploadTargetsSchema,
   uuidSchema,
 } from './common.js'
+import { trajectoryConstraintsSchema } from './trajectories.js'
 
 const uploadUrlsSchema = z.object({
   acce: z.string().url().optional().openapi({ description: '加速度センサ用のアップロード URL' }),
@@ -43,6 +44,9 @@ export const initRecordingRequestSchema = z.object({
   }),
   upload_targets: uploadTargetsSchema.openapi({
     description: '初回アップロードで要求するセンサデータの一覧',
+  }),
+  constraints: trajectoryConstraintsSchema.optional().openapi({
+    description: 'recording のデフォルト解析条件',
   }),
 })
 

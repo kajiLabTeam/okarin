@@ -126,6 +126,7 @@ export const initRecording = async (actor: RequestActor, payload: InitRecordingR
     floor_id: payload.floor_id,
     organization_id: pedestrian.organization_id,
     upload_targets: uploadTargets,
+    constraints: payload.constraints ?? [],
   })
   const { expiresAt, uploadUrls } = await issueRecordingUploadUrls(
     recording.organization_id,

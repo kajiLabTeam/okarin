@@ -82,6 +82,50 @@ describe('POST /api/recordings/init', () => {
     expect(created?.organization_id).toBe(organizationId)
     expect(created?.upload_status).toBe('accepted')
     expect(created?.upload_targets).toEqual(['acce', 'gyro', 'wifi', 'metadata'])
+    expect(created?.constraints).toEqual([])
+  })
+
+  it('指定された constraints を recording に保存する', async () => {
+    const { floorId, pedestrianId } = await createRecordingFixture(db)
+    const constraints = [{ seq: 0, point_type: 'start', x: 120, y: 300, direction: 90 }]
+
+    const response = await app.request('/api/recordings/init', {
+      method: 'POST',
+      headers: { ...authHeaders, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        pedestrian_id: pedestrianId,
+        floor_id: floorId,
+        upload_targets: ['acce', 'gyro'],
+        constraints,
+      }),
+    })
+
+    expect(response.status).toBe(201)
+    const body = initRecordingResponseSchema.parse(await response.json())
+    const created = await db
+      .selectFrom('recordings')
+      .select(['constraints'])
+      .where('id', '=', body.recording_id)
+      .executeTakeFirstOrThrow()
+
+    expect(created.constraints).toEqual(constraints)
+  })
+
+  it('constraints が null なら 400 を返す', async () => {
+    const { floorId, pedestrianId } = await createRecordingFixture(db)
+
+    const response = await app.request('/api/recordings/init', {
+      method: 'POST',
+      headers: { ...authHeaders, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        pedestrian_id: pedestrianId,
+        floor_id: floorId,
+        upload_targets: ['acce', 'gyro'],
+        constraints: null,
+      }),
+    })
+
+    expect(response.status).toBe(400)
   })
 
   it('存在しない pedestrian_id は 404 を返す', async () => {

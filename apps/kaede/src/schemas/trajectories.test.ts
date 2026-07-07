@@ -13,6 +13,7 @@ import {
   trajectoryMapDataQuerySchema,
   trajectoryMapDataResponseSchema,
   trajectoryIdParamsSchema,
+  trajectoryConstraintsSchema,
   batchTrajectoryMapDataRequestSchema,
 } from './trajectories.js'
 
@@ -21,6 +22,19 @@ describe('trajectory schemas', () => {
     const result = createTrajectoryRequestSchema.safeParse({})
 
     expect(result.success).toBe(true)
+    expect(result.data?.constraints).toBeUndefined()
+  })
+
+  it('createTrajectoryRequestSchema は null の constraints を拒否する', () => {
+    const result = createTrajectoryRequestSchema.safeParse({ constraints: null })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('trajectoryConstraintsSchema は空配列を受け入れる', () => {
+    const result = trajectoryConstraintsSchema.safeParse([])
+
+    expect(result).toEqual({ success: true, data: [] })
   })
 
   it('createTrajectoryResponseSchema は organization_id を含むレスポンスを受け入れる', () => {
@@ -75,7 +89,7 @@ describe('trajectory schemas', () => {
       constraints: [],
     })
 
-    expect(result.success).toBe(true)
+    expect(result).toEqual({ success: true, data: { constraints: [] } })
   })
 
   it('cloneAndReanalyzeRequestSchema は空の constraints を拒否する', () => {

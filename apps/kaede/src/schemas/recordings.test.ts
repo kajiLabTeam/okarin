@@ -20,6 +20,24 @@ describe('recording schemas', () => {
     })
 
     expect(result.success).toBe(true)
+    expect(result.data?.constraints).toBeUndefined()
+  })
+
+  it('initRecordingRequestSchema は constraints を受け入れ、null は拒否する', () => {
+    const input = {
+      pedestrian_id: '11111111-1111-4111-8111-111111111111',
+      floor_id: '22222222-2222-4222-8222-222222222222',
+      upload_targets: ['acce', 'gyro'],
+    }
+    const constraints = [{ seq: 0, point_type: 'start' as const, x: 10, y: 20 }]
+
+    expect(initRecordingRequestSchema.safeParse({ ...input, constraints })).toEqual({
+      success: true,
+      data: { ...input, constraints },
+    })
+    expect(initRecordingRequestSchema.safeParse({ ...input, constraints: null }).success).toBe(
+      false
+    )
   })
 
   it('initRecordingRequestSchema は必須センサーが不足した upload_targets を拒否する', () => {

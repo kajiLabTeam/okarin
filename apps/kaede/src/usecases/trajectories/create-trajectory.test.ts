@@ -6,7 +6,7 @@ const {
   findFloorByIdMock,
   findRecordingAuthorizationByIdMock,
   findRecordingByIdMock,
-  insertTrajectoryWithConstraintsMock,
+  insertTrajectoryMock,
   markTrajectoryFailedMock,
   markTrajectoryProcessingMock,
   issueInternalRecordingRawDownloadUrlsMock,
@@ -18,7 +18,7 @@ const {
   findFloorByIdMock: vi.fn(),
   findRecordingAuthorizationByIdMock: vi.fn(),
   findRecordingByIdMock: vi.fn(),
-  insertTrajectoryWithConstraintsMock: vi.fn(),
+  insertTrajectoryMock: vi.fn(),
   markTrajectoryFailedMock: vi.fn(),
   markTrajectoryProcessingMock: vi.fn(),
   issueInternalRecordingRawDownloadUrlsMock: vi.fn(),
@@ -42,7 +42,7 @@ vi.mock('../../services/floors/index.js', () => ({
 }))
 
 vi.mock('../../services/trajectories/index.js', () => ({
-  insertTrajectoryWithConstraints: insertTrajectoryWithConstraintsMock,
+  insertTrajectory: insertTrajectoryMock,
   markTrajectoryFailed: markTrajectoryFailedMock,
   markTrajectoryProcessing: markTrajectoryProcessingMock,
 }))
@@ -101,7 +101,7 @@ describe('createTrajectory', () => {
       pedestrian_id: '44444444-4444-4444-8444-444444444444',
       pedestrian_user_id: null,
     })
-    insertTrajectoryWithConstraintsMock.mockResolvedValue({
+    insertTrajectoryMock.mockResolvedValue({
       id: trajectoryId,
       recording_id: recordingId,
       floor_id: floorId,
@@ -149,15 +149,13 @@ describe('createTrajectory', () => {
         status: 'processing',
       },
     })
-    expect(insertTrajectoryWithConstraintsMock).toHaveBeenCalledWith(
-      {
-        recording_id: recordingId,
-        floor_id: floorId,
-        organization_id: organizationId,
-        status: 'accepted',
-      },
-      []
-    )
+    expect(insertTrajectoryMock).toHaveBeenCalledWith({
+      recording_id: recordingId,
+      floor_id: floorId,
+      organization_id: organizationId,
+      status: 'accepted',
+      constraints: [],
+    })
     expect(markTrajectoryProcessingMock).toHaveBeenCalledWith(trajectoryId)
     expect(submitAnalyzeRequestMock).toHaveBeenCalledWith({
       trajectory_id: trajectoryId,
@@ -191,7 +189,7 @@ describe('createTrajectory', () => {
       id: floorId,
       organization_id: organizationId,
     })
-    insertTrajectoryWithConstraintsMock.mockResolvedValue({
+    insertTrajectoryMock.mockResolvedValue({
       id: trajectoryId,
       recording_id: recordingId,
       floor_id: floorId,
@@ -301,7 +299,7 @@ describe('createTrajectory', () => {
         type: 'AUTH_DASHBOARD_FORBIDDEN',
       },
     })
-    expect(insertTrajectoryWithConstraintsMock).not.toHaveBeenCalled()
+    expect(insertTrajectoryMock).not.toHaveBeenCalled()
     expect(submitAnalyzeRequestMock).not.toHaveBeenCalled()
   })
 
@@ -347,7 +345,7 @@ describe('createTrajectory', () => {
         type: 'AUTH_ORGANIZATION_FORBIDDEN',
       },
     })
-    expect(insertTrajectoryWithConstraintsMock).not.toHaveBeenCalled()
+    expect(insertTrajectoryMock).not.toHaveBeenCalled()
     expect(submitAnalyzeRequestMock).not.toHaveBeenCalled()
   })
 
@@ -449,7 +447,7 @@ describe('createTrajectory', () => {
         floorId,
       },
     })
-    expect(insertTrajectoryWithConstraintsMock).not.toHaveBeenCalled()
+    expect(insertTrajectoryMock).not.toHaveBeenCalled()
   })
 
   it('recording と floor の organization が異なれば RESOURCE_ORGANIZATION_MISMATCH を返す', async () => {
@@ -489,7 +487,7 @@ describe('createTrajectory', () => {
         floorOrganizationId,
       },
     })
-    expect(insertTrajectoryWithConstraintsMock).not.toHaveBeenCalled()
+    expect(insertTrajectoryMock).not.toHaveBeenCalled()
   })
 
   it('nozomi 依頼失敗時は failed にして 502 相当エラーを返す', async () => {
@@ -508,7 +506,7 @@ describe('createTrajectory', () => {
       id: '33333333-3333-4333-8333-333333333333',
       organization_id: organizationId,
     })
-    insertTrajectoryWithConstraintsMock.mockResolvedValue({
+    insertTrajectoryMock.mockResolvedValue({
       id: trajectoryId,
       recording_id: recordingId,
       floor_id: '33333333-3333-4333-8333-333333333333',
@@ -581,7 +579,7 @@ describe('createTrajectory', () => {
       id: '33333333-3333-4333-8333-333333333333',
       organization_id: organizationId,
     })
-    insertTrajectoryWithConstraintsMock.mockResolvedValue({
+    insertTrajectoryMock.mockResolvedValue({
       id: trajectoryId,
       recording_id: recordingId,
       floor_id: '33333333-3333-4333-8333-333333333333',

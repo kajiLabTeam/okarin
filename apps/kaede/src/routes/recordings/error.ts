@@ -236,6 +236,17 @@ export const toCreateTrajectoryErrorResponse = (error: CreateTrajectoryError) =>
         },
         status: 500 as const,
       }
+    case 'RECORDING_CONSTRAINTS_INVALID':
+      return {
+        body: {
+          error_code: error.type,
+          error_message: 'recording constraints contain invalid values',
+          details: {
+            recording_id: error.recordingId,
+          },
+        },
+        status: 500 as const,
+      }
     case 'FLOOR_NOT_FOUND':
       return {
         body: {

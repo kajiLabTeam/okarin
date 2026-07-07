@@ -4,6 +4,7 @@ import type { RequestActor } from '../../middleware/request-actor-context.js'
 import { uploadTargetsSchema } from '../../schemas/common.js'
 import type { RecordingIdParams } from '../../schemas/recordings.js'
 import type { CreateTrajectoryRequest } from '../../schemas/trajectories.js'
+import { trajectoryConstraintsSchema } from '../../schemas/trajectories.js'
 import { findFloorById } from '../../services/floors/index.js'
 import { submitAnalyzeRequest } from '../../services/nozomi/index.js'
 import { findRecordingById } from '../../services/recordings/index.js'
@@ -13,7 +14,7 @@ import {
 } from '../../services/storage/index.js'
 import { generateCallbackToken } from '../../services/trajectories/callback-token.js'
 import {
-  insertTrajectoryWithConstraints,
+  insertTrajectory,
   markTrajectoryFailed,
   markTrajectoryProcessing,
 } from '../../services/trajectories/index.js'
@@ -35,6 +36,10 @@ export type CreateTrajectoryError =
       type: 'RECORDING_UPLOAD_TARGETS_INVALID'
       recordingId: string
       invalidTargets: string[]
+    }
+  | {
+      type: 'RECORDING_CONSTRAINTS_INVALID'
+      recordingId: string
     }
   | {
       type: 'FLOOR_NOT_FOUND'
@@ -132,6 +137,21 @@ export const createTrajectory = async (
     return authorization
   }
 
+  let usedConstraints = payload.constraints
+  if (usedConstraints === undefined) {
+    const recordingConstraints = trajectoryConstraintsSchema.safeParse(recording.constraints)
+    if (!recordingConstraints.success) {
+      return {
+        ok: false,
+        error: {
+          type: 'RECORDING_CONSTRAINTS_INVALID',
+          recordingId: recording.id,
+        },
+      }
+    }
+    usedConstraints = recordingConstraints.data
+  }
+
   const floor = await findFloorById(recording.floor_id)
 
   if (!floor) {
@@ -162,23 +182,13 @@ export const createTrajectory = async (
     }
   }
 
-  const trajectory = await insertTrajectoryWithConstraints(
-    {
-      recording_id: recording.id,
-      floor_id: recording.floor_id,
-      organization_id: recording.organization_id,
-      status: 'accepted',
-    },
-    payload.constraints.map((constraint) => ({
-      seq: constraint.seq,
-      point_type: constraint.point_type,
-      x: constraint.x,
-      y: constraint.y,
-      direction: constraint.direction ?? null,
-      relative_timestamp:
-        constraint.point_type === 'waypoint' ? constraint.relative_timestamp : null,
-    }))
-  )
+  const trajectory = await insertTrajectory({
+    recording_id: recording.id,
+    floor_id: recording.floor_id,
+    organization_id: recording.organization_id,
+    status: 'accepted',
+    constraints: usedConstraints,
+  })
 
   const processing = await markTrajectoryProcessing(trajectory.id)
   if (!processing) {
@@ -225,7 +235,7 @@ export const createTrajectory = async (
       trajectory_id: processing.id,
       recording_id: recording.id,
       floor_id: recording.floor_id,
-      constraints: payload.constraints,
+      constraints: usedConstraints,
       raw_data_urls: rawDataUrls,
       result_upload_url: resultUploadUrl,
       callback_url: getCallbackUrl(),

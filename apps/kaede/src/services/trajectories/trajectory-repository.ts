@@ -1,13 +1,16 @@
 import type { Insertable, Kysely, Selectable, Transaction, Updateable } from 'kysely'
-import type { Trajectories, TrajectoryConstraints } from '../db/generated.js'
+import type { TrajectoryConstraints } from '../../schemas/trajectories.js'
+import type { Trajectories } from '../db/generated.js'
 import { db } from '../db/index.js'
 import type { DB } from '../db/index.js'
 
 type DbExecutor = Kysely<DB> | Transaction<DB>
 export type Trajectory = Selectable<Trajectories>
 type NewTrajectory = Insertable<Trajectories>
+type NewTrajectoryInput = Omit<NewTrajectory, 'constraints'> & {
+  constraints?: TrajectoryConstraints
+}
 type TrajectoryUpdate = Updateable<Trajectories>
-type NewTrajectoryConstraint = Insertable<TrajectoryConstraints>
 
 const activeTrajectoriesQuery = (executor: DbExecutor) =>
   executor.selectFrom('trajectories').where('deleted_at', 'is', null)
@@ -35,44 +38,15 @@ export const listTrajectoriesByRecordingId = async (
 }
 
 export const insertTrajectory = async (
-  newTrajectory: NewTrajectory,
+  newTrajectory: NewTrajectoryInput,
   executor: DbExecutor = db
 ): Promise<Trajectory> => {
-  return executor
-    .insertInto('trajectories')
-    .values(newTrajectory)
-    .returningAll()
-    .executeTakeFirstOrThrow()
-}
+  const values: NewTrajectory =
+    newTrajectory.constraints === undefined
+      ? newTrajectory
+      : { ...newTrajectory, constraints: JSON.stringify(newTrajectory.constraints) }
 
-export const insertTrajectoryConstraints = async (
-  constraints: NewTrajectoryConstraint[],
-  executor: DbExecutor = db
-): Promise<void> => {
-  if (constraints.length === 0) {
-    return
-  }
-
-  await executor.insertInto('trajectory_constraints').values(constraints).execute()
-}
-
-export const insertTrajectoryWithConstraints = async (
-  trajectory: NewTrajectory,
-  constraints: Omit<NewTrajectoryConstraint, 'trajectory_id'>[]
-): Promise<Trajectory> => {
-  return db.transaction().execute(async (trx) => {
-    const insertedTrajectory = await insertTrajectory(trajectory, trx)
-
-    await insertTrajectoryConstraints(
-      constraints.map((constraint) => ({
-        ...constraint,
-        trajectory_id: insertedTrajectory.id,
-      })),
-      trx
-    )
-
-    return insertedTrajectory
-  })
+  return executor.insertInto('trajectories').values(values).returningAll().executeTakeFirstOrThrow()
 }
 
 export const updateTrajectory = async (

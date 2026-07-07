@@ -58,14 +58,6 @@ export interface Floors {
   updated_at: Generated<Timestamp>
 }
 
-export interface OrganizationMemberships {
-  created_at: Generated<Timestamp>
-  organization_id: string
-  role: string
-  updated_at: Generated<Timestamp>
-  user_id: string
-}
-
 export interface OrganizationCreationRequests {
   created_at: Generated<Timestamp>
   created_organization_id: string | null
@@ -104,6 +96,14 @@ export interface OrganizationInvites {
   used_count: Generated<number>
 }
 
+export interface OrganizationMemberships {
+  created_at: Generated<Timestamp>
+  organization_id: string
+  role: string
+  updated_at: Generated<Timestamp>
+  user_id: string
+}
+
 export interface Organizations {
   created_at: Generated<Timestamp>
   id: Generated<string>
@@ -125,6 +125,7 @@ export interface Pedestrians {
 }
 
 export interface Recordings {
+  constraints: Generated<Json>
   created_at: Generated<Timestamp>
   deleted_at: Timestamp | null
   floor_id: string
@@ -148,6 +149,7 @@ export interface Sessions {
 }
 
 export interface Trajectories {
+  constraints: Generated<Json>
   created_at: Generated<Timestamp>
   deleted_at: Timestamp | null
   error_code: string | null
@@ -161,16 +163,16 @@ export interface Trajectories {
   updated_at: Generated<Timestamp>
 }
 
-export interface TrajectoryConstraints {
+export interface UserActivationTokens {
   created_at: Generated<Timestamp>
-  direction: number | null
-  point_type: string
-  relative_timestamp: number | null
-  seq: number
-  trajectory_id: string
-  updated_at: Generated<Timestamp>
-  x: number
-  y: number
+  created_by_user_id: string
+  expires_at: Timestamp
+  id: Generated<string>
+  organization_id: string
+  revoked_at: Timestamp | null
+  token_hash: string
+  used_at: Timestamp | null
+  user_id: string
 }
 
 export interface Users {
@@ -187,18 +189,6 @@ export interface Users {
   updated_at: Generated<Timestamp>
 }
 
-export interface UserActivationTokens {
-  created_at: Generated<Timestamp>
-  created_by_user_id: string
-  expires_at: Timestamp
-  id: Generated<string>
-  organization_id: string
-  revoked_at: Timestamp | null
-  token_hash: string
-  used_at: Timestamp | null
-  user_id: string
-}
-
 export interface DB {
   auth_identities: AuthIdentities
   buildings: Buildings
@@ -212,7 +202,6 @@ export interface DB {
   recordings: Recordings
   sessions: Sessions
   trajectories: Trajectories
-  trajectory_constraints: TrajectoryConstraints
   user_activation_tokens: UserActivationTokens
   users: Users
 }
