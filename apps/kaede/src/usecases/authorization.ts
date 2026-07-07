@@ -177,6 +177,20 @@ export const requireDashboardWriteAccess = (
   return requireOrganizationManager(actor, organizationId)
 }
 
+export const requireUserDashboardWriteAccess = (
+  actor: RequestActor,
+  organizationId: string
+): { ok: true } | { ok: false; error: AuthorizationError } => {
+  if (actor.type !== 'user') {
+    return {
+      ok: false,
+      error: { type: 'AUTH_DASHBOARD_FORBIDDEN' },
+    }
+  }
+
+  return requireDashboardWriteAccess(actor, organizationId)
+}
+
 export const requireDashboardReadAccess = (
   actor: RequestActor
 ): { ok: true; organizationIds?: string[] } | { ok: false; error: AuthorizationError } => {

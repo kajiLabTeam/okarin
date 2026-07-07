@@ -221,6 +221,8 @@ describe('createApp auth wiring', { timeout: 60_000 }, () => {
       ['/api/pedestrians/me', 'get'],
       ['/api/pedestrians/me/recordings', 'get'],
       ['/api/recordings/{recordingId}', 'get'],
+      ['/api/recordings/{recordingId}/constraints', 'get'],
+      ['/api/recordings/{recordingId}/constraints', 'put'],
     ] as const
 
     for (const [path, method] of expectedPaths) {

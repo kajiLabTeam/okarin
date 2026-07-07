@@ -1,9 +1,11 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetRuntimeConfigForTests } from '../../../src/config/runtime.js'
+import type { RequestActor } from '../../../src/middleware/request-actor-context.js'
 import { createTrajectoryResponseSchema } from '../../../src/schemas/trajectories.js'
 import { createApp } from '../../../src/server.js'
 import { createDb } from '../../../src/services/db/client.js'
 import type * as StorageService from '../../../src/services/storage/index.js'
+import { updateRecordingConstraints } from '../../../src/usecases/recordings/update-recording-constraints.js'
 import { resetDatabase } from '../../db/helpers.js'
 import { createRecordingFixture } from '../../fixtures/recordings.js'
 
@@ -39,6 +41,17 @@ let app: ReturnType<typeof createApp>
 const authHeaders = {
   authorization: 'Bearer shared-token',
 }
+
+const managerActor = (organizationId: string): RequestActor => ({
+  type: 'user',
+  user_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  email: 'manager@example.test',
+  global_role: 'none',
+  account_state: 'active',
+  memberships: [
+    { organization_id: organizationId, organization_name: 'Test Organization', role: 'manager' },
+  ],
+})
 
 describe('POST /api/recordings/:recordingId/trajectories', () => {
   beforeEach(async () => {
@@ -234,6 +247,54 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
       .where('recording_id', '=', recordingId)
       .execute()
     expect(trajectories).toEqual([])
+  })
+
+  it('recording constraints 更新後も既存 snapshot は変わらず次回作成から反映する', async () => {
+    const initialConstraints = [{ seq: 0, point_type: 'start' as const, x: 10, y: 20 }]
+    const updatedConstraints = [{ seq: 0, point_type: 'start' as const, x: 30, y: 40 }]
+    const { organizationId, recordingId } = await createRecordingFixture(db, {
+      uploadStatus: 'ready',
+      uploadTargets: ['acce', 'gyro'],
+      constraints: initialConstraints,
+    })
+    submitAnalyzeRequestMock.mockImplementation((payload: { trajectory_id: string }) => ({
+      trajectory_id: payload.trajectory_id,
+      status: 'accepted',
+    }))
+
+    const firstResponse = await app.request(`/api/recordings/${recordingId}/trajectories`, {
+      method: 'POST',
+      headers: { ...authHeaders, 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    const first = createTrajectoryResponseSchema.parse(await firstResponse.json())
+
+    await expect(
+      updateRecordingConstraints(
+        managerActor(organizationId),
+        { recordingId },
+        { constraints: updatedConstraints }
+      )
+    ).resolves.toMatchObject({ ok: true })
+
+    const secondResponse = await app.request(`/api/recordings/${recordingId}/trajectories`, {
+      method: 'POST',
+      headers: { ...authHeaders, 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    const second = createTrajectoryResponseSchema.parse(await secondResponse.json())
+
+    const snapshots = await db
+      .selectFrom('trajectories')
+      .select(['id', 'constraints'])
+      .where('id', 'in', [first.trajectory_id, second.trajectory_id])
+      .execute()
+    expect(snapshots.find(({ id }) => id === first.trajectory_id)?.constraints).toEqual(
+      initialConstraints
+    )
+    expect(snapshots.find(({ id }) => id === second.trajectory_id)?.constraints).toEqual(
+      updatedConstraints
+    )
   })
 
   it('ready でない recording は 409 を返す', async () => {

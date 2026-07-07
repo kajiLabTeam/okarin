@@ -97,6 +97,14 @@ export const updateRecording = async (
     .executeTakeFirst()
 }
 
+export const updateRecordingConstraints = async (
+  recordingId: string,
+  constraints: TrajectoryConstraints,
+  executor: DbExecutor = db
+): Promise<Recording | undefined> => {
+  return updateRecording(recordingId, { constraints: JSON.stringify(constraints) }, executor)
+}
+
 export const markRecordingUploadReady = async (
   recordingId: string,
   executor: DbExecutor = db

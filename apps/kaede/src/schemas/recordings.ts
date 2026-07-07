@@ -66,6 +66,17 @@ export const initRecordingResponseSchema = z.object({
   }),
 })
 
+export const updateRecordingConstraintsRequestSchema = z.object({
+  constraints: trajectoryConstraintsSchema,
+})
+
+export const recordingConstraintsResponseSchema = z.object({
+  recording_id: uuidSchema.openapi({
+    description: 'recording の ID',
+  }),
+  constraints: trajectoryConstraintsSchema,
+})
+
 export const completeUploadResponseSchema = z.object({
   recording_id: uuidSchema.openapi({
     description: 'アップロード完了を反映した recording の ID',
@@ -192,6 +203,10 @@ export const recordingGroundTruthCompleteResponseSchema = z.object({
 
 export type InitRecordingRequest = z.infer<typeof initRecordingRequestSchema>
 export type RecordingIdParams = z.infer<typeof recordingIdParamsSchema>
+export type RecordingConstraintsResponse = z.infer<typeof recordingConstraintsResponseSchema>
+export type UpdateRecordingConstraintsRequest = z.infer<
+  typeof updateRecordingConstraintsRequestSchema
+>
 export type RecordingDetailResponse = z.infer<typeof recordingDetailResponseSchema>
 export type RecordingTrajectoriesResponse = z.infer<typeof recordingTrajectoriesResponseSchema>
 export type RefreshUploadUrlsRequest = z.infer<typeof refreshUploadUrlsRequestSchema>

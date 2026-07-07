@@ -7,8 +7,10 @@ import {
   recordingDetailResponseSchema,
   recordingIdParamsSchema,
   recordingGroundTruthRequestSchema,
+  recordingConstraintsResponseSchema,
   recordingTrajectoriesResponseSchema,
   refreshUploadUrlsRequestSchema,
+  updateRecordingConstraintsRequestSchema,
 } from './recordings.js'
 
 describe('recording schemas', () => {
@@ -64,6 +66,25 @@ describe('recording schemas', () => {
     })
 
     expect(result.success).toBe(true)
+  })
+
+  it('recording constraints の request/response schema を検証する', () => {
+    const constraints = [{ seq: 0, point_type: 'start' as const, x: 10, y: 20 }]
+
+    expect(updateRecordingConstraintsRequestSchema.safeParse({ constraints }).success).toBe(true)
+    expect(updateRecordingConstraintsRequestSchema.safeParse({ constraints: [] }).success).toBe(
+      true
+    )
+    expect(updateRecordingConstraintsRequestSchema.safeParse({}).success).toBe(false)
+    expect(updateRecordingConstraintsRequestSchema.safeParse({ constraints: null }).success).toBe(
+      false
+    )
+    expect(
+      recordingConstraintsResponseSchema.safeParse({
+        recording_id: '33333333-3333-4333-8333-333333333333',
+        constraints,
+      }).success
+    ).toBe(true)
   })
 
   it('recordingDetailResponseSchema は organization_id を含むレスポンスを受け入れる', () => {

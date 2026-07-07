@@ -5,6 +5,7 @@ import {
   insertRecording,
   markRecordingUploadFailed,
   markRecordingUploadReady,
+  updateRecordingConstraints,
 } from '../../../src/services/recordings/index.js'
 import { resetDatabase } from '../../db/helpers.js'
 
@@ -113,5 +114,23 @@ describe('recording repository', () => {
     const updated = await markRecordingUploadReady(created.id, db)
 
     expect(updated).toBeUndefined()
+  })
+
+  it('constraints を全置換できる', async () => {
+    const { organization, floor, pedestrian } = await createRecordingParents('D')
+    const created = await insertRecording(
+      {
+        pedestrian_id: pedestrian.id,
+        floor_id: floor.id,
+        organization_id: organization.id,
+        upload_targets: ['acce', 'gyro'],
+      },
+      db
+    )
+    const constraints = [{ seq: 0, point_type: 'start' as const, x: 10, y: 20 }]
+
+    const updated = await updateRecordingConstraints(created.id, constraints, db)
+
+    expect(updated?.constraints).toEqual(constraints)
   })
 })

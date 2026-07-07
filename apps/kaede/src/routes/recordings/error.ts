@@ -1,8 +1,10 @@
 import type { CompleteUploadResult } from '../../usecases/recordings/complete-upload.js'
+import type { GetRecordingConstraintsResult } from '../../usecases/recordings/get-recording-constraints.js'
 import type { GetRecordingResult } from '../../usecases/recordings/get-recording.js'
 import type { InitRecordingResult } from '../../usecases/recordings/init-recording.js'
 import type { ListRecordingTrajectoriesResult } from '../../usecases/recordings/list-recording-trajectories.js'
 import type { RefreshUploadUrlsResult } from '../../usecases/recordings/refresh-upload-urls.js'
+import type { UpdateRecordingConstraintsResult } from '../../usecases/recordings/update-recording-constraints.js'
 import type { CreateTrajectoryResult } from '../../usecases/trajectories/create-trajectory.js'
 import { toAuthorizationErrorResponse } from '../authorization-error.js'
 
@@ -15,6 +17,56 @@ type ListRecordingTrajectoriesError = Extract<
 >['error']
 type RefreshUploadUrlsError = Extract<RefreshUploadUrlsResult, { ok: false }>['error']
 type CreateTrajectoryError = Extract<CreateTrajectoryResult, { ok: false }>['error']
+type GetRecordingConstraintsError = Extract<GetRecordingConstraintsResult, { ok: false }>['error']
+type UpdateRecordingConstraintsError = Extract<
+  UpdateRecordingConstraintsResult,
+  { ok: false }
+>['error']
+
+export const toGetRecordingConstraintsErrorResponse = (error: GetRecordingConstraintsError) => {
+  switch (error.type) {
+    case 'AUTH_DASHBOARD_FORBIDDEN':
+    case 'AUTH_ORGANIZATION_FORBIDDEN':
+      return toAuthorizationErrorResponse(error)
+    case 'RECORDING_NOT_FOUND':
+      return {
+        body: {
+          error_code: error.type,
+          error_message: 'recording not found',
+          details: { recording_id: error.recordingId },
+        },
+        status: 404 as const,
+      }
+    case 'RECORDING_CONSTRAINTS_INVALID':
+      return {
+        body: {
+          error_code: error.type,
+          error_message: 'recording constraints contain invalid values',
+          details: { recording_id: error.recordingId },
+        },
+        status: 500 as const,
+      }
+  }
+}
+
+export const toUpdateRecordingConstraintsErrorResponse = (
+  error: UpdateRecordingConstraintsError
+) => {
+  switch (error.type) {
+    case 'AUTH_DASHBOARD_FORBIDDEN':
+    case 'AUTH_ORGANIZATION_FORBIDDEN':
+      return toAuthorizationErrorResponse(error)
+    case 'RECORDING_NOT_FOUND':
+      return {
+        body: {
+          error_code: error.type,
+          error_message: 'recording not found',
+          details: { recording_id: error.recordingId },
+        },
+        status: 404 as const,
+      }
+  }
+}
 
 export const toInitRecordingErrorResponse = (error: InitRecordingError) => {
   switch (error.type) {
