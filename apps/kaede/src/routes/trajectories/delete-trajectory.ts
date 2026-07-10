@@ -1,8 +1,11 @@
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
-import { errorResponseSchema, notImplementedResponseSchema } from '../../schemas/common.js'
+import { requireRequestActor } from '../../middleware/request-actor-context.js'
+import type { RequestActorContext } from '../../middleware/request-actor-context.js'
+import { errorResponseSchema } from '../../schemas/common.js'
 import { trajectoryIdParamsSchema } from '../../schemas/trajectories.js'
-import { notImplemented } from '../../utils/not-implemented.js'
+import { deleteTrajectory } from '../../usecases/trajectories/delete-trajectory.js'
+import { toDeleteTrajectoryErrorResponse } from './error.js'
 
 export const registerDeleteTrajectoryRoute = (app: OpenAPIHono) => {
   const route = createRoute({
@@ -25,20 +28,27 @@ export const registerDeleteTrajectoryRoute = (app: OpenAPIHono) => {
           },
         },
       },
-      501: {
-        description: 'not implemented',
+      403: {
+        description: 'permission denied',
         content: {
           'application/json': {
-            schema: notImplementedResponseSchema,
+            schema: errorResponseSchema,
           },
         },
       },
     },
   })
 
-  app.openapi(route, (c) => {
-    c.req.valid('param')
+  app.openapi(route, async (c) => {
+    const params = c.req.valid('param')
+    const actor = requireRequestActor(c as unknown as RequestActorContext)
+    const result = await deleteTrajectory(actor, params)
 
-    return notImplemented(c, 'DELETE /api/trajectories/:trajectoryId', 'trajectory を削除する')
+    if (!result.ok) {
+      const error = toDeleteTrajectoryErrorResponse(result.error)
+      return c.json(error.body, error.status)
+    }
+
+    return c.body(null, 204)
   })
 }

@@ -63,6 +63,20 @@ export const updateTrajectory = async (
     .executeTakeFirst()
 }
 
+export const softDeleteTrajectory = async (
+  trajectoryId: string,
+  deletedAt: Date = new Date(),
+  executor: DbExecutor = db
+): Promise<Trajectory | undefined> => {
+  return executor
+    .updateTable('trajectories')
+    .set({ deleted_at: deletedAt })
+    .where('id', '=', trajectoryId)
+    .where('deleted_at', 'is', null)
+    .returningAll()
+    .executeTakeFirst()
+}
+
 export const markTrajectoryProcessing = async (
   trajectoryId: string,
   executor: DbExecutor = db
