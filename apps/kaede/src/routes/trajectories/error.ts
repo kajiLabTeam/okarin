@@ -1,14 +1,35 @@
+import type { DeleteTrajectoryResult } from '../../usecases/trajectories/delete-trajectory.js'
 import type { GetTrajectoryMapDataResult } from '../../usecases/trajectories/get-trajectory-map-data.js'
 import type { GetTrajectoryResultDownloadResult } from '../../usecases/trajectories/get-trajectory-result.js'
 import type { GetTrajectoryResult } from '../../usecases/trajectories/get-trajectory.js'
 import { toAuthorizationErrorResponse } from '../authorization-error.js'
 
+type DeleteTrajectoryError = Extract<DeleteTrajectoryResult, { ok: false }>['error']
 type GetTrajectoryError = Extract<GetTrajectoryResult, { ok: false }>['error']
 type GetTrajectoryResultDownloadError = Extract<
   GetTrajectoryResultDownloadResult,
   { ok: false }
 >['error']
 type GetTrajectoryMapDataError = Extract<GetTrajectoryMapDataResult, { ok: false }>['error']
+
+export const toDeleteTrajectoryErrorResponse = (error: DeleteTrajectoryError) => {
+  switch (error.type) {
+    case 'AUTH_DASHBOARD_FORBIDDEN':
+    case 'AUTH_ORGANIZATION_FORBIDDEN':
+      return toAuthorizationErrorResponse(error)
+    case 'TRAJECTORY_NOT_FOUND':
+      return {
+        body: {
+          error_code: error.type,
+          error_message: 'trajectory not found',
+          details: {
+            trajectory_id: error.trajectoryId,
+          },
+        },
+        status: 404 as const,
+      }
+  }
+}
 
 export const toGetTrajectoryErrorResponse = (error: GetTrajectoryError) => {
   switch (error.type) {

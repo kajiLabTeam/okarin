@@ -276,6 +276,8 @@ describe('createApp auth wiring', { timeout: 60_000 }, () => {
       ['/api/recordings/{recordingId}/refresh-upload-urls', 'post', '403'],
       ['/api/recordings/{recordingId}/trajectories', 'post', '403'],
       ['/api/trajectories/{trajectoryId}', 'get', '403'],
+      ['/api/trajectories/{trajectoryId}', 'delete', '403'],
+      ['/api/trajectories/{trajectoryId}', 'delete', '404'],
       ['/api/trajectories/{trajectoryId}/map-data', 'get', '400'],
       ['/api/trajectories/{trajectoryId}/map-data', 'get', '403'],
       ['/api/trajectories/{trajectoryId}/map-data', 'get', '404'],

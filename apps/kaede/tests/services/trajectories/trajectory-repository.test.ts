@@ -1,10 +1,12 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { createDb } from '../../../src/services/db/client.js'
 import {
+  findTrajectoryById,
   insertTrajectory,
   listTrajectoriesByRecordingId,
   markTrajectoryFailed,
   markTrajectoryProcessing,
+  softDeleteTrajectory,
 } from '../../../src/services/trajectories/index.js'
 import { resetDatabase } from '../../db/helpers.js'
 import { createRecordingFixture } from '../../fixtures/recordings.js'
@@ -114,5 +116,55 @@ describe('trajectory repository', () => {
     const trajectories = await listTrajectoriesByRecordingId(recording.id, db)
 
     expect(trajectories.map((trajectory) => trajectory.id)).toEqual([newer.id, older.id])
+  })
+
+  it('trajectory を論理削除し active query から除外できる', async () => {
+    const { floor, organization, recording } = await createRecordingFixture(db, {
+      uploadTargets: ['acce', 'gyro'],
+      floorLevel: 1,
+      floorName: '1F',
+      buildingName: 'Trajectory Building',
+    })
+    const deletedAt = new Date('2026-06-14T00:00:00.000Z')
+    const created = await insertTrajectory(
+      {
+        recording_id: recording.id,
+        floor_id: floor.id,
+        organization_id: organization.id,
+        status: 'completed',
+      },
+      db
+    )
+
+    const deleted = await softDeleteTrajectory(created.id, deletedAt, db)
+    const found = await findTrajectoryById(created.id, db)
+    const listed = await listTrajectoriesByRecordingId(recording.id, db)
+
+    expect(deleted?.deleted_at?.toISOString()).toBe('2026-06-14T00:00:00.000Z')
+    expect(found).toBeUndefined()
+    expect(listed).toEqual([])
+  })
+
+  it('削除済み trajectory は再削除しない', async () => {
+    const { floor, organization, recording } = await createRecordingFixture(db, {
+      uploadTargets: ['acce', 'gyro'],
+      floorLevel: 1,
+      floorName: '1F',
+      buildingName: 'Trajectory Building',
+    })
+    const created = await insertTrajectory(
+      {
+        recording_id: recording.id,
+        floor_id: floor.id,
+        organization_id: organization.id,
+        status: 'completed',
+        deleted_at: new Date('2026-06-13T00:00:00.000Z'),
+      },
+      db
+    )
+
+    const deleted = await softDeleteTrajectory(created.id, new Date('2026-06-14T00:00:00.000Z'), db)
+
+    expect(deleted).toBeUndefined()
   })
 })

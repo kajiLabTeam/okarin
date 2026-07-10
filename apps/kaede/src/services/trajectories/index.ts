@@ -5,6 +5,7 @@ export {
   markTrajectoryCompleted,
   markTrajectoryFailed,
   markTrajectoryProcessing,
+  softDeleteTrajectory,
   updateTrajectory,
 } from './trajectory-repository.js'
 export type { Trajectory } from './trajectory-repository.js'
