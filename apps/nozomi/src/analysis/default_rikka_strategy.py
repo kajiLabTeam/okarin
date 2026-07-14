@@ -6,7 +6,7 @@ from urllib.request import urlopen
 
 import pandas as pd
 from rikka.analyze import pdr
-from rikka.config import INITIAL_DIRECTION
+from rikka.config import FLOORMAP_SCALE, INITIAL_DIRECTION
 
 from src.schemas.analysis import AnalyzeRequest
 
@@ -144,8 +144,9 @@ class DefaultRikkaStrategy:
         df_trajectory = pd.DataFrame(trajectory, columns=["x", "y"])
         start = self._start_constraint(request)
         if start is not None:
-            df_trajectory["x"] = df_trajectory["x"] + float(start.x)
-            df_trajectory["y"] = df_trajectory["y"] + float(start.y)
+            floor_scale = self._floor_scale(request)
+            df_trajectory["x"] = float(start.x) + df_trajectory["x"] / floor_scale
+            df_trajectory["y"] = float(start.y) - df_trajectory["y"] / floor_scale
 
         csv_text = str(df_trajectory.to_csv(index=False))
         return csv_text.encode("utf-8")
@@ -197,6 +198,11 @@ class DefaultRikkaStrategy:
         if start is None or start.direction is None:
             return float(INITIAL_DIRECTION)
         return float(start.direction)
+
+    def _floor_scale(self, request: AnalyzeRequest) -> float:
+        if request.floor_scale is None:
+            return float(FLOORMAP_SCALE)
+        return float(request.floor_scale)
 
     def _result_object_key(self, request: AnalyzeRequest) -> str:
         return f"trajectories/{request.trajectory_id}/analyzed/result.csv"

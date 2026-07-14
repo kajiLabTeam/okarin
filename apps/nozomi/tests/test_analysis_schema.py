@@ -9,6 +9,7 @@ def valid_analyze_request() -> dict[str, object]:
         "trajectory_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
         "recording_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
         "floor_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        "floor_scale": 0.01,
         "constraints": [
             {
                 "seq": 0,
@@ -47,6 +48,7 @@ def test_analyze_request_accepts_valid_payload() -> None:
     request = AnalyzeRequest.model_validate(valid_analyze_request())
 
     assert str(request.trajectory_id) == "dddddddd-dddd-dddd-dddd-dddddddddddd"
+    assert request.floor_scale == 0.01
     assert len(request.constraints) == 3
     assert request.constraints[0].point_type == "start"
     assert request.raw_data_urls.pressure is not None
@@ -60,6 +62,15 @@ def test_analyze_request_accepts_payload_without_constraints() -> None:
     request = AnalyzeRequest.model_validate(payload)
 
     assert request.constraints == []
+
+
+def test_analyze_request_accepts_payload_without_floor_scale() -> None:
+    payload = valid_analyze_request()
+    payload.pop("floor_scale")
+
+    request = AnalyzeRequest.model_validate(payload)
+
+    assert request.floor_scale is None
 
 
 def test_analyze_request_accepts_payload_with_empty_constraints() -> None:
@@ -209,6 +220,14 @@ def test_analyze_request_rejects_direction_out_of_range() -> None:
     ]
 
     with pytest.raises(ValidationError, match="less than 360"):
+        AnalyzeRequest.model_validate(payload)
+
+
+def test_analyze_request_rejects_non_positive_floor_scale() -> None:
+    payload = valid_analyze_request()
+    payload["floor_scale"] = 0
+
+    with pytest.raises(ValidationError, match="greater than 0"):
         AnalyzeRequest.model_validate(payload)
 
 

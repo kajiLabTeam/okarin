@@ -19,6 +19,7 @@ export interface AnalyzeRequestPayload {
   trajectory_id: string
   recording_id: string
   floor_id: string
+  floor_scale?: number | null
   constraints: AnalyzeConstraint[]
   raw_data_urls: {
     acce: string

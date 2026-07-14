@@ -71,6 +71,7 @@ class AnalyzeRequest(BaseModel):
                 "trajectory_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
                 "recording_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
                 "floor_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                "floor_scale": 0.01,
                 "constraints": [
                     {
                         "seq": 0,
@@ -109,6 +110,11 @@ class AnalyzeRequest(BaseModel):
     trajectory_id: UUID = Field(description="解析対象 trajectory の ID")
     recording_id: UUID = Field(description="元になった recording の ID")
     floor_id: UUID = Field(description="解析対象の floor ID")
+    floor_scale: float | None = Field(
+        default=None,
+        gt=0,
+        description="floor map の縮尺。1px あたりのメートル数。未設定時はデフォルト",
+    )
     constraints: list[Constraint] = Field(
         default_factory=list,
         description="開始点・経由点・終了点からなる制約点の一覧。省略時は制約なし",

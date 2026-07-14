@@ -235,6 +235,7 @@ export const createTrajectory = async (
       trajectory_id: processing.id,
       recording_id: recording.id,
       floor_id: recording.floor_id,
+      floor_scale: floor.scale ?? null,
       constraints: usedConstraints,
       raw_data_urls: rawDataUrls,
       result_upload_url: resultUploadUrl,
