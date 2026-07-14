@@ -926,7 +926,7 @@ wheels = [
 [[package]]
 name = "rikka"
 version = "0.1.0"
-source = { git = "https://github.com/kajiLabTeam/rikka.git#81a3bf6406f7c9ff26b86f7a345f722d837abdc9" }
+source = { git = "https://github.com/kajiLabTeam/rikka.git#233e3e4d38cd05661489f8447a7021ce918d7621" }
 dependencies = [
     { name = "click" },
     { name = "matplotlib" },
