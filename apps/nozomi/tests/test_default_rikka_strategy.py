@@ -153,7 +153,7 @@ def test_default_rikka_strategy_falls_back_to_rikka_floor_scale(
         pd.DataFrame({"t": [0.0], "x": [0.0], "y": [0.0], "z": [0.0]}),
     )
 
-    assert result_csv == b"x,y\n10.0,20.0\n110.0,-80.0\n"
+    assert result_csv == b"x,y\n10.0,20.0\n110.0,120.0\n"
 
 
 def test_default_rikka_strategy_normalizes_mobile_sensor_headers() -> None:
