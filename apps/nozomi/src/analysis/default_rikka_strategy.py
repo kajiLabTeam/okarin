@@ -146,7 +146,7 @@ class DefaultRikkaStrategy:
         if start is not None:
             floor_scale = self._floor_scale(request)
             df_trajectory["x"] = float(start.x) + df_trajectory["x"] / floor_scale
-            df_trajectory["y"] = float(start.y) - df_trajectory["y"] / floor_scale
+            df_trajectory["y"] = float(start.y) + df_trajectory["y"] / floor_scale
 
         csv_text = str(df_trajectory.to_csv(index=False))
         return csv_text.encode("utf-8")
