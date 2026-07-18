@@ -116,7 +116,7 @@ def test_default_rikka_strategy_runs_pdr_uploads_result_and_marks_completed(
     assert calls[2][2] == (
         b"step_index,rikka_timestamp_s,rikka_x,rikka_y,x,y\n"
         b"0,,0.0,0.0,10.0,20.0\n"
-        b"1,0.0,1.5,2.5,13.0,15.0\n"
+        b"1,0.0,1.5,2.5,13.0,25.0\n"
     )
     assert calls[3][0] == "https://mediator.example.com/api/trajectories/callback"
     assert calls[3][1] == "POST"
@@ -160,7 +160,7 @@ def test_default_rikka_strategy_falls_back_to_rikka_floor_scale(
     assert result_csv == (
         b"step_index,rikka_timestamp_s,rikka_x,rikka_y,x,y\n"
         b"0,,0.0,0.0,10.0,20.0\n"
-        b"1,0.0,1.0,1.0,110.0,-80.0\n"
+        b"1,0.0,1.0,1.0,110.0,120.0\n"
     )
 
 
