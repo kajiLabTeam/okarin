@@ -135,21 +135,51 @@ class DefaultRikkaStrategy:
     ) -> bytes:
         df_acc, df_gyro = pdr.process_sensor_data(df_acc, df_gyro)
         peaks = pdr.detect_steps(df_acc)
-        trajectory, _, _ = pdr.estimate_trajectory(
+        trajectory, _, t_at_steps = pdr.estimate_trajectory(
             peaks,
             df_gyro,
             df_acc,
             initial_direction=self._initial_direction(request),
         )
-        df_trajectory = pd.DataFrame(trajectory, columns=["x", "y"])
+        df_trajectory = self._build_result_dataframe(trajectory, t_at_steps)
         start = self._start_constraint(request)
         if start is not None:
             floor_scale = self._floor_scale(request)
-            df_trajectory["x"] = float(start.x) + df_trajectory["x"] / floor_scale
-            df_trajectory["y"] = float(start.y) - df_trajectory["y"] / floor_scale
+            df_trajectory["x"] = float(start.x) + df_trajectory["rikka_x"] / floor_scale
+            df_trajectory["y"] = float(start.y) - df_trajectory["rikka_y"] / floor_scale
 
         csv_text = str(df_trajectory.to_csv(index=False))
         return csv_text.encode("utf-8")
+
+    def _build_result_dataframe(
+        self,
+        trajectory: list[list[float]],
+        t_at_steps: list[float],
+    ) -> pd.DataFrame:
+        df_trajectory = pd.DataFrame(trajectory, columns=["rikka_x", "rikka_y"])
+        df_trajectory.insert(0, "step_index", range(len(df_trajectory)))
+        df_trajectory.insert(
+            1,
+            "rikka_timestamp_s",
+            self._result_timestamps(len(df_trajectory), t_at_steps),
+        )
+        df_trajectory["x"] = df_trajectory["rikka_x"]
+        df_trajectory["y"] = df_trajectory["rikka_y"]
+        return df_trajectory
+
+    def _result_timestamps(
+        self,
+        point_count: int,
+        t_at_steps: list[float],
+    ) -> list[float | None]:
+        if point_count != len(t_at_steps) + 1:
+            return [None] * point_count
+        if not t_at_steps:
+            return [None] * point_count
+
+        first_step_time = t_at_steps[0]
+        moved_timestamps = [float(t - first_step_time) for t in t_at_steps]
+        return [None, *moved_timestamps]
 
     def _upload_result(self, url: object, result_csv: bytes) -> None:
         upload_request = UrlRequest(

@@ -94,7 +94,7 @@ def test_default_rikka_strategy_runs_pdr_uploads_result_and_marks_completed(
     )
     monkeypatch.setattr(
         "src.analysis.default_rikka_strategy.pdr.estimate_trajectory",
-        lambda *_args, **_kwargs: ([[0.0, 0.0], [1.5, 2.5]], [], []),
+        lambda *_args, **_kwargs: ([[0.0, 0.0], [1.5, 2.5]], [], [10.0]),
     )
 
     DefaultRikkaStrategy().run(valid_analyze_request())
@@ -113,7 +113,11 @@ def test_default_rikka_strategy_runs_pdr_uploads_result_and_marks_completed(
     )
     assert calls[2][0] == "https://object-storage.example.com/result.csv"
     assert calls[2][1] == "PUT"
-    assert calls[2][2] == b"x,y\n10.0,20.0\n13.0,15.0\n"
+    assert calls[2][2] == (
+        b"step_index,rikka_timestamp_s,rikka_x,rikka_y,x,y\n"
+        b"0,,0.0,0.0,10.0,20.0\n"
+        b"1,0.0,1.5,2.5,13.0,15.0\n"
+    )
     assert calls[3][0] == "https://mediator.example.com/api/trajectories/callback"
     assert calls[3][1] == "POST"
     assert calls[3][2] is not None
@@ -144,7 +148,7 @@ def test_default_rikka_strategy_falls_back_to_rikka_floor_scale(
     )
     monkeypatch.setattr(
         "src.analysis.default_rikka_strategy.pdr.estimate_trajectory",
-        lambda *_args, **_kwargs: ([[0.0, 0.0], [1.0, 1.0]], [], []),
+        lambda *_args, **_kwargs: ([[0.0, 0.0], [1.0, 1.0]], [], [10.0]),
     )
 
     result_csv = DefaultRikkaStrategy()._analyze_to_csv(
@@ -153,7 +157,11 @@ def test_default_rikka_strategy_falls_back_to_rikka_floor_scale(
         pd.DataFrame({"t": [0.0], "x": [0.0], "y": [0.0], "z": [0.0]}),
     )
 
-    assert result_csv == b"x,y\n10.0,20.0\n110.0,-80.0\n"
+    assert result_csv == (
+        b"step_index,rikka_timestamp_s,rikka_x,rikka_y,x,y\n"
+        b"0,,0.0,0.0,10.0,20.0\n"
+        b"1,0.0,1.0,1.0,110.0,-80.0\n"
+    )
 
 
 def test_default_rikka_strategy_normalizes_mobile_sensor_headers() -> None:
