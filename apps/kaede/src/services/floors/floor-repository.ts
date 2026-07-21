@@ -91,10 +91,10 @@ export const insertFloor = async (
 export const findFloorById = async (
   floorId: string,
   executor: DbExecutor = db
-): Promise<Pick<Floor, 'id' | 'organization_id'> | undefined> => {
+): Promise<Pick<Floor, 'id' | 'organization_id' | 'scale'> | undefined> => {
   return executor
     .selectFrom('floors')
-    .select(['id', 'organization_id'])
+    .select(['id', 'organization_id', 'scale'])
     .where('id', '=', floorId)
     .executeTakeFirst()
 }

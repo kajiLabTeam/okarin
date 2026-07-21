@@ -94,6 +94,7 @@ describe('createTrajectory', () => {
     findFloorByIdMock.mockResolvedValue({
       id: floorId,
       organization_id: organizationId,
+      scale: 0.01,
     })
     findRecordingAuthorizationByIdMock.mockResolvedValue({
       id: recordingId,
@@ -161,6 +162,7 @@ describe('createTrajectory', () => {
       trajectory_id: trajectoryId,
       recording_id: recordingId,
       floor_id: floorId,
+      floor_scale: 0.01,
       constraints: [],
       raw_data_urls: {
         acce: 'http://seaweedfs:8333/acce',
