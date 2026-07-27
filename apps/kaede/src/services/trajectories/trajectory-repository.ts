@@ -1,4 +1,6 @@
+import { sql } from 'kysely'
 import type { Insertable, Kysely, Selectable, Transaction, Updateable } from 'kysely'
+import type { PaginationOptions } from '../../schemas/pagination.js'
 import type { TrajectoryConstraints } from '../../schemas/trajectories.js'
 import type { Trajectories } from '../db/generated.js'
 import { db } from '../db/index.js'
@@ -11,6 +13,15 @@ type NewTrajectoryInput = Omit<NewTrajectory, 'constraints'> & {
   constraints?: TrajectoryConstraints
 }
 type TrajectoryUpdate = Updateable<Trajectories>
+
+export type TrajectoryPageRow = Trajectory & {
+  cursor_created_at: string
+}
+
+export interface TrajectoryPageRows {
+  rows: TrajectoryPageRow[]
+  totalCount: number
+}
 
 const activeTrajectoriesQuery = (executor: DbExecutor) =>
   executor.selectFrom('trajectories').where('deleted_at', 'is', null)
@@ -35,6 +46,43 @@ export const listTrajectoriesByRecordingId = async (
     .orderBy('created_at', 'desc')
     .orderBy('id', 'desc')
     .execute()
+}
+
+export const listTrajectoriesByRecordingIdPaginated = async (
+  recordingId: string,
+  options: PaginationOptions,
+  executor: DbExecutor = db
+): Promise<TrajectoryPageRows> => {
+  let rowsQuery = activeTrajectoriesQuery(executor)
+    .selectAll()
+    .select(
+      sql<string>`to_char(trajectories.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`.as(
+        'cursor_created_at'
+      )
+    )
+    .where('recording_id', '=', recordingId)
+    .orderBy('created_at', 'desc')
+    .orderBy('id', 'desc')
+    .limit(options.limit + 1)
+
+  if (options.cursor) {
+    rowsQuery = rowsQuery.where(
+      sql<boolean>`(trajectories.created_at, trajectories.id) < (${options.cursor.createdAt}::timestamptz, ${options.cursor.id}::uuid)`
+    )
+  }
+
+  const [rows, countRow] = await Promise.all([
+    rowsQuery.execute(),
+    activeTrajectoriesQuery(executor)
+      .select(({ fn }) => fn.countAll<string>().as('count'))
+      .where('recording_id', '=', recordingId)
+      .executeTakeFirstOrThrow(),
+  ])
+
+  return {
+    rows,
+    totalCount: Number(countRow.count),
+  }
 }
 
 export const insertTrajectory = async (

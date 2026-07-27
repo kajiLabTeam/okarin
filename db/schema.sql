@@ -608,10 +608,24 @@ CREATE INDEX recordings_floor_id_created_at_active_idx ON public.recordings USIN
 
 
 --
+-- Name: recordings_organization_created_at_id_active_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX recordings_organization_created_at_id_active_idx ON public.recordings USING btree (organization_id, created_at DESC, id DESC) WHERE (deleted_at IS NULL);
+
+
+--
 -- Name: recordings_organization_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX recordings_organization_id_idx ON public.recordings USING btree (organization_id);
+
+
+--
+-- Name: recordings_pedestrian_created_at_id_active_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX recordings_pedestrian_created_at_id_active_idx ON public.recordings USING btree (pedestrian_id, created_at DESC, id DESC) WHERE (deleted_at IS NULL);
 
 
 --
@@ -647,6 +661,13 @@ CREATE INDEX sessions_user_id_idx ON public.sessions USING btree (user_id);
 --
 
 CREATE INDEX trajectories_organization_id_idx ON public.trajectories USING btree (organization_id);
+
+
+--
+-- Name: trajectories_recording_created_at_id_active_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX trajectories_recording_created_at_id_active_idx ON public.trajectories USING btree (recording_id, created_at DESC, id DESC) WHERE (deleted_at IS NULL);
 
 
 --
@@ -998,4 +1019,7 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20260616100000'),
     ('20260623010000'),
     ('20260626010000'),
-    ('20260708010000');
+    ('20260708010000'),
+    ('20260728010000'),
+    ('20260728010100'),
+    ('20260728010200');

@@ -3,6 +3,8 @@ import { createDb } from '../../../src/services/db/client.js'
 import {
   findRecordingById,
   insertRecording,
+  listRecordingsByOrganizationIdPaginated,
+  listRecordingsByPedestrianIdPaginated,
   markRecordingUploadFailed,
   markRecordingUploadReady,
   updateRecordingConstraints,
@@ -132,5 +134,118 @@ describe('recording repository', () => {
     const updated = await updateRecordingConstraints(created.id, constraints, db)
 
     expect(updated?.constraints).toEqual(constraints)
+  })
+
+  it('organization recording をマイクロ秒精度の cursor でページングできる', async () => {
+    const { organization, floor, pedestrian } = await createRecordingParents('E')
+    const ids = [
+      '11111111-1111-4111-8111-111111111111',
+      '22222222-2222-4222-8222-222222222222',
+      '33333333-3333-4333-8333-333333333333',
+    ]
+    const timestamps = [
+      '2026-07-28T00:00:00.123400Z',
+      '2026-07-28T00:00:00.123500Z',
+      '2026-07-28T00:00:00.123600Z',
+    ]
+
+    for (const [index, id] of ids.entries()) {
+      await insertRecording(
+        {
+          id,
+          pedestrian_id: pedestrian.id,
+          floor_id: floor.id,
+          organization_id: organization.id,
+          upload_targets: ['acce', 'gyro'],
+          created_at: timestamps[index],
+        },
+        db
+      )
+    }
+
+    await insertRecording(
+      {
+        pedestrian_id: pedestrian.id,
+        floor_id: floor.id,
+        organization_id: organization.id,
+        upload_targets: ['acce', 'gyro'],
+        deleted_at: new Date('2026-07-28T01:00:00.000Z'),
+      },
+      db
+    )
+
+    const first = await listRecordingsByOrganizationIdPaginated(
+      organization.id,
+      { limit: 1, cursor: null },
+      db
+    )
+    const second = await listRecordingsByOrganizationIdPaginated(
+      organization.id,
+      {
+        limit: 1,
+        cursor: {
+          createdAt: first.rows[0].cursor_created_at,
+          id: first.rows[0].id,
+        },
+      },
+      db
+    )
+
+    expect(first.totalCount).toBe(3)
+    expect(first.rows).toHaveLength(2)
+    expect(first.rows[0]).toMatchObject({
+      id: ids[2],
+      cursor_created_at: timestamps[2],
+    })
+    expect(second.totalCount).toBe(3)
+    expect(second.rows[0]).toMatchObject({
+      id: ids[1],
+      cursor_created_at: timestamps[1],
+    })
+  })
+
+  it('pedestrian recording を created_at、id の降順でページングできる', async () => {
+    const { organization, floor, pedestrian } = await createRecordingParents('F')
+    const createdAt = '2026-07-28T00:00:00.123456Z'
+    const ids = [
+      '11111111-1111-4111-8111-111111111111',
+      '22222222-2222-4222-8222-222222222222',
+      '33333333-3333-4333-8333-333333333333',
+    ]
+
+    for (const id of ids) {
+      await insertRecording(
+        {
+          id,
+          pedestrian_id: pedestrian.id,
+          floor_id: floor.id,
+          organization_id: organization.id,
+          upload_targets: ['acce', 'gyro'],
+          created_at: createdAt,
+        },
+        db
+      )
+    }
+
+    const first = await listRecordingsByPedestrianIdPaginated(
+      pedestrian.id,
+      { limit: 2, cursor: null },
+      db
+    )
+    const second = await listRecordingsByPedestrianIdPaginated(
+      pedestrian.id,
+      {
+        limit: 2,
+        cursor: {
+          createdAt: first.rows[1].cursor_created_at,
+          id: first.rows[1].id,
+        },
+      },
+      db
+    )
+
+    expect(first.rows.map((row) => row.id)).toEqual([ids[2], ids[1], ids[0]])
+    expect(second.rows.map((row) => row.id)).toEqual([ids[0]])
+    expect(second.totalCount).toBe(3)
   })
 })
