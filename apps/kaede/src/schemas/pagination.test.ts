@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildPaginatedResult,
   decodePaginationCursor,
   encodePaginationCursor,
   paginationQuerySchema,
@@ -81,6 +82,36 @@ describe('pagination cursor codec', () => {
     expect(decodePaginationCursor(Buffer.from([0xc3, 0x28]).toString('base64url'))).toEqual({
       ok: false,
       error: { type: 'PAGINATION_CURSOR_INVALID' },
+    })
+  })
+})
+
+describe('buildPaginatedResult', () => {
+  const rows = [
+    { id: '11111111-1111-4111-8111-111111111111', cursor_created_at: cursor.createdAt },
+    { id: '22222222-2222-4222-8222-222222222222', cursor_created_at: cursor.createdAt },
+    { id: '33333333-3333-4333-8333-333333333333', cursor_created_at: cursor.createdAt },
+  ]
+
+  it('limit + 1 件から返却対象と next cursor を作る', () => {
+    const result = buildPaginatedResult(rows, 2, 3)
+
+    expect(result.items).toEqual(rows.slice(0, 2))
+    expect(result.totalCount).toBe(3)
+    expect(decodePaginationCursor(result.nextCursor ?? '')).toEqual({
+      ok: true,
+      value: {
+        createdAt: rows[1].cursor_created_at,
+        id: rows[1].id,
+      },
+    })
+  })
+
+  it('最終ページは next cursor を返さない', () => {
+    expect(buildPaginatedResult(rows.slice(0, 2), 2, 2)).toEqual({
+      items: rows.slice(0, 2),
+      nextCursor: null,
+      totalCount: 2,
     })
   })
 })

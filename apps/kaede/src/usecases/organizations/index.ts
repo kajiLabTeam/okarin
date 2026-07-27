@@ -13,6 +13,8 @@ import type {
   OrganizationUserResponse,
   RejectOrganizationCreationRequestRequest,
 } from '../../schemas/organizations.js'
+import { buildPaginatedResult, decodePaginationCursor } from '../../schemas/pagination.js'
+import type { PaginationQuery } from '../../schemas/pagination.js'
 import type { RecordingDetailResponse } from '../../schemas/recordings.js'
 import {
   generateActivationToken,
@@ -45,7 +47,7 @@ import type {
   OrganizationCreationRequest,
 } from '../../services/organizations/index.js'
 import { insertPedestrian } from '../../services/pedestrians/index.js'
-import { listRecordingsByOrganizationId } from '../../services/recordings/index.js'
+import { listRecordingsByOrganizationIdPaginated } from '../../services/recordings/index.js'
 import {
   findOrganizationMembership,
   findOrganizationUserById,
@@ -371,20 +373,51 @@ export const getOrganizationForSession = async (
 export const listOrganizationRecordingsForSession = async (
   sessionToken: string | undefined,
   organizationId: string,
+  query: PaginationQuery,
   executor?: DbExecutor
-): Promise<OrganizationResult<{ recordings: RecordingDetailResponse[] }>> => {
+): Promise<
+  | {
+      ok: true
+      value: {
+        recordings: RecordingDetailResponse[]
+        pagination: { next_cursor: string | null; total_count: number }
+      }
+    }
+  | {
+      ok: false
+      error: OrganizationError | { type: 'PAGINATION_CURSOR_INVALID' }
+    }
+> => {
   const actor = await requireOrganizationManagerOrAdmin(sessionToken, organizationId, executor)
 
   if (!actor.ok) {
     return actor
   }
 
-  const recordings = await listRecordingsByOrganizationId(organizationId, executor)
+  const cursorResult = query.cursor ? decodePaginationCursor(query.cursor) : null
+
+  if (cursorResult && !cursorResult.ok) {
+    return cursorResult
+  }
+
+  const pageRows = await listRecordingsByOrganizationIdPaginated(
+    organizationId,
+    {
+      limit: query.limit,
+      cursor: cursorResult?.value ?? null,
+    },
+    executor
+  )
+  const page = buildPaginatedResult(pageRows.rows, query.limit, pageRows.totalCount)
 
   return {
     ok: true,
     value: {
-      recordings: recordings.map(toRecordingDetailResponse),
+      recordings: page.items.map(toRecordingDetailResponse),
+      pagination: {
+        next_cursor: page.nextCursor,
+        total_count: page.totalCount,
+      },
     },
   }
 }

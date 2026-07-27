@@ -1,7 +1,6 @@
 export {
   findTrajectoryById,
   insertTrajectory,
-  listTrajectoriesByRecordingId,
   listTrajectoriesByRecordingIdPaginated,
   markTrajectoryCompleted,
   markTrajectoryFailed,

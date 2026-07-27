@@ -58,6 +58,11 @@ export interface PaginatedResult<T> {
   totalCount: number
 }
 
+interface CursorPageRow {
+  id: string
+  cursor_created_at: string
+}
+
 export type PaginationCursorDecodeResult =
   | { ok: true; value: PaginationCursor }
   | { ok: false; error: { type: 'PAGINATION_CURSOR_INVALID' } }
@@ -109,5 +114,27 @@ export const decodePaginationCursor = (encoded: string): PaginationCursorDecodeR
     }
   } catch {
     return invalidCursor()
+  }
+}
+
+export const buildPaginatedResult = <T extends CursorPageRow>(
+  rows: T[],
+  limit: number,
+  totalCount: number
+): PaginatedResult<T> => {
+  const hasNextPage = rows.length > limit
+  const items = hasNextPage ? rows.slice(0, limit) : rows
+  const lastItem = items.at(-1)
+
+  return {
+    items,
+    nextCursor:
+      hasNextPage && lastItem
+        ? encodePaginationCursor({
+            createdAt: lastItem.cursor_created_at,
+            id: lastItem.id,
+          })
+        : null,
+    totalCount,
   }
 }

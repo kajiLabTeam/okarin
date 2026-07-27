@@ -3,7 +3,6 @@ import { createDb } from '../../../src/services/db/client.js'
 import {
   findTrajectoryById,
   insertTrajectory,
-  listTrajectoriesByRecordingId,
   listTrajectoriesByRecordingIdPaginated,
   markTrajectoryFailed,
   markTrajectoryProcessing,
@@ -114,9 +113,13 @@ describe('trajectory repository', () => {
       db
     )
 
-    const trajectories = await listTrajectoriesByRecordingId(recording.id, db)
+    const trajectories = await listTrajectoriesByRecordingIdPaginated(
+      recording.id,
+      { limit: 100, cursor: null },
+      db
+    )
 
-    expect(trajectories.map((trajectory) => trajectory.id)).toEqual([newer.id, older.id])
+    expect(trajectories.rows.map((trajectory) => trajectory.id)).toEqual([newer.id, older.id])
   })
 
   it('trajectory を論理削除し active query から除外できる', async () => {
@@ -139,11 +142,15 @@ describe('trajectory repository', () => {
 
     const deleted = await softDeleteTrajectory(created.id, deletedAt, db)
     const found = await findTrajectoryById(created.id, db)
-    const listed = await listTrajectoriesByRecordingId(recording.id, db)
+    const listed = await listTrajectoriesByRecordingIdPaginated(
+      recording.id,
+      { limit: 100, cursor: null },
+      db
+    )
 
     expect(deleted?.deleted_at?.toISOString()).toBe('2026-06-14T00:00:00.000Z')
     expect(found).toBeUndefined()
-    expect(listed).toEqual([])
+    expect(listed).toEqual({ rows: [], totalCount: 0 })
   })
 
   it('削除済み trajectory は再削除しない', async () => {

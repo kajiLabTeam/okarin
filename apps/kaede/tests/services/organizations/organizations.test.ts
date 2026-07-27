@@ -781,6 +781,7 @@ describe('organizations usecase', () => {
     const result = await listOrganizationRecordingsForSession(
       admin.sessionToken,
       organization.id,
+      { limit: 20 },
       db
     )
 
@@ -816,6 +817,7 @@ describe('organizations usecase', () => {
     const result = await listOrganizationRecordingsForSession(
       manager.sessionToken,
       organization.id,
+      { limit: 20 },
       db
     )
 
@@ -847,6 +849,7 @@ describe('organizations usecase', () => {
     const result = await listOrganizationRecordingsForSession(
       manager.sessionToken,
       otherOrganization.id,
+      { limit: 20 },
       db
     )
 
@@ -875,6 +878,7 @@ describe('organizations usecase', () => {
     const result = await listOrganizationRecordingsForSession(
       admin.sessionToken,
       organization.id,
+      { limit: 20 },
       db
     )
 

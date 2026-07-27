@@ -65,5 +65,13 @@ export const toListMyRecordingsErrorResponse = (error: ListMyRecordingsError) =>
         },
         status: 404 as const,
       }
+    case 'PAGINATION_CURSOR_INVALID':
+      return {
+        body: {
+          error_code: error.type,
+          error_message: 'pagination cursor is invalid',
+        },
+        status: 400 as const,
+      }
   }
 }

@@ -46,6 +46,10 @@ describe('GET /api/recordings/:recordingId/trajectories', () => {
             created_at: '2026-06-12T00:00:00.000Z',
           },
         ],
+        pagination: {
+          next_cursor: null,
+          total_count: 1,
+        },
       },
     })
 
@@ -65,10 +69,18 @@ describe('GET /api/recordings/:recordingId/trajectories', () => {
           created_at: '2026-06-12T00:00:00.000Z',
         },
       ],
+      pagination: {
+        next_cursor: null,
+        total_count: 1,
+      },
     })
-    expect(listRecordingTrajectoriesMock).toHaveBeenCalledWith(managerActor, {
-      recordingId,
-    })
+    expect(listRecordingTrajectoriesMock).toHaveBeenCalledWith(
+      managerActor,
+      {
+        recordingId,
+      },
+      { limit: 20 }
+    )
   })
 
   it('存在しない recording は 404 を返す', async () => {
@@ -94,6 +106,45 @@ describe('GET /api/recordings/:recordingId/trajectories', () => {
       details: {
         recording_id: recordingId,
       },
+    })
+  })
+
+  it('pagination query が不正な場合は 400 を返す', async () => {
+    const recordingId = '22222222-2222-4222-8222-222222222222'
+    const app = createRouteTestApp('/recordings', registerListRecordingTrajectoriesRoute, {
+      actor: managerActor,
+    })
+    const response = await app.request(
+      `/api/recordings/${recordingId}/trajectories?limit=20&limit=30`
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'PAGINATION_QUERY_INVALID',
+      error_message: 'pagination query is invalid',
+    })
+    expect(listRecordingTrajectoriesMock).not.toHaveBeenCalled()
+  })
+
+  it('cursor payload が不正な場合は 400 を返す', async () => {
+    const recordingId = '22222222-2222-4222-8222-222222222222'
+    listRecordingTrajectoriesMock.mockResolvedValue({
+      ok: false,
+      error: {
+        type: 'PAGINATION_CURSOR_INVALID',
+      },
+    })
+    const app = createRouteTestApp('/recordings', registerListRecordingTrajectoriesRoute, {
+      actor: managerActor,
+    })
+    const response = await app.request(
+      `/api/recordings/${recordingId}/trajectories?cursor=invalid-but-basic-query`
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'PAGINATION_CURSOR_INVALID',
+      error_message: 'pagination cursor is invalid',
     })
   })
 

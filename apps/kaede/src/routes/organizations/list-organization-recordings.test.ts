@@ -31,12 +31,16 @@ describe('GET /api/organizations/:organizationId/recordings', () => {
             updated_at: '2026-06-11T00:00:00.000Z',
           },
         ],
+        pagination: {
+          next_cursor: null,
+          total_count: 1,
+        },
       },
     })
 
     const app = createRouteTestApp('/organizations', registerListOrganizationRecordingsRoute)
     const response = await app.request(
-      '/api/organizations/11111111-1111-4111-8111-111111111111/recordings',
+      '/api/organizations/11111111-1111-4111-8111-111111111111/recordings?limit=10&cursor=opaque-cursor',
       {
         headers: {
           cookie: 'okarin_session=session-token',
@@ -58,11 +62,30 @@ describe('GET /api/organizations/:organizationId/recordings', () => {
           updated_at: '2026-06-11T00:00:00.000Z',
         },
       ],
+      pagination: {
+        next_cursor: null,
+        total_count: 1,
+      },
     })
     expect(listOrganizationRecordingsForSessionMock).toHaveBeenCalledWith(
       'session-token',
-      '11111111-1111-4111-8111-111111111111'
+      '11111111-1111-4111-8111-111111111111',
+      { limit: 10, cursor: 'opaque-cursor' }
     )
+  })
+
+  it('pagination query が不正な場合は 400 を返す', async () => {
+    const app = createRouteTestApp('/organizations', registerListOrganizationRecordingsRoute)
+    const response = await app.request(
+      '/api/organizations/11111111-1111-4111-8111-111111111111/recordings?limit=20.0'
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'PAGINATION_QUERY_INVALID',
+      error_message: 'pagination query is invalid',
+    })
+    expect(listOrganizationRecordingsForSessionMock).not.toHaveBeenCalled()
   })
 
   it('未ログイン時 401 を返す', async () => {

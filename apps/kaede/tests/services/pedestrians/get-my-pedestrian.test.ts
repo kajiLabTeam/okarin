@@ -185,7 +185,7 @@ describe('listMyRecordings', () => {
       })
       .execute()
 
-    const result = await listMyRecordings(userActor(user.id))
+    const result = await listMyRecordings(userActor(user.id), { limit: 20 })
 
     expect(result).toMatchObject({
       ok: true,
@@ -216,7 +216,7 @@ describe('listMyRecordings', () => {
       .returning(['id'])
       .executeTakeFirstOrThrow()
 
-    const result = await listMyRecordings(userActor(user.id))
+    const result = await listMyRecordings(userActor(user.id), { limit: 20 })
 
     expect(result).toEqual({
       ok: false,

@@ -36,18 +36,6 @@ export const findTrajectoryById = async (
     .executeTakeFirst()
 }
 
-export const listTrajectoriesByRecordingId = async (
-  recordingId: string,
-  executor: DbExecutor = db
-): Promise<Trajectory[]> => {
-  return activeTrajectoriesQuery(executor)
-    .selectAll()
-    .where('recording_id', '=', recordingId)
-    .orderBy('created_at', 'desc')
-    .orderBy('id', 'desc')
-    .execute()
-}
-
 export const listTrajectoriesByRecordingIdPaginated = async (
   recordingId: string,
   options: PaginationOptions,

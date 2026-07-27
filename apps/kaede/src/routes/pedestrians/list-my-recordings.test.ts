@@ -41,6 +41,10 @@ describe('GET /api/pedestrians/me/recordings', () => {
             updated_at: '2026-06-11T00:00:00.000Z',
           },
         ],
+        pagination: {
+          next_cursor: null,
+          total_count: 1,
+        },
       },
     })
 
@@ -63,8 +67,12 @@ describe('GET /api/pedestrians/me/recordings', () => {
           updated_at: '2026-06-11T00:00:00.000Z',
         },
       ],
+      pagination: {
+        next_cursor: null,
+        total_count: 1,
+      },
     })
-    expect(listMyRecordingsMock).toHaveBeenCalledWith(userActor)
+    expect(listMyRecordingsMock).toHaveBeenCalledWith(userActor, { limit: 20 })
   })
 
   it('紐づく pedestrian がない場合は 404 を返す', async () => {
@@ -85,6 +93,20 @@ describe('GET /api/pedestrians/me/recordings', () => {
       error_code: 'PEDESTRIAN_NOT_FOUND',
       error_message: 'pedestrian not found',
     })
+  })
+
+  it('pagination query が不正な場合は 400 を返す', async () => {
+    const app = createRouteTestApp('/pedestrians', registerListMyRecordingsRoute, {
+      actor: userActor,
+    })
+    const response = await app.request('/api/pedestrians/me/recordings?limit=01')
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'PAGINATION_QUERY_INVALID',
+      error_message: 'pagination query is invalid',
+    })
+    expect(listMyRecordingsMock).not.toHaveBeenCalled()
   })
 
   it('service client は 403 を返す', async () => {
