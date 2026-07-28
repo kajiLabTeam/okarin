@@ -12,6 +12,7 @@ import {
   listOrganizationBuildingsForSession,
   listOrganizationFloorsForSession,
   listOrganizationRecordingsForSession,
+  listOrganizationTrajectoriesForSession,
   listOrganizationUsersForSession,
   listOrganizationsForSession,
 } from '../../../src/usecases/organizations/index.js'
@@ -890,6 +891,201 @@ describe('organizations usecase', () => {
             recording_id: activeRecording.id,
           },
         ],
+      },
+    })
+  })
+
+  it('admin can page through active trajectories in an organization', async () => {
+    const organization = await createOrganization()
+    const otherOrganization = await createOrganization('Group B')
+    const admin = await createUserWithSession({
+      email: 'admin@example.com',
+      globalRole: 'admin',
+    })
+    const recording = await createRecordingForOrganization(organization.id, 'A')
+    const otherRecording = await createRecordingForOrganization(otherOrganization.id, 'B')
+    const older = await db
+      .insertInto('trajectories')
+      .values({
+        recording_id: recording.id,
+        floor_id: recording.floor_id,
+        organization_id: organization.id,
+        status: 'completed',
+        created_at: '2026-06-10T00:00:00.123455Z',
+        updated_at: '2026-06-10T00:01:00.000Z',
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    const newer = await db
+      .insertInto('trajectories')
+      .values({
+        recording_id: recording.id,
+        floor_id: recording.floor_id,
+        organization_id: organization.id,
+        status: 'processing',
+        created_at: '2026-06-10T00:00:00.123456Z',
+        updated_at: '2026-06-10T00:02:00.000Z',
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    await db
+      .insertInto('trajectories')
+      .values([
+        {
+          recording_id: recording.id,
+          floor_id: recording.floor_id,
+          organization_id: organization.id,
+          status: 'completed',
+          deleted_at: fixedTimestamp,
+        },
+        {
+          recording_id: otherRecording.id,
+          floor_id: otherRecording.floor_id,
+          organization_id: otherOrganization.id,
+          status: 'completed',
+        },
+      ])
+      .execute()
+
+    const first = await listOrganizationTrajectoriesForSession(
+      admin.sessionToken,
+      organization.id,
+      { limit: 1 },
+      db
+    )
+
+    expect(first).toEqual({
+      ok: true,
+      value: {
+        trajectories: [
+          {
+            trajectory_id: newer.id,
+            recording_id: recording.id,
+            floor_id: recording.floor_id,
+            organization_id: organization.id,
+            status: 'processing',
+            created_at: '2026-06-10T00:00:00.123Z',
+            updated_at: '2026-06-10T00:02:00.000Z',
+          },
+        ],
+        pagination: {
+          next_cursor: expect.any(String),
+          total_count: 2,
+        },
+      },
+    })
+
+    if (!first.ok || !first.value.pagination.next_cursor) {
+      throw new Error('expected the first page to have a next cursor')
+    }
+
+    const second = await listOrganizationTrajectoriesForSession(
+      admin.sessionToken,
+      organization.id,
+      { limit: 1, cursor: first.value.pagination.next_cursor },
+      db
+    )
+
+    expect(second).toEqual({
+      ok: true,
+      value: {
+        trajectories: [
+          {
+            trajectory_id: older.id,
+            recording_id: recording.id,
+            floor_id: recording.floor_id,
+            organization_id: organization.id,
+            status: 'completed',
+            created_at: '2026-06-10T00:00:00.123Z',
+            updated_at: '2026-06-10T00:01:00.000Z',
+          },
+        ],
+        pagination: {
+          next_cursor: null,
+          total_count: 2,
+        },
+      },
+    })
+  })
+
+  it.each(['manager', 'owner'] as const)(
+    '%s can list trajectories in their organization',
+    async (role) => {
+      const organization = await createOrganization()
+      const actor = await createUserWithSession({
+        email: `${role}@example.com`,
+        globalRole: 'none',
+        membership: {
+          organizationId: organization.id,
+          role,
+        },
+      })
+
+      const result = await listOrganizationTrajectoriesForSession(
+        actor.sessionToken,
+        organization.id,
+        { limit: 20 },
+        db
+      )
+
+      expect(result).toEqual({
+        ok: true,
+        value: {
+          trajectories: [],
+          pagination: {
+            next_cursor: null,
+            total_count: 0,
+          },
+        },
+      })
+    }
+  )
+
+  it('manager cannot list trajectories in another organization', async () => {
+    const organization = await createOrganization()
+    const otherOrganization = await createOrganization('Group B')
+    const manager = await createUserWithSession({
+      email: 'manager@example.com',
+      globalRole: 'none',
+      membership: {
+        organizationId: organization.id,
+        role: 'manager',
+      },
+    })
+
+    const result = await listOrganizationTrajectoriesForSession(
+      manager.sessionToken,
+      otherOrganization.id,
+      { limit: 20 },
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'AUTH_FORBIDDEN',
+      },
+    })
+  })
+
+  it('organization trajectory list rejects an invalid cursor', async () => {
+    const organization = await createOrganization()
+    const admin = await createUserWithSession({
+      email: 'admin@example.com',
+      globalRole: 'admin',
+    })
+
+    const result = await listOrganizationTrajectoriesForSession(
+      admin.sessionToken,
+      organization.id,
+      { limit: 20, cursor: 'invalid-cursor' },
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'PAGINATION_CURSOR_INVALID',
       },
     })
   })
