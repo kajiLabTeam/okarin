@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi'
 
 import { isoDatetimeSchema, trajectoryStatusSchema, uuidSchema } from './common.js'
+import { paginationMetadataSchema } from './pagination.js'
 
 const finiteNumberSchema = z.number().finite()
 const directionSchema = finiteNumberSchema.min(0).lt(360)
@@ -256,6 +257,37 @@ export const trajectoryStatusResponseSchema = z.object({
   }),
 })
 
+export const organizationTrajectoriesResponseSchema = z.object({
+  trajectories: z
+    .array(
+      z.object({
+        trajectory_id: uuidSchema.openapi({
+          description: 'trajectory の ID',
+        }),
+        recording_id: uuidSchema.openapi({
+          description: '紐づく recording の ID',
+        }),
+        floor_id: uuidSchema.openapi({
+          description: '解析対象 floor の ID',
+        }),
+        organization_id: uuidSchema.openapi({
+          description: 'trajectory が所属する organization の ID',
+        }),
+        status: trajectoryStatusSchema,
+        created_at: isoDatetimeSchema.openapi({
+          description: 'trajectory の作成日時',
+        }),
+        updated_at: isoDatetimeSchema.openapi({
+          description: 'trajectory の最終更新日時',
+        }),
+      })
+    )
+    .openapi({
+      description: 'organization に紐づく trajectory の一覧',
+    }),
+  pagination: paginationMetadataSchema,
+})
+
 export const trajectoryResultResponseSchema = z.object({
   trajectory_id: uuidSchema.openapi({
     description: 'result を取得する trajectory の ID',
@@ -379,6 +411,9 @@ export type CreateTrajectoryRequest = z.infer<typeof createTrajectoryRequestSche
 export type TrajectoryConstraints = z.infer<typeof trajectoryConstraintsSchema>
 export type CallbackRequest = z.infer<typeof callbackRequestSchema>
 export type TrajectoryStatusResponse = z.infer<typeof trajectoryStatusResponseSchema>
+export type OrganizationTrajectoriesResponse = z.infer<
+  typeof organizationTrajectoriesResponseSchema
+>
 export type TrajectoryResultResponse = z.infer<typeof trajectoryResultResponseSchema>
 export type TrajectoryMapDataQuery = z.infer<typeof trajectoryMapDataQuerySchema>
 export type TrajectoryMapDataResponse = z.infer<typeof trajectoryMapDataResponseSchema>

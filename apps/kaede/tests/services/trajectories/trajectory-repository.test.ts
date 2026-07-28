@@ -3,6 +3,7 @@ import { createDb } from '../../../src/services/db/client.js'
 import {
   findTrajectoryById,
   insertTrajectory,
+  listTrajectoriesByOrganizationIdPaginated,
   listTrajectoriesByRecordingIdPaginated,
   markTrajectoryFailed,
   markTrajectoryProcessing,
@@ -242,5 +243,78 @@ describe('trajectory repository', () => {
       id: ids[1],
       cursor_created_at: timestamps[1],
     })
+  })
+
+  it('organization に紐づく未削除 trajectory を安定した順序でページングできる', async () => {
+    const fixtureA = await createRecordingFixture(db, { organizationName: 'Organization A' })
+    const fixtureB = await createRecordingFixture(db, { organizationName: 'Organization B' })
+    const ids = [
+      '11111111-1111-4111-8111-111111111111',
+      '22222222-2222-4222-8222-222222222222',
+      '33333333-3333-4333-8333-333333333333',
+    ]
+
+    for (const [id, createdAt] of [
+      [ids[0], '2026-07-28T00:00:00.123455Z'],
+      [ids[1], '2026-07-28T00:00:00.123456Z'],
+      [ids[2], '2026-07-28T00:00:00.123456Z'],
+    ] as const) {
+      await insertTrajectory(
+        {
+          id,
+          recording_id: fixtureA.recording.id,
+          floor_id: fixtureA.floor.id,
+          organization_id: fixtureA.organization.id,
+          status: 'completed',
+          created_at: createdAt,
+        },
+        db
+      )
+    }
+
+    await insertTrajectory(
+      {
+        recording_id: fixtureA.recording.id,
+        floor_id: fixtureA.floor.id,
+        organization_id: fixtureA.organization.id,
+        status: 'completed',
+        deleted_at: new Date('2026-07-28T01:00:00.000Z'),
+      },
+      db
+    )
+    await insertTrajectory(
+      {
+        recording_id: fixtureB.recording.id,
+        floor_id: fixtureB.floor.id,
+        organization_id: fixtureB.organization.id,
+        status: 'completed',
+        created_at: '2026-07-28T02:00:00.000000Z',
+      },
+      db
+    )
+
+    const first = await listTrajectoriesByOrganizationIdPaginated(
+      fixtureA.organization.id,
+      { limit: 2, cursor: null },
+      db
+    )
+    const second = await listTrajectoriesByOrganizationIdPaginated(
+      fixtureA.organization.id,
+      {
+        limit: 2,
+        cursor: {
+          createdAt: first.rows[1].cursor_created_at,
+          id: first.rows[1].id,
+        },
+      },
+      db
+    )
+
+    expect(first.totalCount).toBe(3)
+    expect(first.rows).toHaveLength(3)
+    expect(first.rows.slice(0, 2).map((trajectory) => trajectory.id)).toEqual([ids[2], ids[1]])
+    expect(first.rows[0].cursor_created_at).toBe('2026-07-28T00:00:00.123456Z')
+    expect(second.totalCount).toBe(3)
+    expect(second.rows.map((trajectory) => trajectory.id)).toEqual([ids[0]])
   })
 })

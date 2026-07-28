@@ -73,6 +73,43 @@ export const listTrajectoriesByRecordingIdPaginated = async (
   }
 }
 
+export const listTrajectoriesByOrganizationIdPaginated = async (
+  organizationId: string,
+  options: PaginationOptions,
+  executor: DbExecutor = db
+): Promise<TrajectoryPageRows> => {
+  let rowsQuery = activeTrajectoriesQuery(executor)
+    .selectAll()
+    .select(
+      sql<string>`to_char(trajectories.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`.as(
+        'cursor_created_at'
+      )
+    )
+    .where('organization_id', '=', organizationId)
+    .orderBy('created_at', 'desc')
+    .orderBy('id', 'desc')
+    .limit(options.limit + 1)
+
+  if (options.cursor) {
+    rowsQuery = rowsQuery.where(
+      sql<boolean>`(trajectories.created_at, trajectories.id) < (${options.cursor.createdAt}::timestamptz, ${options.cursor.id}::uuid)`
+    )
+  }
+
+  const [rows, countRow] = await Promise.all([
+    rowsQuery.execute(),
+    activeTrajectoriesQuery(executor)
+      .select(({ fn }) => fn.countAll<string>().as('count'))
+      .where('organization_id', '=', organizationId)
+      .executeTakeFirstOrThrow(),
+  ])
+
+  return {
+    rows,
+    totalCount: Number(countRow.count),
+  }
+}
+
 export const insertTrajectory = async (
   newTrajectory: NewTrajectoryInput,
   executor: DbExecutor = db

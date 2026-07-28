@@ -11,6 +11,7 @@ import { registerListOrganizationBuildingFloorsRoute } from './list-organization
 import { registerListOrganizationBuildingsRoute } from './list-organization-buildings.js'
 import { registerListOrganizationFloorsRoute } from './list-organization-floors.js'
 import { registerListOrganizationRecordingsRoute } from './list-organization-recordings.js'
+import { registerListOrganizationTrajectoriesRoute } from './list-organization-trajectories.js'
 import { registerListOrganizationUsersRoute } from './list-organization-users.js'
 import { registerListOrganizationsRoute } from './list-organizations.js'
 
@@ -25,6 +26,7 @@ registerCreateOrganizationBuildingFloorRoute(organizationsRoutes)
 registerListOrganizationBuildingFloorsRoute(organizationsRoutes)
 registerListOrganizationFloorsRoute(organizationsRoutes)
 registerListOrganizationRecordingsRoute(organizationsRoutes)
+registerListOrganizationTrajectoriesRoute(organizationsRoutes)
 registerListOrganizationUsersRoute(organizationsRoutes)
 registerGetOrganizationUserRoute(organizationsRoutes)
 registerCreateOrganizationUserRoute(organizationsRoutes)

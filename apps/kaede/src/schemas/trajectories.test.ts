@@ -7,6 +7,7 @@ import {
   cloneAndReanalyzeRequestSchema,
   createTrajectoryResponseSchema,
   createTrajectoryRequestSchema,
+  organizationTrajectoriesResponseSchema,
   retriedTrajectoryResponseSchema,
   trajectoryResultResponseSchema,
   trajectoryStatusResponseSchema,
@@ -57,6 +58,28 @@ describe('trajectory schemas', () => {
       error_code: 'NOZOMI_REQUEST_FAILED',
       error_message: 'failed to submit analyze request to nozomi',
       failed_at: '2026-05-13T00:00:00.000Z',
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('organizationTrajectoriesResponseSchema は表示用情報と pagination を受け入れる', () => {
+    const result = organizationTrajectoriesResponseSchema.safeParse({
+      trajectories: [
+        {
+          trajectory_id: '33333333-3333-4333-8333-333333333333',
+          recording_id: '11111111-1111-4111-8111-111111111111',
+          floor_id: '22222222-2222-4222-8222-222222222222',
+          organization_id: '99999999-9999-4999-8999-999999999999',
+          status: 'completed',
+          created_at: '2026-07-28T00:00:00.000Z',
+          updated_at: '2026-07-28T00:01:00.000Z',
+        },
+      ],
+      pagination: {
+        next_cursor: null,
+        total_count: 1,
+      },
     })
 
     expect(result.success).toBe(true)
