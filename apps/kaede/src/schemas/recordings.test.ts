@@ -113,6 +113,10 @@ describe('recording schemas', () => {
           created_at: '2026-05-13T00:00:00.000Z',
         },
       ],
+      pagination: {
+        next_cursor: null,
+        total_count: 1,
+      },
     })
 
     expect(result.success).toBe(true)

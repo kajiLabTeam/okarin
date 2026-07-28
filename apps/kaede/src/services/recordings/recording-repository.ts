@@ -1,4 +1,6 @@
+import { sql } from 'kysely'
 import type { Insertable, Kysely, Selectable, Transaction, Updateable } from 'kysely'
+import type { PaginationOptions } from '../../schemas/pagination.js'
 import type { TrajectoryConstraints } from '../../schemas/trajectories.js'
 import type { Recordings } from '../db/generated.js'
 import { db } from '../db/index.js'
@@ -12,6 +14,15 @@ type NewRecordingInput = Omit<NewRecording, 'constraints'> & {
 }
 type RecordingUpdate = Updateable<Recordings>
 export type { Recording }
+
+export type RecordingPageRow = Recording & {
+  cursor_created_at: string
+}
+
+export interface RecordingPageRows {
+  rows: RecordingPageRow[]
+  totalCount: number
+}
 
 export interface RecordingAuthorizationRow {
   id: string
@@ -33,26 +44,78 @@ export const findRecordingById = async (
     .executeTakeFirst()
 }
 
-export const listRecordingsByOrganizationId = async (
+export const listRecordingsByOrganizationIdPaginated = async (
   organizationId: string,
+  options: PaginationOptions,
   executor: DbExecutor = db
-): Promise<Recording[]> => {
-  return activeRecordingsQuery(executor)
+): Promise<RecordingPageRows> => {
+  let rowsQuery = activeRecordingsQuery(executor)
     .selectAll()
+    .select(
+      sql<string>`to_char(recordings.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`.as(
+        'cursor_created_at'
+      )
+    )
     .where('organization_id', '=', organizationId)
     .orderBy('created_at', 'desc')
-    .execute()
+    .orderBy('id', 'desc')
+    .limit(options.limit + 1)
+
+  if (options.cursor) {
+    rowsQuery = rowsQuery.where(
+      sql<boolean>`(recordings.created_at, recordings.id) < (${options.cursor.createdAt}::timestamptz, ${options.cursor.id}::uuid)`
+    )
+  }
+
+  const [rows, countRow] = await Promise.all([
+    rowsQuery.execute(),
+    activeRecordingsQuery(executor)
+      .select(({ fn }) => fn.countAll<string>().as('count'))
+      .where('organization_id', '=', organizationId)
+      .executeTakeFirstOrThrow(),
+  ])
+
+  return {
+    rows,
+    totalCount: Number(countRow.count),
+  }
 }
 
-export const listRecordingsByPedestrianId = async (
+export const listRecordingsByPedestrianIdPaginated = async (
   pedestrianId: string,
+  options: PaginationOptions,
   executor: DbExecutor = db
-): Promise<Recording[]> => {
-  return activeRecordingsQuery(executor)
+): Promise<RecordingPageRows> => {
+  let rowsQuery = activeRecordingsQuery(executor)
     .selectAll()
+    .select(
+      sql<string>`to_char(recordings.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`.as(
+        'cursor_created_at'
+      )
+    )
     .where('pedestrian_id', '=', pedestrianId)
     .orderBy('created_at', 'desc')
-    .execute()
+    .orderBy('id', 'desc')
+    .limit(options.limit + 1)
+
+  if (options.cursor) {
+    rowsQuery = rowsQuery.where(
+      sql<boolean>`(recordings.created_at, recordings.id) < (${options.cursor.createdAt}::timestamptz, ${options.cursor.id}::uuid)`
+    )
+  }
+
+  const [rows, countRow] = await Promise.all([
+    rowsQuery.execute(),
+    activeRecordingsQuery(executor)
+      .select(({ fn }) => fn.countAll<string>().as('count'))
+      .where('pedestrian_id', '=', pedestrianId)
+      .executeTakeFirstOrThrow(),
+  ])
+
+  return {
+    rows,
+    totalCount: Number(countRow.count),
+  }
 }
 
 export const findRecordingAuthorizationById = async (

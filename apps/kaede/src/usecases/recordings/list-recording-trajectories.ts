@@ -1,11 +1,13 @@
 import type { RequestActor } from '../../middleware/request-actor-context.js'
+import { buildPaginatedResult, decodePaginationCursor } from '../../schemas/pagination.js'
+import type { PaginationQuery } from '../../schemas/pagination.js'
 import type { RecordingIdParams, RecordingTrajectoriesResponse } from '../../schemas/recordings.js'
 import {
   findRecordingAuthorizationById,
   findRecordingById,
 } from '../../services/recordings/index.js'
 import type { Trajectory } from '../../services/trajectories/index.js'
-import { listTrajectoriesByRecordingId } from '../../services/trajectories/index.js'
+import { listTrajectoriesByRecordingIdPaginated } from '../../services/trajectories/index.js'
 import type { AuthorizationError } from '../authorization.js'
 import { requireOrganizationManager } from '../authorization.js'
 
@@ -14,6 +16,9 @@ export type ListRecordingTrajectoriesError =
   | {
       type: 'RECORDING_NOT_FOUND'
       recordingId: string
+    }
+  | {
+      type: 'PAGINATION_CURSOR_INVALID'
     }
 
 export type ListRecordingTrajectoriesResult =
@@ -37,7 +42,8 @@ const toTrajectorySummary = (
 
 export const listRecordingTrajectories = async (
   actor: RequestActor,
-  params: RecordingIdParams
+  params: RecordingIdParams,
+  query: PaginationQuery
 ): Promise<ListRecordingTrajectoriesResult> => {
   const recording = await findRecordingById(params.recordingId)
 
@@ -69,13 +75,27 @@ export const listRecordingTrajectories = async (
     return authorization
   }
 
-  const trajectories = await listTrajectoriesByRecordingId(recording.id)
+  const cursorResult = query.cursor ? decodePaginationCursor(query.cursor) : null
+
+  if (cursorResult && !cursorResult.ok) {
+    return cursorResult
+  }
+
+  const pageRows = await listTrajectoriesByRecordingIdPaginated(recording.id, {
+    limit: query.limit,
+    cursor: cursorResult?.value ?? null,
+  })
+  const page = buildPaginatedResult(pageRows.rows, query.limit, pageRows.totalCount)
 
   return {
     ok: true,
     value: {
       recording_id: recording.id,
-      trajectories: trajectories.map(toTrajectorySummary),
+      trajectories: page.items.map(toTrajectorySummary),
+      pagination: {
+        next_cursor: page.nextCursor,
+        total_count: page.totalCount,
+      },
     },
   }
 }

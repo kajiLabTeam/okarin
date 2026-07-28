@@ -8,6 +8,7 @@ import {
   uploadTargetsSchema,
   uuidSchema,
 } from './common.js'
+import { paginationMetadataSchema } from './pagination.js'
 import { trajectoryConstraintsSchema } from './trajectories.js'
 
 const uploadUrlsSchema = z.object({
@@ -139,6 +140,7 @@ export const recordingDetailResponseSchema = z.object({
 
 export const recordingsResponseSchema = z.object({
   recordings: z.array(recordingDetailResponseSchema),
+  pagination: paginationMetadataSchema,
 })
 
 export const recordingTrajectoriesResponseSchema = z.object({
@@ -163,6 +165,7 @@ export const recordingTrajectoriesResponseSchema = z.object({
     .openapi({
       description: 'recording に紐づく trajectory の一覧',
     }),
+  pagination: paginationMetadataSchema,
 })
 
 export const recordingGroundTruthUploadUrlResponseSchema = z.object({

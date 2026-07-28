@@ -3,7 +3,7 @@ import { createDb } from '../../../src/services/db/client.js'
 import {
   findTrajectoryById,
   insertTrajectory,
-  listTrajectoriesByRecordingId,
+  listTrajectoriesByRecordingIdPaginated,
   markTrajectoryFailed,
   markTrajectoryProcessing,
   softDeleteTrajectory,
@@ -113,9 +113,13 @@ describe('trajectory repository', () => {
       db
     )
 
-    const trajectories = await listTrajectoriesByRecordingId(recording.id, db)
+    const trajectories = await listTrajectoriesByRecordingIdPaginated(
+      recording.id,
+      { limit: 100, cursor: null },
+      db
+    )
 
-    expect(trajectories.map((trajectory) => trajectory.id)).toEqual([newer.id, older.id])
+    expect(trajectories.rows.map((trajectory) => trajectory.id)).toEqual([newer.id, older.id])
   })
 
   it('trajectory を論理削除し active query から除外できる', async () => {
@@ -138,11 +142,15 @@ describe('trajectory repository', () => {
 
     const deleted = await softDeleteTrajectory(created.id, deletedAt, db)
     const found = await findTrajectoryById(created.id, db)
-    const listed = await listTrajectoriesByRecordingId(recording.id, db)
+    const listed = await listTrajectoriesByRecordingIdPaginated(
+      recording.id,
+      { limit: 100, cursor: null },
+      db
+    )
 
     expect(deleted?.deleted_at?.toISOString()).toBe('2026-06-14T00:00:00.000Z')
     expect(found).toBeUndefined()
-    expect(listed).toEqual([])
+    expect(listed).toEqual({ rows: [], totalCount: 0 })
   })
 
   it('削除済み trajectory は再削除しない', async () => {
@@ -166,5 +174,73 @@ describe('trajectory repository', () => {
     const deleted = await softDeleteTrajectory(created.id, new Date('2026-06-14T00:00:00.000Z'), db)
 
     expect(deleted).toBeUndefined()
+  })
+
+  it('trajectory をマイクロ秒精度の cursor でページングできる', async () => {
+    const { floor, organization, recording } = await createRecordingFixture(db)
+    const ids = [
+      '11111111-1111-4111-8111-111111111111',
+      '22222222-2222-4222-8222-222222222222',
+      '33333333-3333-4333-8333-333333333333',
+    ]
+    const timestamps = [
+      '2026-07-28T00:00:00.123400Z',
+      '2026-07-28T00:00:00.123500Z',
+      '2026-07-28T00:00:00.123600Z',
+    ]
+
+    for (const [index, id] of ids.entries()) {
+      await insertTrajectory(
+        {
+          id,
+          recording_id: recording.id,
+          floor_id: floor.id,
+          organization_id: organization.id,
+          status: 'completed',
+          created_at: timestamps[index],
+        },
+        db
+      )
+    }
+
+    await insertTrajectory(
+      {
+        recording_id: recording.id,
+        floor_id: floor.id,
+        organization_id: organization.id,
+        status: 'completed',
+        deleted_at: new Date('2026-07-28T01:00:00.000Z'),
+      },
+      db
+    )
+
+    const first = await listTrajectoriesByRecordingIdPaginated(
+      recording.id,
+      { limit: 1, cursor: null },
+      db
+    )
+    const second = await listTrajectoriesByRecordingIdPaginated(
+      recording.id,
+      {
+        limit: 1,
+        cursor: {
+          createdAt: first.rows[0].cursor_created_at,
+          id: first.rows[0].id,
+        },
+      },
+      db
+    )
+
+    expect(first.totalCount).toBe(3)
+    expect(first.rows).toHaveLength(2)
+    expect(first.rows[0]).toMatchObject({
+      id: ids[2],
+      cursor_created_at: timestamps[2],
+    })
+    expect(second.totalCount).toBe(3)
+    expect(second.rows[0]).toMatchObject({
+      id: ids[1],
+      cursor_created_at: timestamps[1],
+    })
   })
 })
