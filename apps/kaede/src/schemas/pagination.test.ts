@@ -65,6 +65,9 @@ describe('pagination cursor codec', () => {
     Buffer.from(
       JSON.stringify({ v: 1, created_at: '2026-07-28T00:00:00.123Z', id: cursor.id })
     ).toString('base64url'),
+    Buffer.from(
+      JSON.stringify({ v: 1, created_at: '0000-01-01T00:00:00.000000Z', id: cursor.id })
+    ).toString('base64url'),
     Buffer.from(JSON.stringify({ v: 1, created_at: cursor.createdAt, id: 'not-a-uuid' })).toString(
       'base64url'
     ),

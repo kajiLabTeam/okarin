@@ -7,7 +7,13 @@ const base64UrlSchema = z
   .min(1)
   .max(MAX_CURSOR_LENGTH)
   .regex(/^[A-Za-z0-9_-]+$/)
-const cursorTimestampSchema = z.string().datetime({ offset: false, precision: 6 }).regex(/Z$/)
+const cursorTimestampSchema = z
+  .string()
+  .datetime({ offset: false, precision: 6 })
+  .regex(/Z$/)
+  .refine((value) => !value.startsWith('0000-'), {
+    message: 'year 0000 is not supported by PostgreSQL timestamptz',
+  })
 
 const paginationCursorPayloadSchema = z
   .object({

@@ -126,6 +126,20 @@ describe('GET /api/recordings/:recordingId/trajectories', () => {
     expect(listRecordingTrajectoriesMock).not.toHaveBeenCalled()
   })
 
+  it('recordingId が UUID でない場合は共通形式の 400 を返す', async () => {
+    const app = createRouteTestApp('/recordings', registerListRecordingTrajectoriesRoute, {
+      actor: managerActor,
+    })
+    const response = await app.request('/api/recordings/not-a-uuid/trajectories')
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'REQUEST_PARAMS_INVALID',
+      error_message: 'request parameters are invalid',
+    })
+    expect(listRecordingTrajectoriesMock).not.toHaveBeenCalled()
+  })
+
   it('cursor payload が不正な場合は 400 を返す', async () => {
     const recordingId = '22222222-2222-4222-8222-222222222222'
     listRecordingTrajectoriesMock.mockResolvedValue({

@@ -88,6 +88,18 @@ describe('GET /api/organizations/:organizationId/recordings', () => {
     expect(listOrganizationRecordingsForSessionMock).not.toHaveBeenCalled()
   })
 
+  it('organizationId が UUID でない場合は共通形式の 400 を返す', async () => {
+    const app = createRouteTestApp('/organizations', registerListOrganizationRecordingsRoute)
+    const response = await app.request('/api/organizations/not-a-uuid/recordings')
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toEqual({
+      error_code: 'REQUEST_PARAMS_INVALID',
+      error_message: 'request parameters are invalid',
+    })
+    expect(listOrganizationRecordingsForSessionMock).not.toHaveBeenCalled()
+  })
+
   it('未ログイン時 401 を返す', async () => {
     listOrganizationRecordingsForSessionMock.mockResolvedValue({
       ok: false,

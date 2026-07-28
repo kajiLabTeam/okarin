@@ -28,7 +28,7 @@ export const registerListOrganizationRecordingsRoute = (app: OpenAPIHono) => {
         },
       },
       400: {
-        description: 'invalid pagination query or cursor',
+        description: 'invalid request parameter, pagination query, or cursor',
         content: {
           'application/json': {
             schema: errorResponseSchema,
@@ -96,6 +96,16 @@ export const registerListOrganizationRecordingsRoute = (app: OpenAPIHono) => {
           {
             error_code: 'PAGINATION_QUERY_INVALID',
             error_message: 'pagination query is invalid',
+          },
+          400
+        )
+      }
+
+      if (!result.success && result.target === 'param') {
+        return c.json(
+          {
+            error_code: 'REQUEST_PARAMS_INVALID',
+            error_message: 'request parameters are invalid',
           },
           400
         )
