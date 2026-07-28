@@ -16,6 +16,7 @@ import type {
 import { buildPaginatedResult, decodePaginationCursor } from '../../schemas/pagination.js'
 import type { PaginationQuery } from '../../schemas/pagination.js'
 import type { RecordingDetailResponse } from '../../schemas/recordings.js'
+import type { OrganizationTrajectoriesResponse } from '../../schemas/trajectories.js'
 import {
   generateActivationToken,
   hashActivationToken,
@@ -48,6 +49,8 @@ import type {
 } from '../../services/organizations/index.js'
 import { insertPedestrian } from '../../services/pedestrians/index.js'
 import { listRecordingsByOrganizationIdPaginated } from '../../services/recordings/index.js'
+import type { Trajectory } from '../../services/trajectories/index.js'
+import { listTrajectoriesByOrganizationIdPaginated } from '../../services/trajectories/index.js'
 import {
   findOrganizationMembership,
   findOrganizationUserById,
@@ -414,6 +417,67 @@ export const listOrganizationRecordingsForSession = async (
     ok: true,
     value: {
       recordings: page.items.map(toRecordingDetailResponse),
+      pagination: {
+        next_cursor: page.nextCursor,
+        total_count: page.totalCount,
+      },
+    },
+  }
+}
+
+const toOrganizationTrajectoryResponse = (
+  trajectory: Trajectory
+): OrganizationTrajectoriesResponse['trajectories'][number] => ({
+  trajectory_id: trajectory.id,
+  recording_id: trajectory.recording_id,
+  floor_id: trajectory.floor_id,
+  organization_id: trajectory.organization_id,
+  status: trajectory.status as OrganizationTrajectoriesResponse['trajectories'][number]['status'],
+  created_at: trajectory.created_at.toISOString(),
+  updated_at: trajectory.updated_at.toISOString(),
+})
+
+export const listOrganizationTrajectoriesForSession = async (
+  sessionToken: string | undefined,
+  organizationId: string,
+  query: PaginationQuery,
+  executor?: DbExecutor
+): Promise<
+  | {
+      ok: true
+      value: OrganizationTrajectoriesResponse
+    }
+  | {
+      ok: false
+      error: OrganizationError | { type: 'PAGINATION_CURSOR_INVALID' }
+    }
+> => {
+  const actor = await requireOrganizationManagerOrAdmin(sessionToken, organizationId, executor)
+
+  if (!actor.ok) {
+    return actor
+  }
+
+  const cursorResult = query.cursor ? decodePaginationCursor(query.cursor) : null
+
+  if (cursorResult && !cursorResult.ok) {
+    return cursorResult
+  }
+
+  const pageRows = await listTrajectoriesByOrganizationIdPaginated(
+    organizationId,
+    {
+      limit: query.limit,
+      cursor: cursorResult?.value ?? null,
+    },
+    executor
+  )
+  const page = buildPaginatedResult(pageRows.rows, query.limit, pageRows.totalCount)
+
+  return {
+    ok: true,
+    value: {
+      trajectories: page.items.map(toOrganizationTrajectoryResponse),
       pagination: {
         next_cursor: page.nextCursor,
         total_count: page.totalCount,
