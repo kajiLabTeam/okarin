@@ -664,6 +664,13 @@ CREATE INDEX trajectories_organization_id_idx ON public.trajectories USING btree
 
 
 --
+-- Name: trajectories_organization_created_at_id_active_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX trajectories_organization_created_at_id_active_idx ON public.trajectories USING btree (organization_id, created_at DESC, id DESC) WHERE (deleted_at IS NULL);
+
+
+--
 -- Name: trajectories_recording_created_at_id_active_idx; Type: INDEX; Schema: public; Owner: -
 --
 
