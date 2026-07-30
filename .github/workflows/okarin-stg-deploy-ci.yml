@@ -15,7 +15,7 @@ jobs:
   deploy:
     name: Deploy staging
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     env:
       SSH_PROXY_COMMAND: /tmp/cloudflared/cloudflared access ssh --id ${{ secrets.CLOUDFLARED_SSH_ID }} --secret ${{ secrets.CLOUDFLARED_SSH_SECRET }} --hostname %h
       TARGET_HOST: ${{ secrets.DEPLOY_STG_SSH_HOST }}
