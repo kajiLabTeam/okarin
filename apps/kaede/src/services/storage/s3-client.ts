@@ -8,6 +8,7 @@ interface StorageConfig {
   floorMapDownloadUrlTtlSeconds: number
   publicEndpoint: string
   region: string
+  recordingRawDownloadUrlTtlSeconds: number
   recordingUploadUrlTtlSeconds: number
   secretAccessKey: string
   trajectoryRawDownloadUrlTtlSeconds: number
@@ -39,6 +40,7 @@ const getStorageConfig = (): StorageConfig => {
     floorMapDownloadUrlTtlSeconds: storage.floorMapDownloadUrlTtlSeconds,
     publicEndpoint: storage.publicEndpoint,
     region: storage.region,
+    recordingRawDownloadUrlTtlSeconds: storage.recordingRawDownloadUrlTtlSeconds,
     recordingUploadUrlTtlSeconds: storage.recordingUploadUrlTtlSeconds,
     secretAccessKey: storage.secretAccessKey,
     trajectoryRawDownloadUrlTtlSeconds: storage.trajectoryRawDownloadUrlTtlSeconds,

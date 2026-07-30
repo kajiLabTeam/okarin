@@ -4,6 +4,7 @@ import { registerCompleteGroundTruthUploadRoute } from './complete-ground-truth-
 import { registerCompleteUploadRoute } from './complete-upload.js'
 import { registerCreateTrajectoryRoute } from './create-trajectory.js'
 import { registerGetRecordingConstraintsRoute } from './get-recording-constraints.js'
+import { registerGetRecordingRawRoute } from './get-recording-raw.js'
 import { registerGetRecordingRoute } from './get-recording.js'
 import { registerInitRecordingRoute } from './init-recording.js'
 import { registerIssueGroundTruthUploadUrlRoute } from './issue-ground-truth-upload-url.js'
@@ -20,6 +21,7 @@ registerCreateTrajectoryRoute(recordingsRoutes)
 registerGetRecordingConstraintsRoute(recordingsRoutes)
 registerUpdateRecordingConstraintsRoute(recordingsRoutes)
 registerGetRecordingRoute(recordingsRoutes)
+registerGetRecordingRawRoute(recordingsRoutes)
 registerListRecordingTrajectoriesRoute(recordingsRoutes)
 registerIssueGroundTruthUploadUrlRoute(recordingsRoutes)
 registerCompleteGroundTruthUploadRoute(recordingsRoutes)

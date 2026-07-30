@@ -53,6 +53,7 @@ export interface StorageRuntimeConfig {
   internalEndpoint: string
   publicEndpoint: string
   region: string
+  recordingRawDownloadUrlTtlSeconds: number
   recordingUploadUrlTtlSeconds: number
   secretAccessKey: string
   trajectoryRawDownloadUrlTtlSeconds: number
@@ -73,8 +74,10 @@ const defaultPort = 8080
 const defaultCallbackTokenTtlSeconds = 24 * 60 * 60
 const defaultNozomiRequestTimeoutMs = 10 * 1000
 const defaultFloorMapDownloadUrlTtlSeconds = 60 * 60
+const defaultRecordingRawDownloadUrlTtlSeconds = 15 * 60
 const defaultRecordingUploadUrlTtlSeconds = 15 * 60
 const defaultTrajectoryPresignTtlSeconds = 24 * 60 * 60
+const defaultTrajectoryResultDownloadUrlTtlSeconds = 15 * 60
 
 let appRuntimeConfig: AppRuntimeConfig | undefined
 let callbackRuntimeConfig: CallbackRuntimeConfig | undefined
@@ -229,6 +232,10 @@ export const getStorageRuntimeConfig = (): StorageRuntimeConfig => {
     internalEndpoint,
     publicEndpoint: normalizeBaseUrl(process.env.S3_PUBLIC_ENDPOINT ?? internalEndpoint),
     region: getRequiredEnv('S3_REGION'),
+    recordingRawDownloadUrlTtlSeconds: parsePositiveIntegerEnv(
+      'S3_RECORDING_RAW_DOWNLOAD_URL_TTL_SECONDS',
+      defaultRecordingRawDownloadUrlTtlSeconds
+    ),
     recordingUploadUrlTtlSeconds: parsePositiveIntegerEnv(
       'S3_RECORDING_UPLOAD_URL_TTL_SECONDS',
       defaultRecordingUploadUrlTtlSeconds
@@ -240,7 +247,7 @@ export const getStorageRuntimeConfig = (): StorageRuntimeConfig => {
     ),
     trajectoryResultDownloadUrlTtlSeconds: parsePositiveIntegerEnv(
       'S3_TRAJECTORY_RESULT_DOWNLOAD_URL_TTL_SECONDS',
-      defaultTrajectoryPresignTtlSeconds
+      defaultTrajectoryResultDownloadUrlTtlSeconds
     ),
     trajectoryResultUploadUrlTtlSeconds: parsePositiveIntegerEnv(
       'S3_TRAJECTORY_RESULT_UPLOAD_URL_TTL_SECONDS',

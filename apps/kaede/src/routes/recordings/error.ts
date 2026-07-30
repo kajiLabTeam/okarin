@@ -1,5 +1,6 @@
 import type { CompleteUploadResult } from '../../usecases/recordings/complete-upload.js'
 import type { GetRecordingConstraintsResult } from '../../usecases/recordings/get-recording-constraints.js'
+import type { GetRecordingRawResult } from '../../usecases/recordings/get-recording-raw.js'
 import type { GetRecordingResult } from '../../usecases/recordings/get-recording.js'
 import type { InitRecordingResult } from '../../usecases/recordings/init-recording.js'
 import type { ListRecordingTrajectoriesResult } from '../../usecases/recordings/list-recording-trajectories.js'
@@ -11,6 +12,7 @@ import { toAuthorizationErrorResponse } from '../authorization-error.js'
 type InitRecordingError = Extract<InitRecordingResult, { ok: false }>['error']
 type CompleteUploadError = Extract<CompleteUploadResult, { ok: false }>['error']
 type GetRecordingError = Extract<GetRecordingResult, { ok: false }>['error']
+type GetRecordingRawError = Extract<GetRecordingRawResult, { ok: false }>['error']
 type ListRecordingTrajectoriesError = Extract<
   ListRecordingTrajectoriesResult,
   { ok: false }
@@ -182,6 +184,36 @@ export const toGetRecordingErrorResponse = (error: GetRecordingError) => {
           },
         },
         status: 404 as const,
+      }
+  }
+}
+
+export const toGetRecordingRawErrorResponse = (error: GetRecordingRawError) => {
+  switch (error.type) {
+    case 'AUTH_DASHBOARD_FORBIDDEN':
+    case 'AUTH_ORGANIZATION_FORBIDDEN':
+      return toAuthorizationErrorResponse(error)
+    case 'RECORDING_NOT_FOUND':
+      return {
+        body: {
+          error_code: error.type,
+          error_message: 'recording not found',
+          details: {
+            recording_id: error.recordingId,
+          },
+        },
+        status: 404 as const,
+      }
+    case 'RECORDING_RAW_NOT_FOUND':
+      return {
+        body: {
+          error_code: error.type,
+          error_message: 'recording raw data not found',
+          details: {
+            recording_id: error.recordingId,
+          },
+        },
+        status: 409 as const,
       }
   }
 }

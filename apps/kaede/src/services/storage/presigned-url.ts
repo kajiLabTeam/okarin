@@ -18,6 +18,8 @@ export interface RecordingRawDownloadUrls {
   wifi?: string
 }
 
+export type RecordingDownloadUrls = Partial<Record<UploadTarget, string>>
+
 export type FloorMapImageExtension = 'png' | 'svg'
 
 export type FloorMapContentType = 'image/png' | 'image/svg+xml'
@@ -117,6 +119,37 @@ export const issueFloorMapDownloadUrl = async (objectKey: string, now: Date = ne
     url,
   }
 }
+
+export const issueRecordingRawDownloadUrls = async (
+  organizationId: string,
+  recordingId: string,
+  targets: UploadTarget[],
+  now: Date = new Date()
+) => {
+  const { config, presignClient } = getS3Context()
+  const downloadUrls: RecordingDownloadUrls = {}
+
+  await Promise.all(
+    targets.map(async (target) => {
+      downloadUrls[target] = await getSignedUrl(
+        presignClient,
+        new GetObjectCommand({
+          Bucket: config.bucket,
+          Key: buildRecordingRawObjectKey(organizationId, recordingId, target),
+        }),
+        { expiresIn: config.recordingRawDownloadUrlTtlSeconds }
+      )
+    })
+  )
+
+  return {
+    downloadUrls,
+    expiresAt: new Date(
+      now.getTime() + config.recordingRawDownloadUrlTtlSeconds * 1000
+    ).toISOString(),
+  }
+}
+
 export const issueInternalRecordingRawDownloadUrls = async (
   organizationId: string,
   recordingId: string,
