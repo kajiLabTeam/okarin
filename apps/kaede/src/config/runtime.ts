@@ -75,6 +75,7 @@ const defaultNozomiRequestTimeoutMs = 10 * 1000
 const defaultFloorMapDownloadUrlTtlSeconds = 60 * 60
 const defaultRecordingUploadUrlTtlSeconds = 15 * 60
 const defaultTrajectoryPresignTtlSeconds = 24 * 60 * 60
+const defaultTrajectoryResultDownloadUrlTtlSeconds = 15 * 60
 
 let appRuntimeConfig: AppRuntimeConfig | undefined
 let callbackRuntimeConfig: CallbackRuntimeConfig | undefined
@@ -240,7 +241,7 @@ export const getStorageRuntimeConfig = (): StorageRuntimeConfig => {
     ),
     trajectoryResultDownloadUrlTtlSeconds: parsePositiveIntegerEnv(
       'S3_TRAJECTORY_RESULT_DOWNLOAD_URL_TTL_SECONDS',
-      defaultTrajectoryPresignTtlSeconds
+      defaultTrajectoryResultDownloadUrlTtlSeconds
     ),
     trajectoryResultUploadUrlTtlSeconds: parsePositiveIntegerEnv(
       'S3_TRAJECTORY_RESULT_UPLOAD_URL_TTL_SECONDS',
