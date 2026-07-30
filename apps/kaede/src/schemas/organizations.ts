@@ -6,29 +6,39 @@ import {
   pedestrianSchema,
 } from './pedestrians.js'
 
-export const organizationSchema = z.object({
-  organization_id: uuidSchema,
-  name: z.string().min(1).max(255),
-  created_at: isoDatetimeSchema,
-  updated_at: isoDatetimeSchema,
-})
+export const organizationSchema = z
+  .object({
+    organization_id: uuidSchema,
+    name: z.string().min(1).max(255),
+    created_at: isoDatetimeSchema,
+    updated_at: isoDatetimeSchema,
+  })
+  .openapi('Organization')
 
-export const organizationIdParamsSchema = z.object({
-  organizationId: uuidSchema,
-})
+export const organizationIdParamsSchema = z
+  .object({
+    organizationId: uuidSchema,
+  })
+  .openapi('OrganizationIdParams')
 
-export const organizationUserParamsSchema = z.object({
-  organizationId: uuidSchema,
-  userId: uuidSchema,
-})
+export const organizationUserParamsSchema = z
+  .object({
+    organizationId: uuidSchema,
+    userId: uuidSchema,
+  })
+  .openapi('OrganizationUserParams')
 
-export const organizationsResponseSchema = z.object({
-  organizations: z.array(organizationSchema),
-})
+export const organizationsResponseSchema = z
+  .object({
+    organizations: z.array(organizationSchema),
+  })
+  .openapi('OrganizationsResponse')
 
-export const createOrganizationRequestSchema = z.object({
-  name: z.string().min(1).max(255),
-})
+export const createOrganizationRequestSchema = z
+  .object({
+    name: z.string().min(1).max(255),
+  })
+  .openapi('CreateOrganizationRequest')
 
 export const organizationSlugSchema = z
   .string()
@@ -39,59 +49,78 @@ export const organizationSlugSchema = z
     (slug) => !['admin', 'api', 'auth', 'platform', 'new', 'settings'].includes(slug),
     'reserved organization slug'
   )
+  .openapi('OrganizationSlug')
 
-export const organizationCreationRequestStatusSchema = z.enum(['pending', 'approved', 'rejected'])
+export const organizationCreationRequestStatusSchema = z
+  .enum(['pending', 'approved', 'rejected'])
+  .openapi('OrganizationCreationRequestStatus')
 
-export const organizationCreationRequestSchema = z.object({
-  request_id: uuidSchema,
-  requester_user_id: uuidSchema,
-  requested_organization_name: z.string().min(1),
-  requested_slug: organizationSlugSchema.nullable(),
-  status: organizationCreationRequestStatusSchema,
-  reviewed_by_user_id: uuidSchema.nullable(),
-  reviewed_at: isoDatetimeSchema.nullable(),
-  rejected_reason: z.string().nullable(),
-  created_organization_id: uuidSchema.nullable(),
-  created_at: isoDatetimeSchema,
-  updated_at: isoDatetimeSchema,
-})
+export const organizationCreationRequestSchema = z
+  .object({
+    request_id: uuidSchema,
+    requester_user_id: uuidSchema,
+    requested_organization_name: z.string().min(1),
+    requested_slug: organizationSlugSchema.nullable(),
+    status: organizationCreationRequestStatusSchema,
+    reviewed_by_user_id: uuidSchema.nullable(),
+    reviewed_at: isoDatetimeSchema.nullable(),
+    rejected_reason: z.string().nullable(),
+    created_organization_id: uuidSchema.nullable(),
+    created_at: isoDatetimeSchema,
+    updated_at: isoDatetimeSchema,
+  })
+  .openapi('OrganizationCreationRequest')
 
-export const organizationCreationRequestsResponseSchema = z.object({
-  requests: z.array(organizationCreationRequestSchema),
-})
+export const organizationCreationRequestsResponseSchema = z
+  .object({
+    requests: z.array(organizationCreationRequestSchema),
+  })
+  .openapi('OrganizationCreationRequestsResponse')
 
-export const createOrganizationCreationRequestRequestSchema = z.object({
-  organization_name: z.string().min(1).max(255),
-  requested_slug: organizationSlugSchema.nullable().optional(),
-})
+export const createOrganizationCreationRequestRequestSchema = z
+  .object({
+    organization_name: z.string().min(1).max(255),
+    requested_slug: organizationSlugSchema.nullable().optional(),
+  })
+  .openapi('CreateOrganizationCreationRequestRequest')
 
-export const organizationCreationRequestIdParamsSchema = z.object({
-  requestId: uuidSchema,
-})
+export const organizationCreationRequestIdParamsSchema = z
+  .object({
+    requestId: uuidSchema,
+  })
+  .openapi('OrganizationCreationRequestIdParams')
 
-export const approveOrganizationCreationRequestRequestSchema = z.object({
-  slug: organizationSlugSchema,
-})
+export const approveOrganizationCreationRequestRequestSchema = z
+  .object({
+    slug: organizationSlugSchema,
+  })
+  .openapi('ApproveOrganizationCreationRequestRequest')
 
-export const rejectOrganizationCreationRequestRequestSchema = z.object({
-  reason: z.string().min(1).max(2000),
-})
+export const rejectOrganizationCreationRequestRequestSchema = z
+  .object({
+    reason: z.string().min(1).max(2000),
+  })
+  .openapi('RejectOrganizationCreationRequestRequest')
 
-export const organizationUserSchema = z.object({
-  user_id: authUserSchema.shape.user_id,
-  email: authUserSchema.shape.email,
-  display_name: authUserSchema.shape.display_name,
-  status: authUserSchema.shape.status,
-  role: membershipRoleSchema,
-  password_changed_at: authUserSchema.shape.password_changed_at,
-  created_at: isoDatetimeSchema,
-  updated_at: isoDatetimeSchema,
-  pedestrian: pedestrianSchema.nullable(),
-})
+export const organizationUserSchema = z
+  .object({
+    user_id: authUserSchema.shape.user_id,
+    email: authUserSchema.shape.email,
+    display_name: authUserSchema.shape.display_name,
+    status: authUserSchema.shape.status,
+    role: membershipRoleSchema,
+    password_changed_at: authUserSchema.shape.password_changed_at,
+    created_at: isoDatetimeSchema,
+    updated_at: isoDatetimeSchema,
+    pedestrian: pedestrianSchema.nullable(),
+  })
+  .openapi('OrganizationUser')
 
-export const organizationUsersResponseSchema = z.object({
-  users: z.array(organizationUserSchema),
-})
+export const organizationUsersResponseSchema = z
+  .object({
+    users: z.array(organizationUserSchema),
+  })
+  .openapi('OrganizationUsersResponse')
 
 export const createOrganizationUserRequestSchema = z
   .object({
@@ -110,16 +139,21 @@ export const createOrganizationUserRequestSchema = z
       })
     }
   })
+  .openapi('CreateOrganizationUserRequest')
 
-export const organizationUserActivationLinkResponseSchema = z.object({
-  token: z.string().min(1),
-  expires_at: isoDatetimeSchema,
-})
+export const organizationUserActivationLinkResponseSchema = z
+  .object({
+    token: z.string().min(1),
+    expires_at: isoDatetimeSchema,
+  })
+  .openapi('OrganizationUserActivationLinkResponse')
 
-export const createOrganizationMembershipRequestSchema = z.object({
-  user_id: uuidSchema,
-  role: membershipRoleSchema,
-})
+export const createOrganizationMembershipRequestSchema = z
+  .object({
+    user_id: uuidSchema,
+    role: membershipRoleSchema,
+  })
+  .openapi('CreateOrganizationMembershipRequest')
 
 export type CreateOrganizationMembershipRequest = z.infer<
   typeof createOrganizationMembershipRequestSchema

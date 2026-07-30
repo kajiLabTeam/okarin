@@ -63,14 +63,16 @@ export const createApp = () => {
         description: 'service health',
         content: {
           'application/json': {
-            schema: z.object({
-              service: z.literal('kaede'),
-              role: z.literal('mediator'),
-              status: z.literal('ok'),
-              deploy_ref: z.string(),
-              revision: z.string(),
-              deployed_at: z.string(),
-            }),
+            schema: z
+              .object({
+                service: z.literal('kaede'),
+                role: z.literal('mediator'),
+                status: z.literal('ok'),
+                deploy_ref: z.string(),
+                revision: z.string(),
+                deployed_at: z.string(),
+              })
+              .openapi('HealthResponse'),
           },
         },
       },

@@ -29,24 +29,28 @@ const paginationLimitSchema = z
   .default(String(DEFAULT_PAGE_LIMIT))
   .transform(Number)
 
-export const paginationQuerySchema = z.object({
-  limit: paginationLimitSchema.openapi({
-    description: '1 ページあたりの取得件数。省略時は 20、最大 100',
-    example: '20',
-  }),
-  cursor: z.string().min(1).max(MAX_CURSOR_LENGTH).optional().openapi({
-    description: '次ページ取得用の opaque cursor',
-  }),
-})
+export const paginationQuerySchema = z
+  .object({
+    limit: paginationLimitSchema.openapi({
+      description: '1 ページあたりの取得件数。省略時は 20、最大 100',
+      example: '20',
+    }),
+    cursor: z.string().min(1).max(MAX_CURSOR_LENGTH).optional().openapi({
+      description: '次ページ取得用の opaque cursor',
+    }),
+  })
+  .openapi('PaginationQuery')
 
-export const paginationMetadataSchema = z.object({
-  next_cursor: z.string().nullable().openapi({
-    description: '次ページ取得用 cursor。最終ページの場合は null',
-  }),
-  total_count: z.number().int().min(0).openapi({
-    description: 'cursor 条件を除く一覧 scope 全体の件数',
-  }),
-})
+export const paginationMetadataSchema = z
+  .object({
+    next_cursor: z.string().nullable().openapi({
+      description: '次ページ取得用 cursor。最終ページの場合は null',
+    }),
+    total_count: z.number().int().min(0).openapi({
+      description: 'cursor 条件を除く一覧 scope 全体の件数',
+    }),
+  })
+  .openapi('PaginationMetadata')
 
 export interface PaginationCursor {
   createdAt: string
