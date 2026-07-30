@@ -5,10 +5,6 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
-    inputs:
-      deploy_ref:
-        description: "Branch name or tag name to deploy (default: tag on tag push, otherwise main)"
-        required: false
 
 concurrency:
   group: okarin-prod-deploy
@@ -18,7 +14,7 @@ jobs:
   deploy:
     name: Deploy production
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     env:
       SSH_PROXY_COMMAND: /tmp/cloudflared/cloudflared access ssh --id ${{ secrets.CLOUDFLARED_SSH_ID }} --secret ${{ secrets.CLOUDFLARED_SSH_SECRET }} --hostname %h
       TARGET_HOST: ${{ secrets.DEPLOY_PROD_SSH_HOST }}
@@ -26,18 +22,9 @@ jobs:
     steps:
       - name: Resolve deploy ref
         env:
-          INPUT_DEPLOY_REF: ${{ inputs.deploy_ref }}
-          GITHUB_REF_NAME: ${{ github.ref_name }}
-          GITHUB_REF_TYPE: ${{ github.ref_type }}
+          SELECTED_REF: ${{ github.ref_name }}
         run: |
-          DEPLOY_REF="$INPUT_DEPLOY_REF"
-          if [ -z "$DEPLOY_REF" ] && [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            DEPLOY_REF="$GITHUB_REF_NAME"
-          fi
-          if [ -z "$DEPLOY_REF" ]; then
-            DEPLOY_REF="main"
-          fi
-          echo "DEPLOY_REF=$DEPLOY_REF" >> "$GITHUB_ENV"
+          echo "DEPLOY_REF=$SELECTED_REF" >> "$GITHUB_ENV"
 
       - name: Validate required secrets
         run: |
