@@ -1,10 +1,7 @@
 import { createRoute } from '@hono/zod-openapi'
 import type { OpenAPIHono } from '@hono/zod-openapi'
-import {
-  authUserResponseSchema,
-  sessionForbiddenErrorResponseSchema,
-  sessionUnauthorizedErrorResponseSchema,
-} from '../../schemas/auth.js'
+import { authUserResponseSchema } from '../../schemas/auth.js'
+import { errorResponseSchema } from '../../schemas/common.js'
 import { getMe } from '../../usecases/auth/index.js'
 import { getSessionTokenFromCookie } from './cookie.js'
 import { toAuthErrorResponse } from './error.js'
@@ -28,7 +25,7 @@ export const registerMeRoute = (app: OpenAPIHono) => {
         description: 'login required',
         content: {
           'application/json': {
-            schema: sessionUnauthorizedErrorResponseSchema,
+            schema: errorResponseSchema,
           },
         },
       },
@@ -36,7 +33,7 @@ export const registerMeRoute = (app: OpenAPIHono) => {
         description: 'user disabled',
         content: {
           'application/json': {
-            schema: sessionForbiddenErrorResponseSchema,
+            schema: errorResponseSchema,
           },
         },
       },
@@ -48,10 +45,7 @@ export const registerMeRoute = (app: OpenAPIHono) => {
 
     if (!result.ok) {
       const error = toAuthErrorResponse(result.error)
-      if (error.status === 401) {
-        return c.json(error.body, 401)
-      }
-      return c.json(error.body, 403)
+      return c.json(error.body, error.status)
     }
 
     return c.json(result.value, 200)

@@ -3,6 +3,7 @@ import { createRoute } from '@hono/zod-openapi'
 import { notImplementedResponseSchema } from '../../schemas/common.js'
 import {
   cloneAndReanalyzeRequestSchema,
+  retriedTrajectoryResponseSchema,
   trajectoryIdParamsSchema,
 } from '../../schemas/trajectories.js'
 import { notImplemented } from '../../utils/not-implemented.js'
@@ -24,6 +25,14 @@ export const registerCloneAndReanalyzeRoute = (app: OpenAPIHono) => {
       },
     },
     responses: {
+      200: {
+        description: 'trajectory 複製再解析受付',
+        content: {
+          'application/json': {
+            schema: retriedTrajectoryResponseSchema,
+          },
+        },
+      },
       501: {
         description: 'not implemented',
         content: {

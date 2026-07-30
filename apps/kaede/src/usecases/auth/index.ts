@@ -1,17 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import type {
-  ActivationUnauthorizedErrorCode,
   ActivationCompleteRequest,
   ActivationVerifyRequest,
   ActivationVerifyResponse,
   AuthUserResponse,
-  ChangePasswordUnauthorizedErrorCode,
   ChangePasswordRequest,
-  LoginForbiddenErrorCode,
-  LoginUnauthorizedErrorCode,
   LoginRequest,
-  SessionForbiddenErrorCode,
-  SessionUnauthorizedErrorCode,
 } from '../../schemas/auth.js'
 import { activationCompleteRequestSchema } from '../../schemas/auth.js'
 import type {
@@ -44,35 +38,30 @@ import {
 import type { User } from '../../services/users/index.js'
 import { deriveAccountState } from '../authorization.js'
 
-type ErrorWithCode<TCode extends string> = TCode extends string ? { type: TCode } : never
+type AuthError =
+  | { type: 'AUTH_UNAUTHENTICATED' }
+  | { type: 'AUTH_INVALID_CREDENTIALS' }
+  | { type: 'AUTH_USER_DISABLED' }
+  | { type: 'AUTH_USER_LOCKED' }
+  | { type: 'AUTH_SESSION_EXPIRED' }
+  | { type: 'AUTH_SESSION_REVOKED' }
+  | { type: 'AUTH_ACTIVATION_TOKEN_INVALID' }
 
-type LoginUsecaseForbiddenErrorCode = Exclude<
-  LoginForbiddenErrorCode,
-  'AUTH_PASSWORD_LOGIN_DISABLED'
->
-
-type AuthErrorCode =
-  | SessionUnauthorizedErrorCode
-  | SessionForbiddenErrorCode
-  | LoginUnauthorizedErrorCode
-  | LoginUsecaseForbiddenErrorCode
-  | ActivationUnauthorizedErrorCode
-
-type AuthError = ErrorWithCode<AuthErrorCode>
-
-type AuthResult<T, TError = AuthError> =
+type AuthResult<T> =
   | {
       ok: true
       value: T
     }
   | {
       ok: false
-      error: TError
+      error: AuthError
     }
 
-export type ActiveSessionUserError = ErrorWithCode<
-  SessionUnauthorizedErrorCode | SessionForbiddenErrorCode
->
+export type ActiveSessionUserError =
+  | { type: 'AUTH_UNAUTHENTICATED' }
+  | { type: 'AUTH_SESSION_EXPIRED' }
+  | { type: 'AUTH_SESSION_REVOKED' }
+  | { type: 'AUTH_USER_DISABLED' }
 
 export type ActiveSessionUserResult =
   | {
@@ -88,14 +77,6 @@ export interface LoginResultValue extends AuthUserResponse {
   sessionToken: string
 }
 
-type LoginError = ErrorWithCode<LoginUnauthorizedErrorCode | LoginUsecaseForbiddenErrorCode>
-
-type GetMeError = ActiveSessionUserError
-
-type ChangePasswordError = ErrorWithCode<
-  ChangePasswordUnauthorizedErrorCode | SessionForbiddenErrorCode
->
-
 export type ActivationCompleteResult =
   | {
       ok: true
@@ -103,7 +84,7 @@ export type ActivationCompleteResult =
     }
   | {
       ok: false
-      error: ErrorWithCode<ActivationUnauthorizedErrorCode>
+      error: { type: 'AUTH_ACTIVATION_TOKEN_INVALID' }
     }
 export interface ActivationVerifyResult {
   ok: true
@@ -162,10 +143,7 @@ const toIsoOrNull = (value: Date | null): string | null => value?.toISOString() 
 
 const mapSessionError = (
   error: 'SESSION_NOT_FOUND' | 'SESSION_EXPIRED' | 'SESSION_REVOKED'
-): Extract<
-  AuthError,
-  { type: 'AUTH_UNAUTHENTICATED' | 'AUTH_SESSION_EXPIRED' | 'AUTH_SESSION_REVOKED' }
-> => {
+): AuthError => {
   switch (error) {
     case 'SESSION_NOT_FOUND':
       return { type: 'AUTH_UNAUTHENTICATED' }
@@ -434,7 +412,7 @@ export const login = async (
   payload: LoginRequest,
   now: Date = new Date(),
   executor?: DbExecutor
-): Promise<AuthResult<LoginResultValue, LoginError>> => {
+): Promise<AuthResult<LoginResultValue>> => {
   const user = await findUserByEmail(payload.email, executor)
 
   if (!user) {
@@ -619,7 +597,7 @@ export const getMe = async (
   sessionToken: string | undefined,
   now: Date = new Date(),
   executor?: DbExecutor
-): Promise<AuthResult<AuthUserResponse, GetMeError>> => {
+): Promise<AuthResult<AuthUserResponse>> => {
   if (!sessionToken) {
     return {
       ok: false,
@@ -823,7 +801,7 @@ export const changePassword = async (
   payload: ChangePasswordRequest,
   now: Date = new Date(),
   executor?: DbExecutor
-): Promise<AuthResult<{ ok: true }, ChangePasswordError>> => {
+): Promise<AuthResult<{ ok: true }>> => {
   if (!sessionToken) {
     return {
       ok: false,

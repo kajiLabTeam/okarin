@@ -94,16 +94,6 @@ export const errorResponseSchema = z
   })
   .openapi('ErrorResponse')
 
-export const createErrorResponseSchema = <const TCodes extends readonly [string, ...string[]]>(
-  name: string,
-  codes: TCodes
-) =>
-  errorResponseSchema
-    .extend({
-      error_code: z.enum(codes),
-    })
-    .openapi(name)
-
 export const membershipRoleSchema = z.enum(['member', 'manager', 'owner'])
 
 export const accountStateSchema = z.enum(['active', 'pending_membership', 'suspended'])
@@ -133,7 +123,7 @@ export const authErrorResponseSchema = errorResponseSchema
   })
   .openapi('AuthErrorResponse')
 
-export const authErrorMessages = {
+export const authErrorMessages: Record<AuthErrorCode, string> = {
   AUTH_DASHBOARD_FORBIDDEN: 'dashboard access forbidden',
   AUTH_ACTIVATION_TOKEN_INVALID: 'activation token is invalid',
   AUTH_INVALID_CREDENTIALS: 'invalid email or password',
@@ -145,9 +135,9 @@ export const authErrorMessages = {
   AUTH_UNAUTHENTICATED: 'login required',
   AUTH_USER_DISABLED: 'user is disabled',
   AUTH_USER_LOCKED: 'account is locked due to too many failed attempts',
-} as const satisfies Record<AuthErrorCode, string>
+}
 
-export const authErrorStatuses = {
+export const authErrorStatuses: Record<AuthErrorCode, 401 | 403> = {
   AUTH_DASHBOARD_FORBIDDEN: 403,
   AUTH_ACTIVATION_TOKEN_INVALID: 401,
   AUTH_INVALID_CREDENTIALS: 401,
@@ -159,28 +149,16 @@ export const authErrorStatuses = {
   AUTH_UNAUTHENTICATED: 401,
   AUTH_USER_DISABLED: 403,
   AUTH_USER_LOCKED: 403,
-} as const satisfies Record<AuthErrorCode, 401 | 403>
+}
 
-type AuthErrorResponse<TErrorCode extends AuthErrorCode> = TErrorCode extends AuthErrorCode
-  ? {
-      body: {
-        error_code: TErrorCode
-        error_message: (typeof authErrorMessages)[TErrorCode]
-      }
-      status: (typeof authErrorStatuses)[TErrorCode]
-    }
-  : never
-
-export const toAuthErrorResponse = <TErrorCode extends AuthErrorCode>(
-  errorCode: TErrorCode
-): AuthErrorResponse<TErrorCode> => {
+export const toAuthErrorResponse = (errorCode: AuthErrorCode) => {
   return {
     body: {
       error_code: errorCode,
       error_message: authErrorMessages[errorCode],
     },
     status: authErrorStatuses[errorCode],
-  } as AuthErrorResponse<TErrorCode>
+  }
 }
 
 export const nozomiPingResponseSchema = z

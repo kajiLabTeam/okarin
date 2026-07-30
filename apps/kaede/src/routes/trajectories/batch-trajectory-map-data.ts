@@ -1,7 +1,10 @@
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
 import { notImplementedResponseSchema } from '../../schemas/common.js'
-import { batchTrajectoryMapDataRequestSchema } from '../../schemas/trajectories.js'
+import {
+  batchTrajectoryMapDataRequestSchema,
+  batchTrajectoryMapDataResponseSchema,
+} from '../../schemas/trajectories.js'
 import { notImplemented } from '../../utils/not-implemented.js'
 
 export const registerBatchTrajectoryMapDataRoute = (app: OpenAPIHono) => {
@@ -20,6 +23,14 @@ export const registerBatchTrajectoryMapDataRoute = (app: OpenAPIHono) => {
       },
     },
     responses: {
+      200: {
+        description: '複数 trajectory 地図表示用データ',
+        content: {
+          'application/json': {
+            schema: batchTrajectoryMapDataResponseSchema,
+          },
+        },
+      },
       501: {
         description: 'not implemented',
         content: {

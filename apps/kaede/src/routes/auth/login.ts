@@ -1,12 +1,8 @@
 import { createRoute } from '@hono/zod-openapi'
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { getOidcRuntimeConfig } from '../../config/runtime.js'
-import {
-  authUserResponseSchema,
-  loginForbiddenErrorResponseSchema,
-  loginRequestSchema,
-  loginUnauthorizedErrorResponseSchema,
-} from '../../schemas/auth.js'
+import { authUserResponseSchema, loginRequestSchema } from '../../schemas/auth.js'
+import { errorResponseSchema } from '../../schemas/common.js'
 import { login } from '../../usecases/auth/index.js'
 import { setSessionCookie } from './cookie.js'
 import { toAuthErrorResponse } from './error.js'
@@ -39,7 +35,7 @@ export const registerLoginRoute = (app: OpenAPIHono) => {
         description: 'invalid credentials',
         content: {
           'application/json': {
-            schema: loginUnauthorizedErrorResponseSchema,
+            schema: errorResponseSchema,
           },
         },
       },
@@ -47,7 +43,7 @@ export const registerLoginRoute = (app: OpenAPIHono) => {
         description: 'user disabled or temporary password expired',
         content: {
           'application/json': {
-            schema: loginForbiddenErrorResponseSchema,
+            schema: errorResponseSchema,
           },
         },
       },
@@ -70,10 +66,7 @@ export const registerLoginRoute = (app: OpenAPIHono) => {
 
     if (!result.ok) {
       const error = toAuthErrorResponse(result.error)
-      if (error.status === 401) {
-        return c.json(error.body, 401)
-      }
-      return c.json(error.body, 403)
+      return c.json(error.body, error.status)
     }
 
     setSessionCookie(c, result.value.sessionToken)

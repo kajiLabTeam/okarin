@@ -1,13 +1,6 @@
 import { z } from '@hono/zod-openapi'
 
-import { createErrorResponseSchema, isoDatetimeSchema, uuidSchema } from './common.js'
-
-export const buildingNotFoundErrorCodes = ['BUILDING_NOT_FOUND'] as const
-export type BuildingNotFoundErrorCode = (typeof buildingNotFoundErrorCodes)[number]
-export const buildingNotFoundErrorResponseSchema = createErrorResponseSchema(
-  'BuildingNotFoundErrorResponse',
-  buildingNotFoundErrorCodes
-)
+import { isoDatetimeSchema, uuidSchema } from './common.js'
 
 export const buildingSchema = z
   .object({

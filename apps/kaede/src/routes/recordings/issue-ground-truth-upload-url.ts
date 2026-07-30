@@ -4,6 +4,7 @@ import type { RequestActorHonoEnv } from '../../middleware/request-actor-context
 import { notImplementedResponseSchema } from '../../schemas/common.js'
 import {
   recordingGroundTruthRequestSchema,
+  recordingGroundTruthUploadUrlResponseSchema,
   recordingIdParamsSchema,
 } from '../../schemas/recordings.js'
 import { notImplemented } from '../../utils/not-implemented.js'
@@ -25,6 +26,14 @@ export const registerIssueGroundTruthUploadUrlRoute = (app: OpenAPIHono<RequestA
       },
     },
     responses: {
+      200: {
+        description: 'ground truth raw アップロード URL 発行',
+        content: {
+          'application/json': {
+            schema: recordingGroundTruthUploadUrlResponseSchema,
+          },
+        },
+      },
       501: {
         description: 'not implemented',
         content: {

@@ -3,6 +3,7 @@ import { createRoute } from '@hono/zod-openapi'
 import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
 import { notImplementedResponseSchema } from '../../schemas/common.js'
 import {
+  recordingGroundTruthCompleteResponseSchema,
   recordingGroundTruthRequestSchema,
   recordingIdParamsSchema,
 } from '../../schemas/recordings.js'
@@ -25,6 +26,14 @@ export const registerCompleteGroundTruthUploadRoute = (app: OpenAPIHono<RequestA
       },
     },
     responses: {
+      200: {
+        description: 'ground truth raw 登録完了',
+        content: {
+          'application/json': {
+            schema: recordingGroundTruthCompleteResponseSchema,
+          },
+        },
+      },
       501: {
         description: 'not implemented',
         content: {

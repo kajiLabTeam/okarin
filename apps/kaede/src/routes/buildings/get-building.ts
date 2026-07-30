@@ -2,11 +2,8 @@ import { createRoute } from '@hono/zod-openapi'
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { requireRequestActor } from '../../middleware/request-actor-context.js'
 import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
-import {
-  buildingIdParamsSchema,
-  buildingNotFoundErrorResponseSchema,
-  buildingSchema,
-} from '../../schemas/buildings.js'
+import { buildingIdParamsSchema, buildingSchema } from '../../schemas/buildings.js'
+import { errorResponseSchema } from '../../schemas/common.js'
 import { getBuilding } from '../../usecases/buildings/get-building.js'
 import type { GetBuildingResult } from '../../usecases/buildings/get-building.js'
 
@@ -47,7 +44,7 @@ export const registerGetBuildingRoute = (app: OpenAPIHono<RequestActorHonoEnv>) 
         description: 'building not found',
         content: {
           'application/json': {
-            schema: buildingNotFoundErrorResponseSchema,
+            schema: errorResponseSchema,
           },
         },
       },
