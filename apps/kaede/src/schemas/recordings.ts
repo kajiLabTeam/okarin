@@ -37,6 +37,36 @@ const uploadUrlsSchema = z
   })
   .openapi('RecordingUploadUrls')
 
+const downloadUrlsSchema = z
+  .object({
+    acce: z
+      .string()
+      .url()
+      .optional()
+      .openapi({ description: '加速度センサデータのダウンロード URL' }),
+    gyro: z
+      .string()
+      .url()
+      .optional()
+      .openapi({ description: 'ジャイロセンサデータのダウンロード URL' }),
+    metadata: z
+      .string()
+      .url()
+      .optional()
+      .openapi({ description: '収録メタデータのダウンロード URL' }),
+    pressure: z
+      .string()
+      .url()
+      .optional()
+      .openapi({ description: '気圧センサデータのダウンロード URL' }),
+    wifi: z
+      .string()
+      .url()
+      .optional()
+      .openapi({ description: 'Wi-Fi スキャンデータのダウンロード URL' }),
+  })
+  .openapi('RecordingDownloadUrls')
+
 export const groundTruthTypeSchema = z.enum(['uwb']).openapi({
   description: 'recording 単位 ground truth raw の種別',
   'x-enum-descriptions': {
@@ -170,6 +200,20 @@ export const recordingDetailResponseSchema = z
   })
   .openapi('RecordingDetailResponse')
 
+export const recordingRawDownloadResponseSchema = z
+  .object({
+    recording_id: uuidSchema.openapi({
+      description: 'ダウンロード対象 recording の ID',
+    }),
+    download_urls: downloadUrlsSchema.openapi({
+      description: 'アップロード対象ごとの署名付きダウンロード URL',
+    }),
+    expires_at: isoDatetimeSchema.openapi({
+      description: 'download_urls の有効期限',
+    }),
+  })
+  .openapi('RecordingRawDownloadResponse')
+
 export const recordingsResponseSchema = z
   .object({
     recordings: z.array(recordingDetailResponseSchema),
@@ -253,5 +297,6 @@ export type UpdateRecordingConstraintsRequest = z.infer<
   typeof updateRecordingConstraintsRequestSchema
 >
 export type RecordingDetailResponse = z.infer<typeof recordingDetailResponseSchema>
+export type RecordingRawDownloadResponse = z.infer<typeof recordingRawDownloadResponseSchema>
 export type RecordingTrajectoriesResponse = z.infer<typeof recordingTrajectoriesResponseSchema>
 export type RefreshUploadUrlsRequest = z.infer<typeof refreshUploadUrlsRequestSchema>

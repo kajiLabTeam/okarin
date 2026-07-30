@@ -8,12 +8,27 @@ import {
   recordingIdParamsSchema,
   recordingGroundTruthRequestSchema,
   recordingConstraintsResponseSchema,
+  recordingRawDownloadResponseSchema,
   recordingTrajectoriesResponseSchema,
   refreshUploadUrlsRequestSchema,
   updateRecordingConstraintsRequestSchema,
 } from './recordings.js'
 
 describe('recording schemas', () => {
+  it('recordingRawDownloadResponseSchema は対象ごとのダウンロード URL を受け入れる', () => {
+    const result = recordingRawDownloadResponseSchema.safeParse({
+      recording_id: '11111111-1111-4111-8111-111111111111',
+      download_urls: {
+        acce: 'https://storage.example.test/acce.csv',
+        gyro: 'https://storage.example.test/gyro.csv',
+        metadata: 'https://storage.example.test/metadata.json',
+      },
+      expires_at: '2026-07-31T00:15:00.000Z',
+    })
+
+    expect(result.success).toBe(true)
+  })
+
   it('initRecordingRequestSchema は正しい recording 作成リクエストを受け入れる', () => {
     const result = initRecordingRequestSchema.safeParse({
       pedestrian_id: '11111111-1111-4111-8111-111111111111',

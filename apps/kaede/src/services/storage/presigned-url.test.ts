@@ -7,6 +7,7 @@ import {
   getFloorMapContentType,
   getFloorMapExtensionFromObjectKey,
   issueFloorMapDownloadUrl,
+  issueRecordingRawDownloadUrls,
   issueRecordingUploadUrls,
   issueTrajectoryResultDownloadUrl,
   resetS3ClientForTests,
@@ -57,6 +58,7 @@ describe('storage presigned url service', () => {
       region: 'us-east-1',
       bucket: 'okarin-local',
       floorMapDownloadUrlTtlSeconds: 3600,
+      recordingRawDownloadUrlTtlSeconds: 900,
       recordingUploadUrlTtlSeconds: 900,
       trajectoryRawDownloadUrlTtlSeconds: 86400,
       trajectoryResultDownloadUrlTtlSeconds: 3600,
@@ -105,6 +107,48 @@ describe('storage presigned url service', () => {
     )
   })
 
+  it('recording raw の公開 GET 用署名付き URL を生成できる', async () => {
+    getStorageRuntimeConfigMock.mockReturnValue({
+      accessKeyId: 'kaede-test',
+      secretAccessKey: 'kaede-secret',
+      internalEndpoint: 'http://seaweedfs:8333',
+      publicEndpoint: 'http://127.0.0.1:8333',
+      region: 'us-east-1',
+      bucket: 'okarin-local',
+      floorMapDownloadUrlTtlSeconds: 3600,
+      recordingRawDownloadUrlTtlSeconds: 900,
+      recordingUploadUrlTtlSeconds: 900,
+      trajectoryRawDownloadUrlTtlSeconds: 86400,
+      trajectoryResultDownloadUrlTtlSeconds: 900,
+      trajectoryResultUploadUrlTtlSeconds: 86400,
+    })
+    const organizationId = '99999999-9999-4999-8999-999999999999'
+    const recordingId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    const now = new Date('2026-05-13T00:00:00.000Z')
+
+    const download = await issueRecordingRawDownloadUrls(
+      organizationId,
+      recordingId,
+      ['acce', 'metadata'],
+      now
+    )
+
+    expect(download.expiresAt).toBe('2026-05-13T00:15:00.000Z')
+    expect(download.downloadUrls.gyro).toBeUndefined()
+
+    const acceUrl = new URL(download.downloadUrls.acce ?? '')
+    const metadataUrl = new URL(download.downloadUrls.metadata ?? '')
+
+    expect(acceUrl.origin).toBe('http://127.0.0.1:8333')
+    expect(acceUrl.pathname).toBe(
+      `/okarin-local/organizations/${organizationId}/recordings/${recordingId}/raw/acce.csv`
+    )
+    expect(acceUrl.searchParams.get('X-Amz-Expires')).toBe('900')
+    expect(metadataUrl.pathname).toBe(
+      `/okarin-local/organizations/${organizationId}/recordings/${recordingId}/raw/metadata.json`
+    )
+  })
+
   it('floor map object key を保存規約どおりに組み立てる', () => {
     const objectKey = buildFloorMapObjectKey(
       '22222222-2222-4222-8222-222222222222',
@@ -128,6 +172,7 @@ describe('storage presigned url service', () => {
       region: 'us-east-1',
       bucket: 'okarin-local',
       floorMapDownloadUrlTtlSeconds: 3600,
+      recordingRawDownloadUrlTtlSeconds: 900,
       recordingUploadUrlTtlSeconds: 900,
       trajectoryRawDownloadUrlTtlSeconds: 86400,
       trajectoryResultDownloadUrlTtlSeconds: 3600,
@@ -163,6 +208,7 @@ describe('storage presigned url service', () => {
       region: 'us-east-1',
       bucket: 'okarin-local',
       floorMapDownloadUrlTtlSeconds: 3600,
+      recordingRawDownloadUrlTtlSeconds: 900,
       recordingUploadUrlTtlSeconds: 900,
       trajectoryRawDownloadUrlTtlSeconds: 86400,
       trajectoryResultDownloadUrlTtlSeconds: 1800,
