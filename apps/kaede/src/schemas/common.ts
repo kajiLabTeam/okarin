@@ -71,24 +71,28 @@ export const uploadTargetsSchema = z
     }
   })
 
-export const notImplementedResponseSchema = z.object({
-  error: z.literal('NOT_IMPLEMENTED'),
-  endpoint: z.string(),
-  description: z.string(),
-  params: z.record(z.string()).optional(),
-})
+export const notImplementedResponseSchema = z
+  .object({
+    error: z.literal('NOT_IMPLEMENTED'),
+    endpoint: z.string(),
+    description: z.string(),
+    params: z.record(z.string()).optional(),
+  })
+  .openapi('NotImplementedResponse')
 
-export const errorResponseSchema = z.object({
-  error_code: z.string().min(1).openapi({
-    description: 'クライアントが分岐に使う機械可読エラーコード',
-  }),
-  error_message: z.string().min(1).openapi({
-    description: 'ログや画面表示に使う説明文',
-  }),
-  details: z.record(z.string(), z.unknown()).optional().openapi({
-    description: '追加情報がある場合のみ返す任意オブジェクト',
-  }),
-})
+export const errorResponseSchema = z
+  .object({
+    error_code: z.string().min(1).openapi({
+      description: 'クライアントが分岐に使う機械可読エラーコード',
+    }),
+    error_message: z.string().min(1).openapi({
+      description: 'ログや画面表示に使う説明文',
+    }),
+    details: z.record(z.string(), z.unknown()).optional().openapi({
+      description: '追加情報がある場合のみ返す任意オブジェクト',
+    }),
+  })
+  .openapi('ErrorResponse')
 
 export const membershipRoleSchema = z.enum(['member', 'manager', 'owner'])
 
@@ -113,9 +117,11 @@ export const authErrorCodeSchema = z.enum(authErrorCodes).openapi({
   description: 'auth / authorization の機械可読エラーコード',
 })
 
-export const authErrorResponseSchema = errorResponseSchema.extend({
-  error_code: authErrorCodeSchema,
-})
+export const authErrorResponseSchema = errorResponseSchema
+  .extend({
+    error_code: authErrorCodeSchema,
+  })
+  .openapi('AuthErrorResponse')
 
 export const authErrorMessages: Record<AuthErrorCode, string> = {
   AUTH_DASHBOARD_FORBIDDEN: 'dashboard access forbidden',
@@ -155,26 +161,28 @@ export const toAuthErrorResponse = (errorCode: AuthErrorCode) => {
   }
 }
 
-export const nozomiPingResponseSchema = z.object({
-  ok: z.literal(true).openapi({
-    description: 'nozomi 側の ping が正常に完了したことを表す',
-  }),
-  rikka_version: z.string().min(1).openapi({
-    description: 'nozomi が参照した rikka のバージョン',
-    example: '0.1.0',
-  }),
-  ping_module: z.string().min(1).openapi({
-    description: 'ping() が見つかったモジュール名',
-    example: 'rikka.api',
-  }),
-  checked_modules: z.array(z.string()).openapi({
-    description: 'ping() 探索時に確認したモジュール一覧',
-  }),
-  result: z.any().openapi({
-    description: 'nozomi 側 ping() の戻り値',
-    example: 'pong',
-  }),
-})
+export const nozomiPingResponseSchema = z
+  .object({
+    ok: z.literal(true).openapi({
+      description: 'nozomi 側の ping が正常に完了したことを表す',
+    }),
+    rikka_version: z.string().min(1).openapi({
+      description: 'nozomi が参照した rikka のバージョン',
+      example: '0.1.0',
+    }),
+    ping_module: z.string().min(1).openapi({
+      description: 'ping() が見つかったモジュール名',
+      example: 'rikka.api',
+    }),
+    checked_modules: z.array(z.string()).openapi({
+      description: 'ping() 探索時に確認したモジュール一覧',
+    }),
+    result: z.any().openapi({
+      description: 'nozomi 側 ping() の戻り値',
+      example: 'pong',
+    }),
+  })
+  .openapi('NozomiPingResponse')
 
 export type RecordingUploadStatus = z.infer<typeof recordingUploadStatusSchema>
 export type TrajectoryStatus = z.infer<typeof trajectoryStatusSchema>
