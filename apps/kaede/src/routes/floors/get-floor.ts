@@ -2,8 +2,11 @@ import { createRoute } from '@hono/zod-openapi'
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { requireRequestActor } from '../../middleware/request-actor-context.js'
 import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
-import { errorResponseSchema } from '../../schemas/common.js'
-import { floorIdParamsSchema, floorSchema } from '../../schemas/floors.js'
+import {
+  floorIdParamsSchema,
+  floorNotFoundErrorResponseSchema,
+  floorSchema,
+} from '../../schemas/floors.js'
 import { getFloor } from '../../usecases/floors/get-floor.js'
 import type { GetFloorResult } from '../../usecases/floors/get-floor.js'
 
@@ -44,7 +47,7 @@ export const registerGetFloorRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => 
         description: 'floor not found',
         content: {
           'application/json': {
-            schema: errorResponseSchema,
+            schema: floorNotFoundErrorResponseSchema,
           },
         },
       },

@@ -1,7 +1,11 @@
 import { createRoute } from '@hono/zod-openapi'
 import type { OpenAPIHono } from '@hono/zod-openapi'
-import { authOkResponseSchema, changePasswordRequestSchema } from '../../schemas/auth.js'
-import { errorResponseSchema } from '../../schemas/common.js'
+import {
+  authOkResponseSchema,
+  changePasswordUnauthorizedErrorResponseSchema,
+  changePasswordRequestSchema,
+  sessionForbiddenErrorResponseSchema,
+} from '../../schemas/auth.js'
 import { changePassword } from '../../usecases/auth/index.js'
 import { getSessionTokenFromCookie } from './cookie.js'
 import { toAuthErrorResponse } from './error.js'
@@ -34,7 +38,7 @@ export const registerChangePasswordRoute = (app: OpenAPIHono) => {
         description: 'login required or invalid current password',
         content: {
           'application/json': {
-            schema: errorResponseSchema,
+            schema: changePasswordUnauthorizedErrorResponseSchema,
           },
         },
       },
@@ -42,7 +46,7 @@ export const registerChangePasswordRoute = (app: OpenAPIHono) => {
         description: 'user disabled or temporary password expired',
         content: {
           'application/json': {
-            schema: errorResponseSchema,
+            schema: sessionForbiddenErrorResponseSchema,
           },
         },
       },
@@ -55,7 +59,10 @@ export const registerChangePasswordRoute = (app: OpenAPIHono) => {
 
     if (!result.ok) {
       const error = toAuthErrorResponse(result.error)
-      return c.json(error.body, error.status)
+      if (error.status === 401) {
+        return c.json(error.body, 401)
+      }
+      return c.json(error.body, 403)
     }
 
     return c.json(result.value, 200)

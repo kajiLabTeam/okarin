@@ -1,10 +1,7 @@
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
 import { notImplementedResponseSchema } from '../../schemas/common.js'
-import {
-  trajectoryCompletionResponseSchema,
-  trajectoryIdParamsSchema,
-} from '../../schemas/trajectories.js'
+import { trajectoryIdParamsSchema } from '../../schemas/trajectories.js'
 import { notImplemented } from '../../utils/not-implemented.js'
 
 export const registerCompleteGroundTruthUploadRoute = (app: OpenAPIHono) => {
@@ -17,14 +14,6 @@ export const registerCompleteGroundTruthUploadRoute = (app: OpenAPIHono) => {
       params: trajectoryIdParamsSchema,
     },
     responses: {
-      200: {
-        description: 'trajectory 単位 ground truth 登録完了',
-        content: {
-          'application/json': {
-            schema: trajectoryCompletionResponseSchema,
-          },
-        },
-      },
       501: {
         description: 'not implemented',
         content: {

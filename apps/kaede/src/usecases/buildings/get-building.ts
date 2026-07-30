@@ -1,5 +1,9 @@
 import type { RequestActor } from '../../middleware/request-actor-context.js'
-import type { BuildingIdParams, BuildingResponse } from '../../schemas/buildings.js'
+import type {
+  BuildingIdParams,
+  BuildingNotFoundErrorCode,
+  BuildingResponse,
+} from '../../schemas/buildings.js'
 import { findBuildingDetailById } from '../../services/buildings/index.js'
 import { accessibleOrganizationIds } from '../authorization.js'
 import { toBuildingResponse } from './building-response.js'
@@ -12,7 +16,7 @@ export type GetBuildingResult =
   | {
       ok: false
       error: {
-        type: 'BUILDING_NOT_FOUND'
+        type: BuildingNotFoundErrorCode
         buildingId: string
       }
     }

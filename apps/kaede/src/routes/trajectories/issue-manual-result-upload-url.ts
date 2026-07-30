@@ -1,10 +1,7 @@
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
 import { notImplementedResponseSchema } from '../../schemas/common.js'
-import {
-  trajectoryIdParamsSchema,
-  uploadUrlWithPathResponseSchema,
-} from '../../schemas/trajectories.js'
+import { trajectoryIdParamsSchema } from '../../schemas/trajectories.js'
 import { notImplemented } from '../../utils/not-implemented.js'
 
 export const registerIssueManualResultUploadUrlRoute = (app: OpenAPIHono) => {
@@ -17,14 +14,6 @@ export const registerIssueManualResultUploadUrlRoute = (app: OpenAPIHono) => {
       params: trajectoryIdParamsSchema,
     },
     responses: {
-      200: {
-        description: '手動推定軌跡アップロード URL 発行',
-        content: {
-          'application/json': {
-            schema: uploadUrlWithPathResponseSchema,
-          },
-        },
-      },
       501: {
         description: 'not implemented',
         content: {

@@ -1,6 +1,10 @@
 import { createRoute } from '@hono/zod-openapi'
 import type { OpenAPIHono } from '@hono/zod-openapi'
-import { activationCompleteRequestSchema, authOkResponseSchema } from '../../schemas/auth.js'
+import {
+  activationCompleteRequestSchema,
+  activationUnauthorizedErrorResponseSchema,
+  authOkResponseSchema,
+} from '../../schemas/auth.js'
 import { errorResponseSchema } from '../../schemas/common.js'
 import { completeActivation } from '../../usecases/auth/index.js'
 import { toAuthErrorResponse } from './error.js'
@@ -33,7 +37,7 @@ export const registerActivationCompleteRoute = (app: OpenAPIHono) => {
         description: 'activation token invalid',
         content: {
           'application/json': {
-            schema: errorResponseSchema,
+            schema: activationUnauthorizedErrorResponseSchema,
           },
         },
       },

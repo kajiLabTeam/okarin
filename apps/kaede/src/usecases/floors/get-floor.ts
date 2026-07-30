@@ -1,5 +1,5 @@
 import type { RequestActor } from '../../middleware/request-actor-context.js'
-import type { FloorIdParams, FloorResponse } from '../../schemas/floors.js'
+import type { FloorIdParams, FloorNotFoundErrorCode, FloorResponse } from '../../schemas/floors.js'
 import { findFloorDetailById } from '../../services/floors/index.js'
 import { accessibleOrganizationIds } from '../authorization.js'
 import { toFloorResponse } from './floor-response.js'
@@ -12,7 +12,7 @@ export type GetFloorResult =
   | {
       ok: false
       error: {
-        type: 'FLOOR_NOT_FOUND'
+        type: FloorNotFoundErrorCode
         floorId: string
       }
     }

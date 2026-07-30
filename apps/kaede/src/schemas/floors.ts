@@ -1,6 +1,13 @@
 import { z } from '@hono/zod-openapi'
 
-import { isoDatetimeSchema, uuidSchema } from './common.js'
+import { createErrorResponseSchema, isoDatetimeSchema, uuidSchema } from './common.js'
+
+export const floorNotFoundErrorCodes = ['FLOOR_NOT_FOUND'] as const
+export type FloorNotFoundErrorCode = (typeof floorNotFoundErrorCodes)[number]
+export const floorNotFoundErrorResponseSchema = createErrorResponseSchema(
+  'FloorNotFoundErrorResponse',
+  floorNotFoundErrorCodes
+)
 
 export const floorSchema = z
   .object({

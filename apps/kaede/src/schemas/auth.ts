@@ -1,11 +1,66 @@
 import { z } from '@hono/zod-openapi'
 import {
   accountStateSchema,
+  createErrorResponseSchema,
   isoDatetimeSchema,
   membershipRoleSchema,
   userStatusSchema,
   uuidSchema,
 } from './common.js'
+
+export const loginUnauthorizedErrorCodes = ['AUTH_INVALID_CREDENTIALS'] as const
+export type LoginUnauthorizedErrorCode = (typeof loginUnauthorizedErrorCodes)[number]
+export const loginUnauthorizedErrorResponseSchema = createErrorResponseSchema(
+  'LoginUnauthorizedErrorResponse',
+  loginUnauthorizedErrorCodes
+)
+
+export const loginForbiddenErrorCodes = [
+  'AUTH_USER_DISABLED',
+  'AUTH_USER_LOCKED',
+  'AUTH_PASSWORD_LOGIN_DISABLED',
+] as const
+export type LoginForbiddenErrorCode = (typeof loginForbiddenErrorCodes)[number]
+export const loginForbiddenErrorResponseSchema = createErrorResponseSchema(
+  'LoginForbiddenErrorResponse',
+  loginForbiddenErrorCodes
+)
+
+export const sessionUnauthorizedErrorCodes = [
+  'AUTH_UNAUTHENTICATED',
+  'AUTH_SESSION_EXPIRED',
+  'AUTH_SESSION_REVOKED',
+] as const
+export type SessionUnauthorizedErrorCode = (typeof sessionUnauthorizedErrorCodes)[number]
+export const sessionUnauthorizedErrorResponseSchema = createErrorResponseSchema(
+  'SessionUnauthorizedErrorResponse',
+  sessionUnauthorizedErrorCodes
+)
+
+export const sessionForbiddenErrorCodes = ['AUTH_USER_DISABLED'] as const
+export type SessionForbiddenErrorCode = (typeof sessionForbiddenErrorCodes)[number]
+export const sessionForbiddenErrorResponseSchema = createErrorResponseSchema(
+  'SessionForbiddenErrorResponse',
+  sessionForbiddenErrorCodes
+)
+
+export const changePasswordUnauthorizedErrorCodes = [
+  ...sessionUnauthorizedErrorCodes,
+  ...loginUnauthorizedErrorCodes,
+] as const
+export type ChangePasswordUnauthorizedErrorCode =
+  (typeof changePasswordUnauthorizedErrorCodes)[number]
+export const changePasswordUnauthorizedErrorResponseSchema = createErrorResponseSchema(
+  'ChangePasswordUnauthorizedErrorResponse',
+  changePasswordUnauthorizedErrorCodes
+)
+
+export const activationUnauthorizedErrorCodes = ['AUTH_ACTIVATION_TOKEN_INVALID'] as const
+export type ActivationUnauthorizedErrorCode = (typeof activationUnauthorizedErrorCodes)[number]
+export const activationUnauthorizedErrorResponseSchema = createErrorResponseSchema(
+  'ActivationUnauthorizedErrorResponse',
+  activationUnauthorizedErrorCodes
+)
 
 export const authMembershipSchema = z
   .object({
