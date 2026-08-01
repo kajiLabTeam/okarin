@@ -15,8 +15,8 @@ const {
 }))
 
 vi.mock('../../services/storage/index.js', () => ({
-  buildTrajectoryAnalyzedResultObjectKey: (trajectoryId: string) =>
-    `trajectories/${trajectoryId}/analyzed/result.csv`,
+  buildTrajectoryAnalyzedResultObjectKey: (organizationId: string, trajectoryId: string) =>
+    `organizations/${organizationId}/trajectories/${trajectoryId}/analyzed/result.csv`,
   doesTrajectoryAnalyzedResultObjectExist: doesTrajectoryAnalyzedResultObjectExistMock,
 }))
 
@@ -36,6 +36,7 @@ describe('receiveCallback', () => {
 
   it('completed callback を受理して completed に更新する', async () => {
     const trajectoryId = '11111111-1111-4111-8111-111111111111'
+    const organizationId = '22222222-2222-4222-8222-222222222222'
 
     verifyCallbackTokenMock.mockReturnValue({
       ok: true,
@@ -46,6 +47,7 @@ describe('receiveCallback', () => {
     })
     findTrajectoryByIdMock.mockResolvedValue({
       id: trajectoryId,
+      organization_id: organizationId,
       status: 'processing',
       error_code: null,
       error_message: null,
@@ -60,7 +62,7 @@ describe('receiveCallback', () => {
       trajectory_id: trajectoryId,
       status: 'completed',
       callback_token: 'signed-token',
-      result_object_key: `trajectories/${trajectoryId}/analyzed/result.csv`,
+      result_object_key: `organizations/${organizationId}/trajectories/${trajectoryId}/analyzed/result.csv`,
     })
 
     expect(result).toEqual({
@@ -101,6 +103,7 @@ describe('receiveCallback', () => {
 
   it('result object が見つからなければ 503 相当を返す', async () => {
     const trajectoryId = '11111111-1111-4111-8111-111111111111'
+    const organizationId = '22222222-2222-4222-8222-222222222222'
 
     verifyCallbackTokenMock.mockReturnValue({
       ok: true,
@@ -111,6 +114,7 @@ describe('receiveCallback', () => {
     })
     findTrajectoryByIdMock.mockResolvedValue({
       id: trajectoryId,
+      organization_id: organizationId,
       status: 'processing',
       error_code: null,
       error_message: null,
@@ -121,7 +125,7 @@ describe('receiveCallback', () => {
       trajectory_id: trajectoryId,
       status: 'completed',
       callback_token: 'signed-token',
-      result_object_key: `trajectories/${trajectoryId}/analyzed/result.csv`,
+      result_object_key: `organizations/${organizationId}/trajectories/${trajectoryId}/analyzed/result.csv`,
     })
 
     expect(result).toEqual({

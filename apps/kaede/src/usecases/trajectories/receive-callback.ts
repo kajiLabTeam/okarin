@@ -71,7 +71,10 @@ export const receiveCallback = async (
   }
 
   if (payload.status === 'completed') {
-    const expectedObjectKey = buildTrajectoryAnalyzedResultObjectKey(payload.trajectory_id)
+    const expectedObjectKey = buildTrajectoryAnalyzedResultObjectKey(
+      trajectory.organization_id,
+      trajectory.id
+    )
 
     if (payload.result_object_key !== expectedObjectKey) {
       return {
@@ -105,7 +108,10 @@ export const receiveCallback = async (
       }
     }
 
-    const exists = await doesTrajectoryAnalyzedResultObjectExist(trajectory.id)
+    const exists = await doesTrajectoryAnalyzedResultObjectExist(
+      trajectory.organization_id,
+      trajectory.id
+    )
     if (!exists) {
       return {
         ok: false,

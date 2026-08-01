@@ -44,7 +44,7 @@ class DefaultRikkaStrategy:
                     "trajectory_id": str(request.trajectory_id),
                     "status": "completed",
                     "callback_token": request.callback_token,
-                    "result_object_key": self._result_object_key(request),
+                    "result_object_key": request.result_object_key,
                 },
             )
         except Exception as error:
@@ -233,6 +233,3 @@ class DefaultRikkaStrategy:
         if request.floor_scale is None:
             return float(FLOORMAP_SCALE)
         return float(request.floor_scale)
-
-    def _result_object_key(self, request: AnalyzeRequest) -> str:
-        return f"trajectories/{request.trajectory_id}/analyzed/result.csv"

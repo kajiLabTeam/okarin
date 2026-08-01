@@ -50,7 +50,7 @@ describe('POST /api/trajectories/callback', () => {
         trajectory_id: trajectory.id,
         status: 'completed',
         callback_token: callbackToken,
-        result_object_key: `trajectories/${trajectory.id}/analyzed/result.csv`,
+        result_object_key: `organizations/${trajectory.organization_id}/trajectories/${trajectory.id}/analyzed/result.csv`,
       }),
     })
 

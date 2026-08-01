@@ -123,6 +123,10 @@ class AnalyzeRequest(BaseModel):
     result_upload_url: HttpUrl = Field(
         description="解析結果 result.csv 保存用の署名付き URL"
     )
+    result_object_key: str = Field(
+        min_length=1,
+        description="解析結果の object key。callback ではこの値をそのまま返す",
+    )
     callback_url: HttpUrl = Field(description="解析完了後に通知する callback URL")
     callback_token: str = Field(
         min_length=1, description="仲介サーバーが検証する callback 用トークン"

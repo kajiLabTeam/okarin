@@ -157,7 +157,7 @@ describe('storage presigned url service', () => {
     )
 
     expect(objectKey).toBe(
-      'maps/22222222-2222-4222-8222-222222222222/33333333-3333-4333-8333-333333333333.png'
+      'organizations/22222222-2222-4222-8222-222222222222/floors/33333333-3333-4333-8333-333333333333/map.png'
     )
     expect(getFloorMapExtensionFromObjectKey(objectKey)).toBe('png')
     expect(getFloorMapContentType('png')).toBe('image/png')
@@ -191,7 +191,7 @@ describe('storage presigned url service', () => {
 
     const downloadUrl = new URL(download.url)
     const expectedPath =
-      '/okarin-local/maps/22222222-2222-4222-8222-222222222222/33333333-3333-4333-8333-333333333333.svg'
+      '/okarin-local/organizations/22222222-2222-4222-8222-222222222222/floors/33333333-3333-4333-8333-333333333333/map.svg'
 
     expect(downloadUrl.origin).toBe('http://127.0.0.1:8333')
     expect(downloadUrl.pathname).toBe(expectedPath)
@@ -215,18 +215,21 @@ describe('storage presigned url service', () => {
       trajectoryResultUploadUrlTtlSeconds: 86400,
     })
     const trajectoryId = '44444444-4444-4444-8444-444444444444'
+    const organizationId = '22222222-2222-4222-8222-222222222222'
     const now = new Date('2026-05-13T00:00:00.000Z')
 
-    const download = await issueTrajectoryResultDownloadUrl(trajectoryId, now)
+    const download = await issueTrajectoryResultDownloadUrl(organizationId, trajectoryId, now)
 
     expect(download.expiresAt).toBe('2026-05-13T00:30:00.000Z')
-    expect(download.objectKey).toBe(buildTrajectoryAnalyzedResultObjectKey(trajectoryId))
+    expect(download.objectKey).toBe(
+      buildTrajectoryAnalyzedResultObjectKey(organizationId, trajectoryId)
+    )
 
     const downloadUrl = new URL(download.downloadUrl)
 
     expect(downloadUrl.origin).toBe('http://127.0.0.1:8333')
     expect(downloadUrl.pathname).toBe(
-      `/okarin-local/trajectories/${trajectoryId}/analyzed/result.csv`
+      `/okarin-local/organizations/${organizationId}/trajectories/${trajectoryId}/analyzed/result.csv`
     )
     expect(downloadUrl.searchParams.get('X-Amz-Expires')).toBe('1800')
     expect(downloadUrl.searchParams.get('X-Amz-SignedHeaders')).toBe('host')

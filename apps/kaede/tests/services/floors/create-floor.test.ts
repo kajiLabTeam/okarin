@@ -128,7 +128,7 @@ describe('createFloor', () => {
     })
     expect(result.value.map_image.download_expires_at).toEqual(expect.any(String))
     const mapDownloadUrl = new URL(result.value.map_image.download_url)
-    const expectedMapPath = `/okarin-test/maps/${building.id}/${result.value.floor_id}.svg`
+    const expectedMapPath = `/okarin-test/organizations/${organization.id}/floors/${result.value.floor_id}/map.svg`
     expect(result.value.map_image).toMatchObject({
       content_type: 'image/svg+xml',
       extension: 'svg',
@@ -153,7 +153,7 @@ describe('createFloor', () => {
       level: 2,
       name: '2F',
       scale: 25,
-      image_object_path: `maps/${building.id}/${result.value.floor_id}.svg`,
+      image_object_path: `organizations/${organization.id}/floors/${result.value.floor_id}/map.svg`,
     })
   })
 

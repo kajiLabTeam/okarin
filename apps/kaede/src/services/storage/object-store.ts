@@ -68,8 +68,11 @@ export const listRecordingRawObjectKeys = async (organizationId: string, recordi
   return keys
 }
 
-export const doesTrajectoryAnalyzedResultObjectExist = async (trajectoryId: string) => {
-  const expectedKey = buildTrajectoryAnalyzedResultObjectKey(trajectoryId)
+export const doesTrajectoryAnalyzedResultObjectExist = async (
+  organizationId: string,
+  trajectoryId: string
+) => {
+  const expectedKey = buildTrajectoryAnalyzedResultObjectKey(organizationId, trajectoryId)
   const { config, internalClient } = getS3Context()
 
   try {
@@ -96,9 +99,10 @@ export const doesTrajectoryAnalyzedResultObjectExist = async (trajectoryId: stri
 }
 
 export const getTrajectoryAnalyzedResultObjectText = async (
+  organizationId: string,
   trajectoryId: string
 ): Promise<string | undefined> => {
-  const expectedKey = buildTrajectoryAnalyzedResultObjectKey(trajectoryId)
+  const expectedKey = buildTrajectoryAnalyzedResultObjectKey(organizationId, trajectoryId)
   const { config, internalClient } = getS3Context()
 
   try {
