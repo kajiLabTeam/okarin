@@ -197,6 +197,7 @@ export const createTrajectory = async (
 
   let rawDataUrls: Awaited<ReturnType<typeof issueInternalRecordingRawDownloadUrls>>['rawDataUrls']
   let resultUploadUrl: string
+  let resultObjectKey: string
   let callbackToken: string
 
   try {
@@ -206,11 +207,12 @@ export const createTrajectory = async (
         recording.id,
         uploadTargets.data
       ),
-      issueInternalTrajectoryResultUploadUrl(processing.id),
+      issueInternalTrajectoryResultUploadUrl(processing.organization_id, processing.id),
       Promise.resolve(generateCallbackToken(processing.id)),
     ])
     rawDataUrls = rawDataUrlResult.rawDataUrls
     resultUploadUrl = resultUploadUrlResult.uploadUrl
+    resultObjectKey = resultUploadUrlResult.objectKey
     callbackToken = callbackTokenResult
   } catch (error) {
     Sentry.captureException(error)
@@ -239,6 +241,7 @@ export const createTrajectory = async (
       constraints: usedConstraints,
       raw_data_urls: rawDataUrls,
       result_upload_url: resultUploadUrl,
+      result_object_key: resultObjectKey,
       callback_url: getCallbackUrl(),
       callback_token: callbackToken,
     })

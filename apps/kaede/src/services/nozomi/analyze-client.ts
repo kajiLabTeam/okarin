@@ -28,6 +28,7 @@ export interface AnalyzeRequestPayload {
     wifi?: string
   }
   result_upload_url: string
+  result_object_key: string
   callback_url: string
   callback_token: string
 }

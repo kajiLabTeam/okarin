@@ -1,5 +1,6 @@
 import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { z } from 'zod'
 import type { UploadTarget } from '../../schemas/common.js'
 import { getS3Context } from './s3-client.js'
 
@@ -47,12 +48,22 @@ export const getFloorMapExtensionFromObjectKey = (
   return undefined
 }
 
+const objectKeyUuidSchema = z.string().uuid()
+
+const validateObjectKeyUuid = (value: string, name: string) => {
+  const parsed = objectKeyUuidSchema.safeParse(value)
+  if (!parsed.success) {
+    throw new Error(`${name} must be a UUID`)
+  }
+  return parsed.data
+}
+
 export const buildFloorMapObjectKey = (
-  buildingId: string,
+  organizationId: string,
   floorId: string,
   extension: FloorMapImageExtension
 ) => {
-  return `maps/${buildingId}/${floorId}.${extension}`
+  return `organizations/${validateObjectKeyUuid(organizationId, 'organizationId')}/floors/${validateObjectKeyUuid(floorId, 'floorId')}/map.${extension}`
 }
 
 export const buildRecordingRawObjectKey = (
@@ -60,6 +71,8 @@ export const buildRecordingRawObjectKey = (
   recordingId: string,
   target: UploadTarget
 ) => {
+  validateObjectKeyUuid(organizationId, 'organizationId')
+  validateObjectKeyUuid(recordingId, 'recordingId')
   if (target === 'metadata') {
     return `organizations/${organizationId}/recordings/${recordingId}/raw/metadata.json`
   }
@@ -71,8 +84,11 @@ export const buildRecordingRawObjectPrefix = (organizationId: string, recordingI
   return `organizations/${organizationId}/recordings/${recordingId}/raw/`
 }
 
-export const buildTrajectoryAnalyzedResultObjectKey = (trajectoryId: string) => {
-  return `trajectories/${trajectoryId}/analyzed/result.csv`
+export const buildTrajectoryAnalyzedResultObjectKey = (
+  organizationId: string,
+  trajectoryId: string
+) => {
+  return `organizations/${validateObjectKeyUuid(organizationId, 'organizationId')}/trajectories/${validateObjectKeyUuid(trajectoryId, 'trajectoryId')}/analyzed/result.csv`
 }
 
 export const issueRecordingUploadUrls = async (
@@ -217,11 +233,12 @@ export const issueInternalRecordingRawDownloadUrls = async (
 }
 
 export const issueInternalTrajectoryResultUploadUrl = async (
+  organizationId: string,
   trajectoryId: string,
   now: Date = new Date()
 ) => {
   const { config, internalClient } = getS3Context()
-  const objectKey = buildTrajectoryAnalyzedResultObjectKey(trajectoryId)
+  const objectKey = buildTrajectoryAnalyzedResultObjectKey(organizationId, trajectoryId)
 
   const uploadUrl = await getSignedUrl(
     internalClient,
@@ -242,11 +259,12 @@ export const issueInternalTrajectoryResultUploadUrl = async (
 }
 
 export const issueTrajectoryResultDownloadUrl = async (
+  organizationId: string,
   trajectoryId: string,
   now: Date = new Date()
 ) => {
   const { config, presignClient } = getS3Context()
-  const objectKey = buildTrajectoryAnalyzedResultObjectKey(trajectoryId)
+  const objectKey = buildTrajectoryAnalyzedResultObjectKey(organizationId, trajectoryId)
 
   const downloadUrl = await getSignedUrl(
     presignClient,

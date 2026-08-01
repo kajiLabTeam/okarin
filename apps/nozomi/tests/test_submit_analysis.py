@@ -27,6 +27,10 @@ def valid_analyze_request() -> AnalyzeRequest:
                 "gyro": "https://object-storage.example.com/gyro.csv",
             },
             "result_upload_url": "https://object-storage.example.com/result.csv",
+            "result_object_key": (
+                "organizations/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/trajectories/"
+                "dddddddd-dddd-dddd-dddd-dddddddddddd/analyzed/result.csv"
+            ),
             "callback_url": "https://mediator.example.com/api/trajectories/callback",
             "callback_token": "signed-callback-token",
         }

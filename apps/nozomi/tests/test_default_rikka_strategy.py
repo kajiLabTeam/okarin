@@ -29,6 +29,10 @@ def valid_analyze_request() -> AnalyzeRequest:
                 "gyro": "https://object-storage.example.com/gyro.csv",
             },
             "result_upload_url": "https://object-storage.example.com/result.csv",
+            "result_object_key": (
+                "organizations/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/trajectories/"
+                "dddddddd-dddd-dddd-dddd-dddddddddddd/analyzed/result.csv"
+            ),
             "callback_url": "https://mediator.example.com/api/trajectories/callback",
             "callback_token": "signed-callback-token",
         }
@@ -126,7 +130,8 @@ def test_default_rikka_strategy_runs_pdr_uploads_result_and_marks_completed(
         "status": "completed",
         "callback_token": "signed-callback-token",
         "result_object_key": (
-            "trajectories/dddddddd-dddd-dddd-dddd-dddddddddddd/analyzed/result.csv"
+            "organizations/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/trajectories/"
+            "dddddddd-dddd-dddd-dddd-dddddddddddd/analyzed/result.csv"
         ),
     }
     assert list(process_sensor_data_calls[0][0].columns) == ["t", "x", "y", "z"]

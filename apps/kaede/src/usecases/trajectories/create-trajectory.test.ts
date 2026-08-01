@@ -169,6 +169,7 @@ describe('createTrajectory', () => {
         gyro: 'http://seaweedfs:8333/gyro',
       },
       result_upload_url: 'http://seaweedfs:8333/result',
+      result_object_key: `trajectories/${trajectoryId}/analyzed/result.csv`,
       callback_url: 'http://kaede:8080/api/trajectories/callback',
       callback_token: 'signed-callback-token',
     })

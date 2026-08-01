@@ -60,7 +60,10 @@ export const getTrajectoryResult = async (
     }
   }
 
-  const resultDownload = await issueTrajectoryResultDownloadUrl(trajectory.id)
+  const resultDownload = await issueTrajectoryResultDownloadUrl(
+    trajectory.organization_id,
+    trajectory.id
+  )
 
   return {
     ok: true,

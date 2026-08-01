@@ -71,7 +71,10 @@ describe('getTrajectoryResult', () => {
         expires_at: '2026-07-07T00:30:00.000Z',
       },
     })
-    expect(issueTrajectoryResultDownloadUrlMock).toHaveBeenCalledWith(trajectoryId)
+    expect(issueTrajectoryResultDownloadUrlMock).toHaveBeenCalledWith(
+      '11111111-1111-4111-8111-111111111111',
+      trajectoryId
+    )
   })
 
   it('completed 以外は TRAJECTORY_RESULT_NOT_READY を返す', async () => {

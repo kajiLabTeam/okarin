@@ -21,36 +21,32 @@
 
 ## prefix 構成
 
-- `maps/`
 - `organizations/`
-- `trajectories/`
 
 ```text
-maps/
 organizations/
-trajectories/
 ```
 
-## maps
+## floor maps
 
 施設マップ画像の保存領域。
 
 キー規約:
 
 ```text
-maps/{building_id}/{floor_id}.{ext}
+organizations/{organization_id}/floors/{floor_id}/map.{ext}
 ```
 
 例:
 
 ```text
-maps/11111111-1111-1111-1111-111111111111/22222222-2222-2222-2222-222222222222.svg
-maps/11111111-1111-1111-1111-111111111111/33333333-3333-3333-3333-333333333333.png
+organizations/99999999-9999-4999-8999-999999999999/floors/22222222-2222-4222-8222-222222222222/map.svg
+organizations/99999999-9999-4999-8999-999999999999/floors/33333333-3333-4333-8333-333333333333/map.png
 ```
 
 ルール:
 
-- `{building_id}` は `buildings.id`
+- `{organization_id}` は `buildings.organization_id`
 - `{floor_id}` は `floors.id`
 - `{ext}` は `svg` または `png`
 - `jpg` / `jpeg` は当面許可しない
@@ -95,7 +91,7 @@ organizations/99999999-9999-9999-9999-999999999999/recordings/aaaaaaaa-aaaa-aaaa
 キー規約:
 
 ```text
-recordings/{recording_id}/ground_truth/{truth_type}.csv
+organizations/{organization_id}/recordings/{recording_id}/ground_truth/{truth_type}.csv
 ```
 
 現時点の正式値:
@@ -105,7 +101,7 @@ recordings/{recording_id}/ground_truth/{truth_type}.csv
 例:
 
 ```text
-recordings/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/ground_truth/uwb.csv
+organizations/99999999-9999-4999-8999-999999999999/recordings/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/ground_truth/uwb.csv
 ```
 
 ルール:
@@ -120,20 +116,21 @@ recordings/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/ground_truth/uwb.csv
 キー規約:
 
 ```text
-trajectories/{trajectory_id}/analyzed/result.csv
-trajectories/{trajectory_id}/ground_truth/result.csv
+organizations/{organization_id}/trajectories/{trajectory_id}/analyzed/result.csv
+organizations/{organization_id}/trajectories/{trajectory_id}/ground_truth/result.csv
 ```
 
 例:
 
 ```text
-trajectories/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/analyzed/result.csv
-trajectories/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/ground_truth/result.csv
+organizations/99999999-9999-4999-8999-999999999999/trajectories/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/analyzed/result.csv
+organizations/99999999-9999-4999-8999-999999999999/trajectories/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/ground_truth/result.csv
 ```
 
 ルール:
 
 - `{trajectory_id}` は `trajectories.id`
+- `{organization_id}` は `trajectories.organization_id`
 - `result.csv` は解析結果の標準出力
 - `ground_truth/result.csv` は trajectory 単位の整形済み ground truth 結果を表す
 - 再解析時は既存結果を上書きせず、新しい `trajectory_id` 配下に保存する
@@ -159,10 +156,7 @@ trajectories/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/ground_truth/result.csv
 
 非公開:
 
-- `organizations/` 配下の recording raw データ
-- `recordings/` 配下の ground truth
-- `trajectories/` 配下の解析結果
-- `trajectories/` 配下の ground truth 解析結果
+- `organizations/` 配下の recording raw、floor map、trajectory analyzed result、ground truth
 
 署名付き URL 発行対象:
 
@@ -178,11 +172,11 @@ trajectories/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/ground_truth/result.csv
 
 ## 保持期間
 
-- `maps/` は手動削除まで保持
+- `organizations/*/floors/*/map.*` は手動削除まで保持
 - `organizations/*/recordings/*/raw` は当面削除しない
-- `recordings/ground_truth` は当面削除しない
-- `trajectories/analyzed/result.csv` は当面削除しない
-- `trajectories/ground_truth/result.csv` は当面削除しない
+- `organizations/*/recordings/*/ground_truth` は当面削除しない
+- `organizations/*/trajectories/*/analyzed/result.csv` は当面削除しない
+- `organizations/*/trajectories/*/ground_truth/result.csv` は当面削除しない
 
 ## 環境ごとの運用
 

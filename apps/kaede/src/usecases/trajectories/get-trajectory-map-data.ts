@@ -144,7 +144,10 @@ export const getTrajectoryMapData = async (
     }
   }
 
-  const csvText = await getTrajectoryAnalyzedResultObjectText(trajectory.id)
+  const csvText = await getTrajectoryAnalyzedResultObjectText(
+    trajectory.organization_id,
+    trajectory.id
+  )
 
   if (csvText === undefined) {
     return {

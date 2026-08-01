@@ -152,7 +152,11 @@ export const createFloor = async (
 
   const mapImageExtension = mapValidation.extension
   const floorId = randomUUID()
-  const imageObjectPath = buildFloorMapObjectKey(building.id, floorId, mapImageExtension)
+  const imageObjectPath = buildFloorMapObjectKey(
+    building.organization_id,
+    floorId,
+    mapImageExtension
+  )
   await putFloorMapObject(imageObjectPath, mapImageExtension, mapImage.bytes)
   let floor: Awaited<ReturnType<typeof insertFloor>>
 
