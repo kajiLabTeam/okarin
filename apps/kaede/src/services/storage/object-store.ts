@@ -165,6 +165,7 @@ export const getAnalysisHeatmapObjectText = async (
 ): Promise<string | undefined> => {
   const objectKey = buildAnalysisHeatmapObjectKey(organizationId, analysisRunId)
   const { config, internalClient } = getS3Context()
+
   try {
     const response = await internalClient.send(
       new GetObjectCommand({ Bucket: config.bucket, Key: objectKey })

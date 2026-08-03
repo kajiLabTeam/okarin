@@ -1,9 +1,12 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   findAnalysisRunById,
+  findOrganizationAnalysisRunById,
   insertAnalysisRun,
   insertAnalysisRunTrajectories,
   listAnalysisRunTrajectories,
+  listAnalysisRunTrajectoryStates,
+  listOrganizationAnalysisRuns,
   markAnalysisRunCompleted,
   markAnalysisRunFailed,
   markAnalysisRunProcessing,
@@ -225,5 +228,54 @@ describe('analysis run repository', () => {
     })
     expect(activeFuture).toMatchObject({ status: 'accepted', finished_at: null })
     expect(terminalCompleted).toMatchObject({ status: 'completed' })
+  })
+
+  it('organization内のrunを絞り込み、trajectoryの削除状態を返す', async () => {
+    const { floor, organization, recording } = await createRecordingFixture(db)
+    const trajectory = await insertTrajectory(
+      {
+        recording_id: recording.id,
+        floor_id: floor.id,
+        organization_id: organization.id,
+        status: 'completed',
+        deleted_at: new Date('2026-08-04T01:00:00.000Z'),
+      },
+      db
+    )
+    const run = await insertAnalysisRun(
+      {
+        organization_id: organization.id,
+        floor_id: floor.id,
+        analysis_type: 'stay_heatmap',
+        parameters: {},
+        definition_version: 'original-v1',
+      },
+      db
+    )
+    await insertAnalysisRunTrajectories(
+      [{ analysis_run_id: run.id, trajectory_id: trajectory.id, seq: 0 }],
+      db
+    )
+
+    const page = await listOrganizationAnalysisRuns(
+      organization.id,
+      {
+        limit: 20,
+        cursor: null,
+        analysisType: 'stay_heatmap',
+        status: 'accepted',
+        floorId: floor.id,
+      },
+      db
+    )
+    const detail = await findOrganizationAnalysisRunById(organization.id, run.id, db)
+    const states = await listAnalysisRunTrajectoryStates(run.id, db)
+
+    expect(page.totalCount).toBe(1)
+    expect(page.rows[0]?.id).toBe(run.id)
+    expect(detail?.id).toBe(run.id)
+    expect(states).toEqual([
+      { analysis_run_id: run.id, trajectory_id: trajectory.id, seq: 0, deleted: true },
+    ])
   })
 })
