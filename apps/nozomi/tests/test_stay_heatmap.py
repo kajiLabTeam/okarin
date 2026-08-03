@@ -76,6 +76,25 @@ def test_schema_rejects_unknown_field_and_invalid_sequence() -> None:
     )
 
 
+def test_schema_rejects_duplicate_trajectory_and_start_outside_floor() -> None:
+    duplicate = valid_payload()
+    trajectories = duplicate["trajectories"]
+    assert isinstance(trajectories, list)
+    first_trajectory = trajectories[0]
+    assert isinstance(first_trajectory, dict)
+    trajectories.append({**first_trajectory, "seq": 1})
+    assert (
+        TestClient(app).post("/stay-heatmaps/analyze", json=duplicate).status_code
+        == 422
+    )
+
+    outside = valid_payload()
+    outside["trajectories"][0]["start"]["x_px"] = 101  # type: ignore[index]
+    assert (
+        TestClient(app).post("/stay-heatmaps/analyze", json=outside).status_code == 422
+    )
+
+
 def test_submit_registers_background_runner(monkeypatch: Any) -> None:
     request = StayHeatmapAnalyzeRequest.model_validate(valid_payload())
     background_tasks = BackgroundTasks()
@@ -156,7 +175,9 @@ def test_runner_processes_trajectories_and_uploads_artifacts(monkeypatch: Any) -
     artifact = json.loads(artifact_body)
     assert artifact["grid"] == {"size_m": 1.0, "column_count": 2, "row_count": 3}
     assert artifact["trajectories"][0]["cells"][0]["stay_cell_visit_count"] == 1
-    callback = json.loads(requests[3][2])
+    callback_body = requests[3][2]
+    assert callback_body is not None
+    callback = json.loads(callback_body)
     assert callback == {
         "analysis_run_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         "status": "completed",
@@ -188,3 +209,83 @@ def test_runner_reports_invalid_csv(monkeypatch: Any) -> None:
     callback = json.loads(requests[-1].data)
     assert callback["status"] == "failed"
     assert callback["error_code"] == "INVALID_TRAJECTORY_CSV"
+
+
+def test_runner_reports_trajectory_download_failure(monkeypatch: Any) -> None:
+    requests: list[Any] = []
+
+    def fake_urlopen(request: Any, timeout: int) -> StubResponse:
+        requests.append(request)
+        if isinstance(request, str):
+            raise OSError("storage unavailable")
+        return StubResponse()
+
+    class UnusedAnalyzer:
+        def enrich_and_aggregate(self, dataframe, request, trajectory):
+            raise AssertionError("analyzer must not be called")
+
+    monkeypatch.setattr("src.analysis.stay_heatmap.urlopen", fake_urlopen)
+    StayHeatmapRunner(UnusedAnalyzer()).run(
+        StayHeatmapAnalyzeRequest.model_validate(valid_payload())
+    )
+
+    callback = json.loads(requests[-1].data)
+    assert callback["status"] == "failed"
+    assert callback["error_code"] == "TRAJECTORY_DOWNLOAD_FAILED"
+    assert "storage unavailable" not in callback["error_message"]
+
+
+def test_runner_reports_analysis_processing_failure(monkeypatch: Any) -> None:
+    requests: list[Any] = []
+
+    def fake_urlopen(request: Any, timeout: int) -> StubResponse:
+        requests.append(request)
+        url = request.full_url if hasattr(request, "full_url") else str(request)
+        if url.endswith("input.csv"):
+            return StubResponse(b"step_index\n0\n")
+        return StubResponse()
+
+    class FailingAnalyzer:
+        def enrich_and_aggregate(self, dataframe, request, trajectory):
+            raise RuntimeError("rikka internal details")
+
+    monkeypatch.setattr("src.analysis.stay_heatmap.urlopen", fake_urlopen)
+    StayHeatmapRunner(FailingAnalyzer()).run(
+        StayHeatmapAnalyzeRequest.model_validate(valid_payload())
+    )
+
+    callback = json.loads(requests[-1].data)
+    assert callback["status"] == "failed"
+    assert callback["error_code"] == "ANALYSIS_PROCESSING_FAILED"
+    assert "rikka internal details" not in callback["error_message"]
+
+
+def test_runner_reports_artifact_upload_failure(monkeypatch: Any) -> None:
+    requests: list[Any] = []
+
+    def fake_urlopen(request: Any, timeout: int) -> StubResponse:
+        requests.append(request)
+        url = request.full_url if hasattr(request, "full_url") else str(request)
+        method = request.get_method() if hasattr(request, "get_method") else "GET"
+        if url.endswith("input.csv"):
+            return StubResponse(b"step_index\n0\n")
+        if method == "PUT":
+            raise OSError("storage write failed")
+        return StubResponse()
+
+    class StubAnalyzer:
+        def enrich_and_aggregate(self, dataframe, request, trajectory):
+            enriched = dataframe.copy()
+            enriched["speed_mps"] = [float("nan")]
+            enriched["is_stay"] = [False]
+            return enriched, []
+
+    monkeypatch.setattr("src.analysis.stay_heatmap.urlopen", fake_urlopen)
+    StayHeatmapRunner(StubAnalyzer()).run(
+        StayHeatmapAnalyzeRequest.model_validate(valid_payload())
+    )
+
+    callback = json.loads(requests[-1].data)
+    assert callback["status"] == "failed"
+    assert callback["error_code"] == "ARTIFACT_UPLOAD_FAILED"
+    assert "storage write failed" not in callback["error_message"]
