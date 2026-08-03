@@ -2,10 +2,12 @@ import asyncio
 import json
 from typing import Any
 
+import pandas as pd
+import pytest
 from fastapi import BackgroundTasks
 from fastapi.testclient import TestClient
 
-from src.analysis.stay_heatmap import StayHeatmapRunner
+from src.analysis.stay_heatmap import RikkaStayHeatmapAnalyzer, StayHeatmapRunner
 from src.schemas.analysis import StayHeatmapAnalyzeRequest
 from src.server import app
 from src.usecases.submit_stay_heatmap import submit_stay_heatmap
@@ -114,6 +116,31 @@ def test_submit_registers_background_runner(monkeypatch: Any) -> None:
 
     assert response.status == "accepted"
     assert calls == [request]
+
+
+def test_rikka_adapter_enriches_and_aggregates_real_implementation() -> None:
+    request = StayHeatmapAnalyzeRequest.model_validate(valid_payload())
+    trajectory = request.trajectories[0]
+    dataframe = pd.DataFrame(
+        {
+            "step_index": [0, 1, 2, 3],
+            "rikka_timestamp_s": [float("nan"), 0.0, 0.6, 1.2],
+            "rikka_x": [0.0, 0.0, 0.1, 0.2],
+            "rikka_y": [0.0, 0.0, 0.0, 0.0],
+            "x": [10.0, 10.0, 100.0, 100.0],
+            "y": [20.0, 20.0, 20.0, 20.0],
+        }
+    )
+
+    enriched, cells = RikkaStayHeatmapAnalyzer().enrich_and_aggregate(
+        dataframe, request, trajectory
+    )
+
+    assert list(enriched.columns[-2:]) == ["speed_mps", "is_stay"]
+    assert enriched["speed_mps"].iloc[:2].isna().all()
+    assert enriched["speed_mps"].iloc[2:].tolist() == pytest.approx([1 / 6, 1 / 6])
+    assert enriched["is_stay"].tolist() == [False, False, True, True]
+    assert cells == [{"grid_column": 1, "grid_row": 0, "stay_cell_visit_count": 1}]
 
 
 class StubResponse:
