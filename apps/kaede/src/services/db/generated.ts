@@ -52,6 +52,8 @@ export interface Floors {
   id: Generated<string>
   image_object_path: string
   level: number
+  map_height_px: number | null
+  map_width_px: number | null
   name: string
   organization_id: string
   scale: number | null

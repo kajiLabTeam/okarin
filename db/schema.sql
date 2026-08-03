@@ -80,6 +80,10 @@ CREATE TABLE public.floors (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     organization_id uuid NOT NULL,
+    map_width_px integer,
+    map_height_px integer,
+    CONSTRAINT floors_map_dimensions_bounds_chk CHECK (((map_width_px IS NULL) OR ((map_width_px > 0) AND (map_height_px > 0) AND (map_width_px <= 20000) AND (map_height_px <= 20000) AND (((map_width_px)::bigint * (map_height_px)::bigint) <= 100000000)))),
+    CONSTRAINT floors_map_dimensions_presence_chk CHECK ((((map_width_px IS NULL) AND (map_height_px IS NULL)) OR ((map_width_px IS NOT NULL) AND (map_height_px IS NOT NULL)))),
     CONSTRAINT floors_image_object_path_format_chk CHECK (((image_object_path ~ '^maps/[0-9a-fA-F-]+/[0-9a-fA-F-]+\.(svg|png)$'::text) OR (image_object_path ~ '^organizations/[0-9a-fA-F-]+/floors/[0-9a-fA-F-]+/map\.(svg|png)$'::text)))
 );
 
