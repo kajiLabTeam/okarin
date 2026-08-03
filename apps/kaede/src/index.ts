@@ -2,8 +2,10 @@ import '../instrument.mjs'
 import { serve } from '@hono/node-server'
 import { validateRuntimeConfig } from './config/runtime.js'
 import { createApp } from './server.js'
+import { expireTimedOutAnalysisRuns } from './services/analysis-runs/index.js'
 
 const runtimeConfig = validateRuntimeConfig()
+await expireTimedOutAnalysisRuns()
 const app = createApp()
 const port = runtimeConfig.app.port
 const host = runtimeConfig.app.host
