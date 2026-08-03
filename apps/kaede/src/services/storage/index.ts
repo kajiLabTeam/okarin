@@ -7,6 +7,8 @@ export {
 } from './object-store.js'
 export {
   buildFloorMapObjectKey,
+  buildAnalysisHeatmapObjectKey,
+  buildAnalysisTrajectoryCsvObjectKey,
   buildTrajectoryAnalyzedResultObjectKey,
   buildRecordingRawObjectPrefix,
   buildRecordingRawObjectKey,
@@ -14,10 +16,14 @@ export {
   getFloorMapContentType,
   getFloorMapExtensionFromObjectKey,
   issueInternalRecordingRawDownloadUrls,
+  issueInternalAnalysisHeatmapUploadUrl,
+  issueInternalAnalysisTrajectoryDownloadUrl,
+  issueInternalAnalysisTrajectoryUploadUrl,
   issueInternalTrajectoryResultUploadUrl,
   issueRecordingRawDownloadUrls,
   issueRecordingUploadUrls,
   issueTrajectoryResultDownloadUrl,
+  issueAnalysisTrajectoryCsvDownloadUrl,
 } from './presigned-url.js'
 export { resetS3ClientForTests } from './s3-client.js'
 export type {

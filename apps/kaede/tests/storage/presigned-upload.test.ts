@@ -1,5 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import {
+  issueAnalysisTrajectoryCsvDownloadUrl,
+  issueInternalAnalysisHeatmapUploadUrl,
+  issueInternalAnalysisTrajectoryUploadUrl,
   putFloorMapObject,
   issueRecordingUploadUrls,
   resetS3ClientForTests,
@@ -80,5 +83,36 @@ describe('presigned upload integration', () => {
     await putFloorMapObject(objectKey, 'svg', new TextEncoder().encode(svg))
 
     await expect(readObjectText(s3, objectKey)).resolves.toBe(svg)
+  }, 30000)
+
+  it('analysis artifact を署名URLで保存してCSVを公開取得できる', async () => {
+    const organizationId = '77777777-7777-4777-8777-777777777777'
+    const analysisRunId = '66666666-6666-4666-8666-666666666666'
+    const trajectoryId = '55555555-5555-4555-8555-555555555555'
+    const csv = 'timestamp,x,y,speed_mps,is_stay\n0,1,2,,false\n'
+    const heatmap = '{"schema_version":"1","trajectories":[]}\n'
+
+    const [csvOutput, heatmapOutput] = await Promise.all([
+      issueInternalAnalysisTrajectoryUploadUrl(organizationId, analysisRunId, trajectoryId),
+      issueInternalAnalysisHeatmapUploadUrl(organizationId, analysisRunId),
+    ])
+
+    const [csvUploadResponse, heatmapUploadResponse] = await Promise.all([
+      fetch(csvOutput.uploadUrl, { method: 'PUT', body: csv }),
+      fetch(heatmapOutput.uploadUrl, { method: 'PUT', body: heatmap }),
+    ])
+    expect(csvUploadResponse.ok).toBe(true)
+    expect(heatmapUploadResponse.ok).toBe(true)
+
+    const csvDownload = await issueAnalysisTrajectoryCsvDownloadUrl(
+      organizationId,
+      analysisRunId,
+      trajectoryId
+    )
+    const csvDownloadResponse = await fetch(csvDownload.downloadUrl)
+
+    expect(csvDownloadResponse.ok).toBe(true)
+    await expect(csvDownloadResponse.text()).resolves.toBe(csv)
+    await expect(readObjectText(s3, heatmapOutput.objectKey)).resolves.toBe(heatmap)
   }, 30000)
 })

@@ -1,12 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { StorageRuntimeConfig } from '../../config/runtime.js'
 import {
+  buildAnalysisHeatmapObjectKey,
+  buildAnalysisTrajectoryCsvObjectKey,
   buildFloorMapObjectKey,
   buildRecordingRawObjectKey,
   buildTrajectoryAnalyzedResultObjectKey,
   getFloorMapContentType,
   getFloorMapExtensionFromObjectKey,
   issueFloorMapDownloadUrl,
+  issueAnalysisTrajectoryCsvDownloadUrl,
+  issueInternalAnalysisHeatmapUploadUrl,
+  issueInternalAnalysisTrajectoryDownloadUrl,
+  issueInternalAnalysisTrajectoryUploadUrl,
   issueRecordingRawDownloadUrls,
   issueRecordingUploadUrls,
   issueTrajectoryResultDownloadUrl,
@@ -28,6 +34,87 @@ afterEach(() => {
 })
 
 describe('storage presigned url service', () => {
+  const analysisOrganizationId = '22222222-2222-4222-8222-222222222222'
+  const analysisRunId = '33333333-3333-4333-8333-333333333333'
+  const analysisTrajectoryId = '44444444-4444-4444-8444-444444444444'
+
+  const mockStorageConfig = () => {
+    getStorageRuntimeConfigMock.mockReturnValue({
+      accessKeyId: 'kaede-test',
+      secretAccessKey: 'kaede-secret',
+      internalEndpoint: 'http://seaweedfs:8333',
+      publicEndpoint: 'http://127.0.0.1:8333',
+      region: 'us-east-1',
+      bucket: 'okarin-local',
+      floorMapDownloadUrlTtlSeconds: 3600,
+      recordingRawDownloadUrlTtlSeconds: 900,
+      recordingUploadUrlTtlSeconds: 900,
+      trajectoryRawDownloadUrlTtlSeconds: 86400,
+      trajectoryResultDownloadUrlTtlSeconds: 900,
+      trajectoryResultUploadUrlTtlSeconds: 86400,
+    })
+  }
+
+  it('analysis artifact key をrun単位の保存規約どおりに組み立てる', () => {
+    expect(
+      buildAnalysisTrajectoryCsvObjectKey(
+        analysisOrganizationId,
+        analysisRunId,
+        analysisTrajectoryId
+      )
+    ).toBe(
+      `organizations/${analysisOrganizationId}/analysis-runs/${analysisRunId}/artifacts/trajectories/${analysisTrajectoryId}/stay.csv`
+    )
+    expect(buildAnalysisHeatmapObjectKey(analysisOrganizationId, analysisRunId)).toBe(
+      `organizations/${analysisOrganizationId}/analysis-runs/${analysisRunId}/artifacts/stay-heatmap.json`
+    )
+  })
+
+  it('Nozomi用analysis URLを既存の24時間設定で生成できる', async () => {
+    mockStorageConfig()
+    const now = new Date('2026-08-04T00:00:00.000Z')
+
+    const [source, trajectoryOutput, heatmapOutput] = await Promise.all([
+      issueInternalAnalysisTrajectoryDownloadUrl(analysisOrganizationId, analysisTrajectoryId, now),
+      issueInternalAnalysisTrajectoryUploadUrl(
+        analysisOrganizationId,
+        analysisRunId,
+        analysisTrajectoryId,
+        now
+      ),
+      issueInternalAnalysisHeatmapUploadUrl(analysisOrganizationId, analysisRunId, now),
+    ])
+
+    expect(source.expiresAt).toBe('2026-08-05T00:00:00.000Z')
+    expect(trajectoryOutput.expiresAt).toBe('2026-08-05T00:00:00.000Z')
+    expect(heatmapOutput.expiresAt).toBe('2026-08-05T00:00:00.000Z')
+    expect(new URL(source.downloadUrl).origin).toBe('http://seaweedfs:8333')
+    expect(new URL(source.downloadUrl).searchParams.get('X-Amz-Expires')).toBe('86400')
+    expect(new URL(trajectoryOutput.uploadUrl).pathname).toBe(
+      `/okarin-local/${trajectoryOutput.objectKey}`
+    )
+    expect(new URL(heatmapOutput.uploadUrl).pathname).toBe(
+      `/okarin-local/${heatmapOutput.objectKey}`
+    )
+  })
+
+  it('公開用analysis CSV URLを15分設定で生成できる', async () => {
+    mockStorageConfig()
+    const now = new Date('2026-08-04T00:00:00.000Z')
+
+    const result = await issueAnalysisTrajectoryCsvDownloadUrl(
+      analysisOrganizationId,
+      analysisRunId,
+      analysisTrajectoryId,
+      now
+    )
+
+    expect(result.expiresAt).toBe('2026-08-04T00:15:00.000Z')
+    expect(new URL(result.downloadUrl).origin).toBe('http://127.0.0.1:8333')
+    expect(new URL(result.downloadUrl).searchParams.get('X-Amz-Expires')).toBe('900')
+    expect(new URL(result.downloadUrl).pathname).toBe(`/okarin-local/${result.objectKey}`)
+  })
+
   it('recording raw object key を保存規約どおりに組み立てる', () => {
     expect(
       buildRecordingRawObjectKey(
