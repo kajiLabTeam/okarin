@@ -9,6 +9,21 @@ interface CallbackTokenPayload {
   exp: number
 }
 
+interface AnalysisCallbackTokenPayload {
+  analysis_run_id: string
+  analysis_type: 'stay_heatmap'
+  exp: number
+}
+
+const signCallbackPayload = (payload: CallbackTokenPayload | AnalysisCallbackTokenPayload) => {
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload))
+  const signature = createHmac('sha256', getCallbackRuntimeConfig().tokenSecret)
+    .update(encodedPayload)
+    .digest('base64url')
+
+  return `${encodedPayload}.${signature}`
+}
+
 export type VerifyCallbackTokenResult =
   | {
       ok: true
@@ -25,18 +40,20 @@ export type VerifyCallbackTokenResult =
 export const generateCallbackToken = (trajectoryId: string, now: Date = new Date()): string => {
   const callbackConfig = getCallbackRuntimeConfig()
   const exp = Math.floor(now.getTime() / 1000) + callbackConfig.tokenTtlSeconds
-  const payload = base64UrlEncode(
-    JSON.stringify({
-      trajectory_id: trajectoryId,
-      exp,
-    })
-  )
+  return signCallbackPayload({ trajectory_id: trajectoryId, exp })
+}
 
-  const signature = createHmac('sha256', callbackConfig.tokenSecret)
-    .update(payload)
-    .digest('base64url')
-
-  return `${payload}.${signature}`
+export const generateAnalysisCallbackToken = (
+  analysisRunId: string,
+  now: Date = new Date()
+): string => {
+  const callbackConfig = getCallbackRuntimeConfig()
+  const exp = Math.floor(now.getTime() / 1000) + callbackConfig.tokenTtlSeconds
+  return signCallbackPayload({
+    analysis_run_id: analysisRunId,
+    analysis_type: 'stay_heatmap',
+    exp,
+  })
 }
 
 export const verifyCallbackToken = (
