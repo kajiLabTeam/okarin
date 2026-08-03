@@ -7,6 +7,7 @@ import {
   markAnalysisRunCompleted,
   markAnalysisRunFailed,
   markAnalysisRunProcessing,
+  markTimedOutAnalysisRunsFailed,
 } from '../../../src/services/analysis-runs/index.js'
 import { createDb } from '../../../src/services/db/client.js'
 import { insertTrajectory } from '../../../src/services/trajectories/index.js'
@@ -172,5 +173,57 @@ describe('analysis run repository', () => {
         db
       )
     ).rejects.toMatchObject({ code: '23505' })
+  })
+
+  it('期限超過したacceptedとprocessingだけをfailedへ更新する', async () => {
+    const { floor, organization } = await createRecordingFixture(db)
+    const deadlineAt = new Date('2026-08-04T01:00:00.000Z')
+    const futureDeadlineAt = new Date('2026-08-04T03:00:00.000Z')
+    const now = new Date('2026-08-04T02:00:00.000Z')
+    const createRun = (deadline_at: Date) =>
+      insertAnalysisRun(
+        {
+          organization_id: organization.id,
+          floor_id: floor.id,
+          analysis_type: 'stay_heatmap',
+          parameters: {},
+          definition_version: 'original-v1',
+          deadline_at,
+        },
+        db
+      )
+    const [accepted, processing, future, completed] = await Promise.all([
+      createRun(deadlineAt),
+      createRun(deadlineAt),
+      createRun(futureDeadlineAt),
+      createRun(deadlineAt),
+    ])
+    await markAnalysisRunProcessing(processing.id, new Date('2026-08-04T00:30:00.000Z'), db)
+    await markAnalysisRunProcessing(completed.id, new Date('2026-08-04T00:30:00.000Z'), db)
+    await markAnalysisRunCompleted(completed.id, new Date('2026-08-04T00:45:00.000Z'), db)
+
+    const expiredCount = await markTimedOutAnalysisRunsFailed(now, db)
+    const [expiredAccepted, expiredProcessing, activeFuture, terminalCompleted] = await Promise.all(
+      [
+        findAnalysisRunById(accepted.id, db),
+        findAnalysisRunById(processing.id, db),
+        findAnalysisRunById(future.id, db),
+        findAnalysisRunById(completed.id, db),
+      ]
+    )
+
+    expect(expiredCount).toBe(2)
+    expect(expiredAccepted).toMatchObject({
+      status: 'failed',
+      error_code: 'ANALYSIS_TIMEOUT',
+      finished_at: now,
+    })
+    expect(expiredProcessing).toMatchObject({
+      status: 'failed',
+      error_code: 'ANALYSIS_TIMEOUT',
+      finished_at: now,
+    })
+    expect(activeFuture).toMatchObject({ status: 'accepted', finished_at: null })
+    expect(terminalCompleted).toMatchObject({ status: 'completed' })
   })
 })

@@ -105,3 +105,23 @@ export const markAnalysisRunFailed = async (
     .returningAll()
     .executeTakeFirst()
 }
+
+export const markTimedOutAnalysisRunsFailed = async (
+  now: Date = new Date(),
+  executor: DbExecutor = db
+): Promise<number> => {
+  const runs = await executor
+    .updateTable('analysis_runs')
+    .set({
+      status: 'failed',
+      error_code: 'ANALYSIS_TIMEOUT',
+      finished_at: now,
+      updated_at: now,
+    })
+    .where('status', 'in', ['accepted', 'processing'])
+    .where('deadline_at', '<=', now)
+    .returning('id')
+    .execute()
+
+  return runs.length
+}
