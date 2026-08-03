@@ -43,6 +43,28 @@ export const deleteFloorMapObject = async (objectKey: string) => {
   )
 }
 
+export const getFloorMapObjectBytes = async (
+  objectKey: string
+): Promise<Uint8Array | undefined> => {
+  const { config, internalClient } = getS3Context()
+  try {
+    const response = await internalClient.send(
+      new GetObjectCommand({ Bucket: config.bucket, Key: objectKey })
+    )
+    return response.Body ? await response.Body.transformToByteArray() : new Uint8Array()
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      (error.name === 'NotFound' || error.name === 'NoSuchKey')
+    ) {
+      return undefined
+    }
+    throw error
+  }
+}
+
 export const listRecordingRawObjectKeys = async (organizationId: string, recordingId: string) => {
   const { config, internalClient } = getS3Context()
   const prefix = buildRecordingRawObjectPrefix(organizationId, recordingId)

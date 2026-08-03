@@ -15,7 +15,8 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
-    "storage-prefix-migration": "tsx src/cli/storage-prefix-migration.ts"
+    "storage-prefix-migration": "tsx src/cli/storage-prefix-migration.ts",
+    "floor-map-dimension-backfill": "tsx src/cli/floor-map-dimension-backfill.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",
