@@ -130,4 +130,21 @@ describe('createApp auth wiring', { timeout: 60_000 }, () => {
       error_code: 'CALLBACK_PAYLOAD_INVALID',
     })
   })
+
+  it('/api/analysis-runs/callback は session なしでも callback route まで到達する', async () => {
+    const app = await createTestApp()
+
+    const response = await app.request('/api/analysis-runs/callback', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    })
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.not.toMatchObject({
+      error_code: 'AUTH_UNAUTHENTICATED',
+    })
+  })
 })

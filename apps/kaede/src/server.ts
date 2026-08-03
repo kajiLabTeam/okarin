@@ -50,7 +50,7 @@ export const createApp = () => {
   app.use(
     '/api/*',
     requestActorMiddleware({
-      exemptPaths: ['/api/auth', '/api/trajectories/callback'],
+      exemptPaths: ['/api/auth', '/api/analysis-runs/callback', '/api/trajectories/callback'],
       sharedToken: runtimeConfig.app.apiSharedToken,
     })
   )
