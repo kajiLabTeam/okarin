@@ -2,6 +2,7 @@ export {
   deleteFloorMapObject,
   doesTrajectoryAnalyzedResultObjectExist,
   getTrajectoryAnalyzedResultObjectText,
+  getAnalysisHeatmapObjectText,
   listRecordingRawObjectKeys,
   putFloorMapObject,
 } from './object-store.js'
