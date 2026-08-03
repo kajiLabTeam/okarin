@@ -25,6 +25,12 @@ export const floorSchema = z
     scale: z.number().nullable().openapi({
       description: '縮尺。未設定の場合は null',
     }),
+    map_width_px: z.number().int().positive().nullable().optional().openapi({
+      description: 'floor map画像の幅（px）。移行前の画像は null',
+    }),
+    map_height_px: z.number().int().positive().nullable().optional().openapi({
+      description: 'floor map画像の高さ（px）。移行前の画像は null',
+    }),
     map_image: z
       .object({
         download_url: z.string().url().openapi({

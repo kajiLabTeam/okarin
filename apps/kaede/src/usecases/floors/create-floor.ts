@@ -3,6 +3,12 @@ import { randomUUID } from 'node:crypto'
 import type { RequestActor } from '../../middleware/request-actor-context.js'
 import type { CreateFloorRequest, FloorResponse } from '../../schemas/floors.js'
 import { findBuildingById } from '../../services/buildings/index.js'
+import {
+  extractFloorMapDimensions,
+  floorMapMaxPixels,
+  floorMapMaxSidePx,
+} from '../../services/floor-maps/dimensions.js'
+import type { FloorMapDimensions } from '../../services/floor-maps/dimensions.js'
 import { insertFloor } from '../../services/floors/index.js'
 import {
   buildFloorMapObjectKey,
@@ -16,6 +22,7 @@ import type { AuthorizationError } from '../authorization.js'
 import { requireDashboardWriteAccess } from '../authorization.js'
 
 export const floorMapImageMaxBytes = 10 * 1024 * 1024
+export { floorMapMaxPixels, floorMapMaxSidePx }
 
 export interface FloorMapImageUpload {
   bytes: Uint8Array
@@ -52,32 +59,13 @@ export type CreateFloorResult =
       error: AuthorizationError
     }
 
-const pngMagicNumber = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
-
-const hasPngMagicNumber = (bytes: Uint8Array) => {
-  return pngMagicNumber.every((value, index) => bytes[index] === value)
-}
-
-const isValidSvg = (bytes: Uint8Array) => {
-  const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes)
-
-  if (!/<\s*svg(?:\s|>)/i.test(text)) {
-    return false
-  }
-
-  if (/<\s*script(?:\s|>)/i.test(text) || /<\s*foreignObject(?:\s|>)/i.test(text)) {
-    return false
-  }
-
-  return !/\son[a-z]+\s*=/i.test(text)
-}
-
 const validateFloorMapImage = (
   upload: FloorMapImageUpload
 ):
   | {
       ok: true
       extension: FloorMapImageExtension
+      dimensions: FloorMapDimensions
     }
   | {
       ok: false
@@ -97,13 +85,15 @@ const validateFloorMapImage = (
   }
 
   if (upload.contentType === 'image/png') {
-    return hasPngMagicNumber(upload.bytes)
-      ? { ok: true, extension: 'png' }
+    const dimensions = extractFloorMapDimensions(upload.bytes, 'png')
+    return dimensions
+      ? { ok: true, extension: 'png', dimensions }
       : { ok: false, error: { type: 'FLOOR_MAP_IMAGE_INVALID' } }
   }
 
-  return isValidSvg(upload.bytes)
-    ? { ok: true, extension: 'svg' }
+  const dimensions = extractFloorMapDimensions(upload.bytes, 'svg')
+  return dimensions
+    ? { ok: true, extension: 'svg', dimensions }
     : { ok: false, error: { type: 'FLOOR_MAP_IMAGE_INVALID' } }
 }
 
@@ -168,6 +158,8 @@ export const createFloor = async (
       level: payload.level,
       name: payload.name,
       image_object_path: imageObjectPath,
+      map_width_px: mapValidation.dimensions.width,
+      map_height_px: mapValidation.dimensions.height,
       scale: payload.scale ?? null,
     })
   } catch (error) {
@@ -196,6 +188,8 @@ export const createFloor = async (
       level: floor.level,
       name: floor.name,
       scale: floor.scale,
+      map_width_px: floor.map_width_px,
+      map_height_px: floor.map_height_px,
       map_image: {
         download_url: mapDownload.url,
         download_expires_at: mapDownload.expiresAt,

@@ -19,9 +19,18 @@ export interface FloorRow {
   level: number
   name: string
   image_object_path: string
+  map_width_px: number | null
+  map_height_px: number | null
   scale: number | null
   created_at: Date
   updated_at: Date
+}
+
+export interface FloorMapDimensionRow {
+  id: string
+  image_object_path: string
+  map_width_px: number | null
+  map_height_px: number | null
 }
 
 const floorRowsQuery = () =>
@@ -36,6 +45,8 @@ const floorRowsQuery = () =>
       'floors.level',
       'floors.name',
       'floors.image_object_path',
+      'floors.map_width_px',
+      'floors.map_height_px',
       'floors.scale',
       'floors.created_at',
       'floors.updated_at',
@@ -91,10 +102,41 @@ export const insertFloor = async (
 export const findFloorById = async (
   floorId: string,
   executor: DbExecutor = db
-): Promise<Pick<Floor, 'id' | 'organization_id' | 'scale'> | undefined> => {
+): Promise<
+  Pick<Floor, 'id' | 'organization_id' | 'scale' | 'map_width_px' | 'map_height_px'> | undefined
+> => {
   return executor
     .selectFrom('floors')
-    .select(['id', 'organization_id', 'scale'])
+    .select(['id', 'organization_id', 'scale', 'map_width_px', 'map_height_px'])
     .where('id', '=', floorId)
     .executeTakeFirst()
+}
+
+export const listFloorMapDimensionRows = async (
+  floorId?: string,
+  executor: DbExecutor = db
+): Promise<FloorMapDimensionRow[]> => {
+  let query = executor
+    .selectFrom('floors')
+    .select(['id', 'image_object_path', 'map_width_px', 'map_height_px'])
+    .orderBy('id', 'asc')
+  if (floorId) query = query.where('id', '=', floorId)
+  return query.execute()
+}
+
+export const backfillFloorMapDimensions = async (
+  floorId: string,
+  width: number,
+  height: number,
+  executor: DbExecutor = db
+): Promise<boolean> => {
+  const updated = await executor
+    .updateTable('floors')
+    .set({ map_width_px: width, map_height_px: height, updated_at: new Date() })
+    .where('id', '=', floorId)
+    .where('map_width_px', 'is', null)
+    .where('map_height_px', 'is', null)
+    .returning('id')
+    .executeTakeFirst()
+  return updated !== undefined
 }

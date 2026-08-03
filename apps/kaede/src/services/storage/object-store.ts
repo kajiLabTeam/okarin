@@ -6,6 +6,8 @@ import {
   PutObjectCommand,
 } from '@aws-sdk/client-s3'
 import {
+  buildAnalysisHeatmapObjectKey,
+  buildAnalysisTrajectoryCsvObjectKey,
   buildRecordingRawObjectPrefix,
   buildTrajectoryAnalyzedResultObjectKey,
   getFloorMapContentType,
@@ -39,6 +41,28 @@ export const deleteFloorMapObject = async (objectKey: string) => {
       Key: objectKey,
     })
   )
+}
+
+export const getFloorMapObjectBytes = async (
+  objectKey: string
+): Promise<Uint8Array | undefined> => {
+  const { config, internalClient } = getS3Context()
+  try {
+    const response = await internalClient.send(
+      new GetObjectCommand({ Bucket: config.bucket, Key: objectKey })
+    )
+    return response.Body ? await response.Body.transformToByteArray() : new Uint8Array()
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      (error.name === 'NotFound' || error.name === 'NoSuchKey')
+    ) {
+      return undefined
+    }
+    throw error
+  }
 }
 
 export const listRecordingRawObjectKeys = async (organizationId: string, recordingId: string) => {
@@ -128,6 +152,56 @@ export const getTrajectoryAnalyzedResultObjectText = async (
       return undefined
     }
 
+    throw error
+  }
+}
+
+const doesObjectExist = async (objectKey: string) => {
+  const { config, internalClient } = getS3Context()
+  try {
+    await internalClient.send(new HeadObjectCommand({ Bucket: config.bucket, Key: objectKey }))
+    return true
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      (error.name === 'NotFound' || error.name === 'NoSuchKey')
+    ) {
+      return false
+    }
+    throw error
+  }
+}
+
+export const doesAnalysisTrajectoryCsvObjectExist = (
+  organizationId: string,
+  analysisRunId: string,
+  trajectoryId: string
+) =>
+  doesObjectExist(buildAnalysisTrajectoryCsvObjectKey(organizationId, analysisRunId, trajectoryId))
+
+export const getAnalysisHeatmapObjectText = async (
+  organizationId: string,
+  analysisRunId: string
+): Promise<string | undefined> => {
+  const objectKey = buildAnalysisHeatmapObjectKey(organizationId, analysisRunId)
+  const { config, internalClient } = getS3Context()
+
+  try {
+    const response = await internalClient.send(
+      new GetObjectCommand({ Bucket: config.bucket, Key: objectKey })
+    )
+    return response.Body ? await response.Body.transformToString() : ''
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      (error.name === 'NotFound' || error.name === 'NoSuchKey')
+    ) {
+      return undefined
+    }
     throw error
   }
 }

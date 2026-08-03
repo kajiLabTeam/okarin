@@ -13,6 +13,8 @@ interface FloorResponseRow {
   level: number
   name: string
   image_object_path: string
+  map_width_px: number | null
+  map_height_px: number | null
   scale: number | null
   created_at: Date
   updated_at: Date
@@ -43,6 +45,8 @@ export const toFloorResponse = async (floor: FloorResponseRow): Promise<FloorRes
     level: floor.level,
     name: floor.name,
     scale: floor.scale,
+    map_width_px: floor.map_width_px,
+    map_height_px: floor.map_height_px,
     map_image: {
       download_url: downloadUrl.url,
       download_expires_at: downloadUrl.expiresAt,

@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "fastapi[standard]>=0.135.1",
+    "pandas>=3.0.1",
     "pydantic>=2.12.5",
     "rikka",
     "sentry-sdk>=2.54.0",
@@ -32,7 +33,7 @@ dev = [
 ]
 
 [tool.uv.sources]
-rikka = { git = "https://github.com/kajiLabTeam/rikka.git" }
+rikka = { git = "https://github.com/kajiLabTeam/rikka.git", rev = "ebbf7978f8c12829bb891c149cbf1985ab846529" }
 
 [tool.ruff]
 line-length = 88

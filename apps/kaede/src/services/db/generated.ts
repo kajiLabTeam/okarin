@@ -36,6 +36,28 @@ export interface AuthIdentities {
   user_id: string
 }
 
+export interface AnalysisRuns {
+  analysis_type: string
+  created_at: Generated<Timestamp>
+  deadline_at: Generated<Timestamp>
+  definition_version: string
+  error_code: string | null
+  finished_at: Timestamp | null
+  floor_id: string
+  id: Generated<string>
+  organization_id: string
+  parameters: Json
+  started_at: Timestamp | null
+  status: Generated<string>
+  updated_at: Generated<Timestamp>
+}
+
+export interface AnalysisRunTrajectories {
+  analysis_run_id: string
+  seq: number
+  trajectory_id: string
+}
+
 export interface Buildings {
   created_at: Generated<Timestamp>
   id: Generated<string>
@@ -52,6 +74,8 @@ export interface Floors {
   id: Generated<string>
   image_object_path: string
   level: number
+  map_height_px: number | null
+  map_width_px: number | null
   name: string
   organization_id: string
   scale: number | null
@@ -190,6 +214,8 @@ export interface Users {
 }
 
 export interface DB {
+  analysis_run_trajectories: AnalysisRunTrajectories
+  analysis_runs: AnalysisRuns
   auth_identities: AuthIdentities
   buildings: Buildings
   floors: Floors

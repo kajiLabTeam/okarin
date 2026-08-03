@@ -34,6 +34,44 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: analysis_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.analysis_runs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    floor_id uuid NOT NULL,
+    analysis_type text NOT NULL,
+    status text DEFAULT 'accepted'::text NOT NULL,
+    parameters jsonb NOT NULL,
+    definition_version text NOT NULL,
+    error_code text,
+    started_at timestamp with time zone,
+    deadline_at timestamp with time zone DEFAULT (now() + '01:00:00'::interval) NOT NULL,
+    finished_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT analysis_runs_analysis_type_nonempty_chk CHECK ((length(btrim(analysis_type)) > 0)),
+    CONSTRAINT analysis_runs_definition_version_nonempty_chk CHECK ((length(btrim(definition_version)) > 0)),
+    CONSTRAINT analysis_runs_parameters_object_chk CHECK ((jsonb_typeof(parameters) = 'object'::text)),
+    CONSTRAINT analysis_runs_state_chk CHECK ((((status = 'accepted'::text) AND (started_at IS NULL) AND (finished_at IS NULL) AND (error_code IS NULL)) OR ((status = 'processing'::text) AND (started_at IS NOT NULL) AND (finished_at IS NULL) AND (error_code IS NULL)) OR ((status = 'completed'::text) AND (started_at IS NOT NULL) AND (finished_at IS NOT NULL) AND (error_code IS NULL)) OR ((status = 'failed'::text) AND (finished_at IS NOT NULL) AND (length(btrim(error_code)) > 0)))),
+    CONSTRAINT analysis_runs_status_chk CHECK ((status = ANY (ARRAY['accepted'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
+);
+
+
+--
+-- Name: analysis_run_trajectories; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.analysis_run_trajectories (
+    analysis_run_id uuid NOT NULL,
+    trajectory_id uuid NOT NULL,
+    seq integer NOT NULL,
+    CONSTRAINT analysis_run_trajectories_seq_check CHECK ((seq >= 0))
+);
+
+
+--
 -- Name: auth_identities; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -80,6 +118,10 @@ CREATE TABLE public.floors (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     organization_id uuid NOT NULL,
+    map_width_px integer,
+    map_height_px integer,
+    CONSTRAINT floors_map_dimensions_bounds_chk CHECK (((map_width_px IS NULL) OR ((map_width_px > 0) AND (map_height_px > 0) AND (map_width_px <= 20000) AND (map_height_px <= 20000) AND (((map_width_px)::bigint * (map_height_px)::bigint) <= 100000000)))),
+    CONSTRAINT floors_map_dimensions_presence_chk CHECK ((((map_width_px IS NULL) AND (map_height_px IS NULL)) OR ((map_width_px IS NOT NULL) AND (map_height_px IS NOT NULL)))),
     CONSTRAINT floors_image_object_path_format_chk CHECK (((image_object_path ~ '^maps/[0-9a-fA-F-]+/[0-9a-fA-F-]+\.(svg|png)$'::text) OR (image_object_path ~ '^organizations/[0-9a-fA-F-]+/floors/[0-9a-fA-F-]+/map\.(svg|png)$'::text)))
 );
 
@@ -315,6 +357,22 @@ CREATE TABLE public.users (
 -- Name: auth_identities auth_identities_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
+ALTER TABLE ONLY public.analysis_runs
+    ADD CONSTRAINT analysis_runs_pkey PRIMARY KEY (id);
+
+
+ALTER TABLE ONLY public.analysis_run_trajectories
+    ADD CONSTRAINT analysis_run_trajectories_pkey PRIMARY KEY (analysis_run_id, trajectory_id);
+
+
+ALTER TABLE ONLY public.analysis_run_trajectories
+    ADD CONSTRAINT analysis_run_trajectories_analysis_run_id_seq_key UNIQUE (analysis_run_id, seq);
+
+
+--
+-- Name: auth_identities auth_identities_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
 ALTER TABLE ONLY public.auth_identities
     ADD CONSTRAINT auth_identities_pkey PRIMARY KEY (id);
 
@@ -493,6 +551,16 @@ ALTER TABLE ONLY public.users
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: auth_identities_one_google_identity_per_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX analysis_runs_organization_created_at_id_idx ON public.analysis_runs USING btree (organization_id, created_at DESC, id DESC);
+
+
+CREATE INDEX analysis_run_trajectories_trajectory_id_idx ON public.analysis_run_trajectories USING btree (trajectory_id);
 
 
 --
@@ -801,6 +869,26 @@ CREATE TRIGGER set_updated_at_trajectories BEFORE UPDATE ON public.trajectories 
 --
 
 CREATE TRIGGER set_updated_at_users BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: auth_identities auth_identities_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.analysis_runs
+    ADD CONSTRAINT analysis_runs_floor_id_fkey FOREIGN KEY (floor_id) REFERENCES public.floors(id);
+
+
+ALTER TABLE ONLY public.analysis_runs
+    ADD CONSTRAINT analysis_runs_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+
+ALTER TABLE ONLY public.analysis_run_trajectories
+    ADD CONSTRAINT analysis_run_trajectories_analysis_run_id_fkey FOREIGN KEY (analysis_run_id) REFERENCES public.analysis_runs(id) ON DELETE CASCADE;
+
+
+ALTER TABLE ONLY public.analysis_run_trajectories
+    ADD CONSTRAINT analysis_run_trajectories_trajectory_id_fkey FOREIGN KEY (trajectory_id) REFERENCES public.trajectories(id);
 
 
 --
