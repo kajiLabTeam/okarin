@@ -6,8 +6,9 @@ import {
   PutObjectCommand,
 } from '@aws-sdk/client-s3'
 import {
-  buildRecordingRawObjectPrefix,
   buildAnalysisHeatmapObjectKey,
+  buildAnalysisTrajectoryCsvObjectKey,
+  buildRecordingRawObjectPrefix,
   buildTrajectoryAnalyzedResultObjectKey,
   getFloorMapContentType,
 } from './presigned-url.js'
@@ -132,6 +133,31 @@ export const getTrajectoryAnalyzedResultObjectText = async (
     throw error
   }
 }
+
+const doesObjectExist = async (objectKey: string) => {
+  const { config, internalClient } = getS3Context()
+  try {
+    await internalClient.send(new HeadObjectCommand({ Bucket: config.bucket, Key: objectKey }))
+    return true
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      (error.name === 'NotFound' || error.name === 'NoSuchKey')
+    ) {
+      return false
+    }
+    throw error
+  }
+}
+
+export const doesAnalysisTrajectoryCsvObjectExist = (
+  organizationId: string,
+  analysisRunId: string,
+  trajectoryId: string
+) =>
+  doesObjectExist(buildAnalysisTrajectoryCsvObjectKey(organizationId, analysisRunId, trajectoryId))
 
 export const getAnalysisHeatmapObjectText = async (
   organizationId: string,

@@ -1,5 +1,6 @@
 export {
   deleteFloorMapObject,
+  doesAnalysisTrajectoryCsvObjectExist,
   doesTrajectoryAnalyzedResultObjectExist,
   getTrajectoryAnalyzedResultObjectText,
   getAnalysisHeatmapObjectText,
