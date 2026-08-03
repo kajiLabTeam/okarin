@@ -67,3 +67,31 @@ make up ENV=local
 - `8333` は S3 API のため、ブラウザで直接開くと `Access Denied` になる
 - `8888` は Filer UI 用ポート
 - `9333` は SeaweedFS の管理情報確認用ポート
+
+## 既存floor mapの画像寸法を移行する
+
+`floors.map_width_px`と`map_height_px`が未設定の環境では、Kaedeコンテナ内で次を実行する。
+`backfill`はobject storage上のPNG IHDRまたはSVG viewBoxから寸法を取得し、未設定行だけを更新する。
+
+```sh
+node dist/cli/floor-map-dimension-backfill.js backfill
+node dist/cli/floor-map-dimension-backfill.js verify
+```
+
+開発環境ではmise経由で実行できる。
+
+```sh
+mise exec -- pnpm floor-map-dimension-backfill -- backfill
+mise exec -- pnpm floor-map-dimension-backfill -- verify
+```
+
+特定floorだけを再実行する場合は`--floor-id`を付ける。
+
+```sh
+node dist/cli/floor-map-dimension-backfill.js backfill --floor-id <UUID>
+```
+
+各floorの結果と最後の集計がJSON Linesで標準出力へ出る。`failed`が1件以上ある場合は終了コード1に
+なるため、objectの存在、拡張子、PNGのIHDRまたはSVGの`viewBox="0 0 width height"`、DBに保存済みの
+寸法との不一致を確認する。`backfill`は保存済み寸法を上書きせず、再実行できる。移行後に`verify`を
+実行し、最後の集計で`failed: 0`であることを確認する。

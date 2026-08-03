@@ -4,6 +4,7 @@ export {
   doesTrajectoryAnalyzedResultObjectExist,
   getTrajectoryAnalyzedResultObjectText,
   getAnalysisHeatmapObjectText,
+  getFloorMapObjectBytes,
   listRecordingRawObjectKeys,
   putFloorMapObject,
 } from './object-store.js'
