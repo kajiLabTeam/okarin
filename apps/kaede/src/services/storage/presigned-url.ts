@@ -91,6 +91,18 @@ export const buildTrajectoryAnalyzedResultObjectKey = (
   return `organizations/${validateObjectKeyUuid(organizationId, 'organizationId')}/trajectories/${validateObjectKeyUuid(trajectoryId, 'trajectoryId')}/analyzed/result.csv`
 }
 
+export const buildAnalysisTrajectoryCsvObjectKey = (
+  organizationId: string,
+  analysisRunId: string,
+  trajectoryId: string
+) => {
+  return `organizations/${validateObjectKeyUuid(organizationId, 'organizationId')}/analysis-runs/${validateObjectKeyUuid(analysisRunId, 'analysisRunId')}/artifacts/trajectories/${validateObjectKeyUuid(trajectoryId, 'trajectoryId')}/stay.csv`
+}
+
+export const buildAnalysisHeatmapObjectKey = (organizationId: string, analysisRunId: string) => {
+  return `organizations/${validateObjectKeyUuid(organizationId, 'organizationId')}/analysis-runs/${validateObjectKeyUuid(analysisRunId, 'analysisRunId')}/artifacts/stay-heatmap.json`
+}
+
 export const issueRecordingUploadUrls = async (
   organizationId: string,
   recordingId: string,
@@ -272,6 +284,96 @@ export const issueTrajectoryResultDownloadUrl = async (
       Bucket: config.bucket,
       Key: objectKey,
     }),
+    { expiresIn: config.trajectoryResultDownloadUrlTtlSeconds }
+  )
+
+  return {
+    downloadUrl,
+    expiresAt: new Date(
+      now.getTime() + config.trajectoryResultDownloadUrlTtlSeconds * 1000
+    ).toISOString(),
+    objectKey,
+  }
+}
+
+export const issueInternalAnalysisTrajectoryDownloadUrl = async (
+  organizationId: string,
+  trajectoryId: string,
+  now: Date = new Date()
+) => {
+  const { config, internalClient } = getS3Context()
+  const objectKey = buildTrajectoryAnalyzedResultObjectKey(organizationId, trajectoryId)
+  const downloadUrl = await getSignedUrl(
+    internalClient,
+    new GetObjectCommand({ Bucket: config.bucket, Key: objectKey }),
+    { expiresIn: config.trajectoryRawDownloadUrlTtlSeconds }
+  )
+
+  return {
+    downloadUrl,
+    expiresAt: new Date(
+      now.getTime() + config.trajectoryRawDownloadUrlTtlSeconds * 1000
+    ).toISOString(),
+    objectKey,
+  }
+}
+
+export const issueInternalAnalysisTrajectoryUploadUrl = async (
+  organizationId: string,
+  analysisRunId: string,
+  trajectoryId: string,
+  now: Date = new Date()
+) => {
+  const { config, internalClient } = getS3Context()
+  const objectKey = buildAnalysisTrajectoryCsvObjectKey(organizationId, analysisRunId, trajectoryId)
+  const uploadUrl = await getSignedUrl(
+    internalClient,
+    new PutObjectCommand({ Bucket: config.bucket, Key: objectKey }),
+    { expiresIn: config.trajectoryResultUploadUrlTtlSeconds }
+  )
+
+  return {
+    expiresAt: new Date(
+      now.getTime() + config.trajectoryResultUploadUrlTtlSeconds * 1000
+    ).toISOString(),
+    objectKey,
+    uploadUrl,
+  }
+}
+
+export const issueInternalAnalysisHeatmapUploadUrl = async (
+  organizationId: string,
+  analysisRunId: string,
+  now: Date = new Date()
+) => {
+  const { config, internalClient } = getS3Context()
+  const objectKey = buildAnalysisHeatmapObjectKey(organizationId, analysisRunId)
+  const uploadUrl = await getSignedUrl(
+    internalClient,
+    new PutObjectCommand({ Bucket: config.bucket, Key: objectKey }),
+    { expiresIn: config.trajectoryResultUploadUrlTtlSeconds }
+  )
+
+  return {
+    expiresAt: new Date(
+      now.getTime() + config.trajectoryResultUploadUrlTtlSeconds * 1000
+    ).toISOString(),
+    objectKey,
+    uploadUrl,
+  }
+}
+
+export const issueAnalysisTrajectoryCsvDownloadUrl = async (
+  organizationId: string,
+  analysisRunId: string,
+  trajectoryId: string,
+  now: Date = new Date()
+) => {
+  const { config, presignClient } = getS3Context()
+  const objectKey = buildAnalysisTrajectoryCsvObjectKey(organizationId, analysisRunId, trajectoryId)
+  const downloadUrl = await getSignedUrl(
+    presignClient,
+    new GetObjectCommand({ Bucket: config.bucket, Key: objectKey }),
     { expiresIn: config.trajectoryResultDownloadUrlTtlSeconds }
   )
 
