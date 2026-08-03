@@ -24,8 +24,13 @@ vi.mock('../../../src/services/storage/index.js', async (importOriginal) => {
 })
 
 const db = createDb()
-const validSvg = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"></svg>')
-const validPng = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+const validSvg = new TextEncoder().encode(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720"></svg>'
+)
+const validPng = new Uint8Array([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+  0x00, 0x00, 0x02, 0x80, 0x00, 0x00, 0x01, 0xe0,
+])
 
 const serviceClientActor: RequestActor = {
   type: 'service_client',
@@ -125,6 +130,8 @@ describe('createFloor', () => {
       level: 2,
       name: '2F',
       scale: 25,
+      map_width_px: 1280,
+      map_height_px: 720,
     })
     expect(result.value.map_image.download_expires_at).toEqual(expect.any(String))
     const mapDownloadUrl = new URL(result.value.map_image.download_url)
@@ -154,6 +161,8 @@ describe('createFloor', () => {
       name: '2F',
       scale: 25,
       image_object_path: `organizations/${organization.id}/floors/${result.value.floor_id}/map.svg`,
+      map_width_px: 1280,
+      map_height_px: 720,
     })
   })
 
@@ -369,6 +378,33 @@ describe('createFloor', () => {
     })
     expect(putFloorMapObjectMock).not.toHaveBeenCalled()
     await expect(db.selectFrom('floors').select('id').execute()).resolves.toEqual([])
+  })
+
+  it('viewBox がない SVG は floor を作成しない', async () => {
+    const organization = await db
+      .insertInto('organizations')
+      .values({ name: 'Invalid SVG Dimensions Organization' })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+    const building = await db
+      .insertInto('buildings')
+      .values({ organization_id: organization.id, name: 'Invalid SVG Dimensions Building' })
+      .returning(['id'])
+      .executeTakeFirstOrThrow()
+
+    const result = await createFloor(
+      adminActor,
+      organization.id,
+      building.id,
+      { level: 1, name: '1F' },
+      {
+        bytes: new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"></svg>'),
+        contentType: 'image/svg+xml',
+      }
+    )
+
+    expect(result).toEqual({ ok: false, error: { type: 'FLOOR_MAP_IMAGE_INVALID' } })
+    expect(putFloorMapObjectMock).not.toHaveBeenCalled()
   })
 
   it('10MB を超える floor map image は floor を作成しない', async () => {

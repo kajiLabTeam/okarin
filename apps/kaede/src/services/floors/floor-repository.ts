@@ -19,6 +19,8 @@ export interface FloorRow {
   level: number
   name: string
   image_object_path: string
+  map_width_px: number | null
+  map_height_px: number | null
   scale: number | null
   created_at: Date
   updated_at: Date
@@ -36,6 +38,8 @@ const floorRowsQuery = () =>
       'floors.level',
       'floors.name',
       'floors.image_object_path',
+      'floors.map_width_px',
+      'floors.map_height_px',
       'floors.scale',
       'floors.created_at',
       'floors.updated_at',
