@@ -37,6 +37,20 @@ export type VerifyCallbackTokenResult =
       error: 'CALLBACK_TOKEN_INVALID' | 'CALLBACK_TOKEN_EXPIRED'
     }
 
+export type VerifyAnalysisCallbackTokenResult =
+  | {
+      ok: true
+      value: {
+        analysisRunId: string
+        analysisType: 'stay_heatmap'
+        exp: number
+      }
+    }
+  | {
+      ok: false
+      error: 'CALLBACK_TOKEN_INVALID' | 'CALLBACK_TOKEN_EXPIRED'
+    }
+
 export const generateCallbackToken = (trajectoryId: string, now: Date = new Date()): string => {
   const callbackConfig = getCallbackRuntimeConfig()
   const exp = Math.floor(now.getTime() / 1000) + callbackConfig.tokenTtlSeconds
@@ -123,6 +137,59 @@ export const verifyCallbackToken = (
     value: {
       trajectoryId: parsedPayload.trajectory_id,
       exp: parsedPayload.exp,
+    },
+  }
+}
+
+export const verifyAnalysisCallbackToken = (
+  token: string,
+  now: Date = new Date()
+): VerifyAnalysisCallbackTokenResult => {
+  const callbackConfig = getCallbackRuntimeConfig()
+  const [payload, signature, ...rest] = token.split('.')
+  if (!payload || !signature || rest.length > 0) {
+    return { ok: false, error: 'CALLBACK_TOKEN_INVALID' }
+  }
+
+  const expectedSignature = createHmac('sha256', callbackConfig.tokenSecret)
+    .update(payload)
+    .digest('base64url')
+  if (
+    signature.length !== expectedSignature.length ||
+    !timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))
+  ) {
+    return { ok: false, error: 'CALLBACK_TOKEN_INVALID' }
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(base64UrlDecode(payload)) as unknown
+  } catch {
+    return { ok: false, error: 'CALLBACK_TOKEN_INVALID' }
+  }
+  if (
+    typeof parsed !== 'object' ||
+    parsed === null ||
+    !('analysis_run_id' in parsed) ||
+    !('analysis_type' in parsed) ||
+    !('exp' in parsed) ||
+    typeof parsed.analysis_run_id !== 'string' ||
+    parsed.analysis_type !== 'stay_heatmap' ||
+    typeof parsed.exp !== 'number' ||
+    !Number.isFinite(parsed.exp)
+  ) {
+    return { ok: false, error: 'CALLBACK_TOKEN_INVALID' }
+  }
+  if (parsed.exp <= Math.floor(now.getTime() / 1000)) {
+    return { ok: false, error: 'CALLBACK_TOKEN_EXPIRED' }
+  }
+
+  return {
+    ok: true,
+    value: {
+      analysisRunId: parsed.analysis_run_id,
+      analysisType: parsed.analysis_type,
+      exp: parsed.exp,
     },
   }
 }

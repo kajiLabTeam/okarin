@@ -1,19 +1,18 @@
 import { z } from '@hono/zod-openapi'
 import { uuidSchema } from './common.js'
 
-const parameterSchema = (minimum: number, maximum: number, defaultValue: number) =>
+const parameterSchema = (minimum: number, maximum: number) =>
   z
     .number()
     .finite()
     .min(minimum)
     .max(maximum)
     .refine((value) => Number.isInteger(value * 1000), 'must have at most 3 decimal places')
-    .default(defaultValue)
 
 export const stayHeatmapParametersSchema = z
   .object({
-    speed_threshold_mps: parameterSchema(0, 2, 0.5),
-    grid_size_m: parameterSchema(0.1, 10, 1),
+    speed_threshold_mps: parameterSchema(0, 2).default(0.5),
+    grid_size_m: parameterSchema(0.1, 10).default(1),
   })
   .strict()
   .openapi('StayHeatmapParameters')
@@ -48,5 +47,111 @@ export const createStayHeatmapErrorResponseSchema = z
   })
   .openapi('CreateStayHeatmapErrorResponse')
 
+const heatmapCellSchema = z
+  .object({
+    grid_column: z.number().int().min(0),
+    grid_row: z.number().int().min(0),
+    stay_cell_visit_count: z.number().int().positive(),
+  })
+  .strict()
+
+export const stayHeatmapArtifactSchema = z
+  .object({
+    schema_version: z.literal('1.0'),
+    definition_version: z.literal('original-v1'),
+    parameters: z
+      .object({
+        speed_threshold_mps: parameterSchema(0, 2),
+        grid_size_m: parameterSchema(0.1, 10),
+      })
+      .strict(),
+    floor_map: z
+      .object({
+        width_px: z.number().int().positive(),
+        height_px: z.number().int().positive(),
+        scale_m_per_px: z.number().positive().finite(),
+      })
+      .strict(),
+    grid: z
+      .object({
+        size_m: z.number().positive().finite(),
+        column_count: z.number().int().positive(),
+        row_count: z.number().int().positive(),
+      })
+      .strict(),
+    input_trajectory_count: z.number().int().positive(),
+    trajectories: z.array(
+      z
+        .object({
+          trajectory_id: uuidSchema,
+          cells: z.array(heatmapCellSchema),
+        })
+        .strict()
+        .superRefine((trajectory, ctx) => {
+          const cells = trajectory.cells.map((cell) => `${cell.grid_row}:${cell.grid_column}`)
+          if (new Set(cells).size !== cells.length) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'cells must be unique' })
+          }
+        })
+    ),
+  })
+  .strict()
+  .superRefine((artifact, ctx) => {
+    const ids = artifact.trajectories.map((trajectory) => trajectory.trajectory_id)
+    if (artifact.input_trajectory_count !== artifact.trajectories.length) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'trajectory count does not match' })
+    }
+    if (new Set(ids).size !== ids.length) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'trajectory IDs must be unique' })
+    }
+    for (const trajectory of artifact.trajectories) {
+      for (const cell of trajectory.cells) {
+        if (
+          cell.grid_column >= artifact.grid.column_count ||
+          cell.grid_row >= artifact.grid.row_count
+        ) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'cell must be inside the grid' })
+        }
+      }
+    }
+  })
+  .openapi('StayHeatmapArtifact')
+
+export const analysisCallbackRequestSchema = z
+  .discriminatedUnion('status', [
+    z
+      .object({
+        analysis_run_id: uuidSchema,
+        status: z.literal('completed'),
+        callback_token: z.string().min(1),
+      })
+      .strict(),
+    z
+      .object({
+        analysis_run_id: uuidSchema,
+        status: z.literal('failed'),
+        callback_token: z.string().min(1),
+        error_code: z.string().min(1).max(100),
+        error_message: z.string().min(1).max(500),
+      })
+      .strict(),
+  ])
+  .openapi('AnalysisCallbackRequest')
+
+export const analysisCallbackResponseSchema = z
+  .object({
+    analysis_run_id: uuidSchema,
+    status: z.enum(['completed', 'failed']),
+  })
+  .openapi('AnalysisCallbackResponse')
+
+export const analysisCallbackErrorResponseSchema = z
+  .object({
+    error_code: z.string(),
+    error_message: z.string(),
+  })
+  .openapi('AnalysisCallbackErrorResponse')
+
 export type CreateStayHeatmapRequest = z.infer<typeof createStayHeatmapRequestSchema>
 export type StayHeatmapParameters = z.infer<typeof stayHeatmapParametersSchema>
+export type AnalysisCallbackRequest = z.infer<typeof analysisCallbackRequestSchema>
