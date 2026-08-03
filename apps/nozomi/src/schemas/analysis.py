@@ -166,3 +166,88 @@ class AnalyzeRequest(BaseModel):
 class AnalyzeAcceptedResponse(BaseModel):
     trajectory_id: UUID = Field(description="受理した trajectory の ID")
     status: Literal["accepted"] = Field(description="解析要求を受理した状態")
+
+
+class StayHeatmapParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    speed_threshold_mps: float = Field(ge=0, le=2)
+    grid_size_m: float = Field(ge=0.1, le=10)
+
+
+class StayHeatmapFloor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    floor_id: UUID
+    map_width_px: int = Field(gt=0)
+    map_height_px: int = Field(gt=0)
+    scale_m_per_px: float = Field(gt=0)
+
+
+class StayHeatmapStart(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    x_px: float
+    y_px: float
+
+
+class StayHeatmapSource(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    download_url: HttpUrl
+
+
+class StayHeatmapOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    upload_url: HttpUrl
+
+
+class StayHeatmapTrajectory(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    trajectory_id: UUID
+    seq: int = Field(ge=0)
+    start: StayHeatmapStart
+    source: StayHeatmapSource
+    output: StayHeatmapOutput
+
+
+class StayHeatmapCallback(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    url: HttpUrl
+    token: str = Field(min_length=1)
+
+
+class StayHeatmapAnalyzeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    analysis_run_id: UUID
+    analysis_type: Literal["stay_heatmap"]
+    definition_version: Literal["original-v1"]
+    parameters: StayHeatmapParameters
+    floor: StayHeatmapFloor
+    trajectories: list[StayHeatmapTrajectory] = Field(min_length=1, max_length=100)
+    heatmap_output: StayHeatmapOutput
+    callback: StayHeatmapCallback
+
+    @model_validator(mode="after")
+    def validate_trajectories(self) -> StayHeatmapAnalyzeRequest:
+        seqs = [trajectory.seq for trajectory in self.trajectories]
+        if seqs != list(range(len(seqs))):
+            raise ValueError("trajectories must be ordered by seq with no gaps")
+        ids = [trajectory.trajectory_id for trajectory in self.trajectories]
+        if len(ids) != len(set(ids)):
+            raise ValueError("trajectory_id must be unique")
+        for trajectory in self.trajectories:
+            if not 0 <= trajectory.start.x_px < self.floor.map_width_px:
+                raise ValueError("start x_px must be inside the floor map")
+            if not 0 <= trajectory.start.y_px < self.floor.map_height_px:
+                raise ValueError("start y_px must be inside the floor map")
+        return self
+
+
+class StayHeatmapAcceptedResponse(BaseModel):
+    analysis_run_id: UUID
+    status: Literal["accepted"]
