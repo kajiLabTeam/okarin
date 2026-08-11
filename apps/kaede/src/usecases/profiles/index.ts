@@ -21,9 +21,6 @@ import {
 import type { MemberProfileContext, UserProfileContext } from '../../services/profiles/index.js'
 import type { AuthorizationError } from '../authorization.js'
 
-const defaultLocale = 'ja-JP'
-const defaultTimezone = 'Asia/Tokyo'
-
 export type ProfileError =
   | AuthorizationError
   | { type: 'USER_NOT_FOUND' }
@@ -60,10 +57,10 @@ const requireUserActor = (
 
 const toUserProfileResponse = (context: UserProfileContext): UserProfileResponse => ({
   user_id: context.user_id,
-  display_name: context.display_name ?? context.legacy_display_name,
-  locale: context.locale ?? defaultLocale,
-  timezone: context.timezone ?? defaultTimezone,
-  updated_at: (context.profile_updated_at ?? context.legacy_updated_at).toISOString(),
+  display_name: context.display_name,
+  locale: context.locale,
+  timezone: context.timezone,
+  updated_at: context.profile_updated_at.toISOString(),
 })
 
 const toMemberProfileResponse = (
@@ -73,7 +70,7 @@ const toMemberProfileResponse = (
     throw new Error('membership id is not available')
   }
 
-  const globalDisplayName = context.display_name ?? context.legacy_display_name
+  const globalDisplayName = context.display_name
 
   return {
     organization_id: context.organization_id,
@@ -151,9 +148,9 @@ export const updateMyUserProfile = async (
     if (!current) return { ok: false, error: { type: 'USER_NOT_FOUND' } }
 
     const next = {
-      display_name: payload.display_name ?? current.display_name ?? current.legacy_display_name,
-      locale: payload.locale ?? current.locale ?? defaultLocale,
-      timezone: payload.timezone ?? current.timezone ?? defaultTimezone,
+      display_name: payload.display_name ?? current.display_name,
+      locale: payload.locale ?? current.locale,
+      timezone: payload.timezone ?? current.timezone,
     }
 
     const profile = await upsertUserProfile(

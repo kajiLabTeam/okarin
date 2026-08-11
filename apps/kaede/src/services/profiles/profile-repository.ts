@@ -10,12 +10,10 @@ export type OrganizationMemberProfileUpdate = Updateable<OrganizationMemberProfi
 
 export interface UserProfileContext {
   user_id: string
-  legacy_display_name: string
-  legacy_updated_at: Date
-  display_name: string | null
-  locale: string | null
-  timezone: string | null
-  profile_updated_at: Date | null
+  display_name: string
+  locale: string
+  timezone: string
+  profile_updated_at: Date
 }
 
 export interface MemberProfileContext extends UserProfileContext {
@@ -33,11 +31,9 @@ export interface MemberProfileContext extends UserProfileContext {
 const userProfileContextQuery = (executor: DbExecutor) =>
   executor
     .selectFrom('users as user')
-    .leftJoin('user_profiles as profile', 'profile.user_id', 'user.id')
+    .innerJoin('user_profiles as profile', 'profile.user_id', 'user.id')
     .select([
       'user.id as user_id',
-      'user.display_name as legacy_display_name',
-      'user.updated_at as legacy_updated_at',
       'profile.display_name as display_name',
       'profile.locale as locale',
       'profile.timezone as timezone',
@@ -55,7 +51,7 @@ const memberProfileContextQuery = (executor: DbExecutor) =>
   executor
     .selectFrom('organization_memberships as membership')
     .innerJoin('users as user', 'user.id', 'membership.user_id')
-    .leftJoin('user_profiles as user_profile', 'user_profile.user_id', 'user.id')
+    .innerJoin('user_profiles as user_profile', 'user_profile.user_id', 'user.id')
     .leftJoin('organization_member_profiles as member_profile', (join) =>
       join.onRef('member_profile.membership_id', '=', 'membership.id')
     )
@@ -66,8 +62,6 @@ const memberProfileContextQuery = (executor: DbExecutor) =>
       'membership.role as role',
       'membership.status as status',
       'user.id as user_id',
-      'user.display_name as legacy_display_name',
-      'user.updated_at as legacy_updated_at',
       'user_profile.display_name as display_name',
       'user_profile.locale as locale',
       'user_profile.timezone as timezone',

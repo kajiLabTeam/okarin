@@ -1,6 +1,7 @@
 import { sql } from 'kysely'
-import type { RawBuilder } from 'kysely'
+import type { Kysely, RawBuilder } from 'kysely'
 import { db } from '../db/index.js'
+import type { DB } from '../db/index.js'
 import type { DbExecutor } from '../executor.js'
 
 export const canonicalGoogleIssuer = 'https://accounts.google.com'
@@ -40,6 +41,13 @@ export interface BackfillResult {
   organizations: number
   pedestrian_memberships: number
   user_profiles: number
+}
+
+export interface OneShotCutoverResult {
+  auth: BackfillResult
+  core: BackfillResult
+  revoked_sessions: number
+  validated: true
 }
 
 const emptyResult = (): BackfillResult => ({
@@ -789,3 +797,61 @@ export const validateMultiOrgAuthExpandConstraints = async (
     )
     .execute(executor)
 }
+
+/**
+ * Migrates all legacy authentication data during a single maintenance window.
+ *
+ * The application must remain stopped until this transaction and the following
+ * membership primary-key/contract migrations have completed. A failed run rolls
+ * back every data write and session revocation performed here; the application
+ * must never restart against a partially migrated database.
+ */
+export const executeOneShotMultiOrgAuthCutover = async (
+  batchSize: number,
+  database: Kysely<DB> = db
+): Promise<OneShotCutoverResult> =>
+  database.transaction().execute(async (trx) => {
+    const preflight = await getMultiOrgAuthPreflightReport(trx)
+    if (preflight.blocking) {
+      throw new Error(
+        `one-shot cutover blocked: ${preflight.issues
+          .filter((issue) => issue.blocking)
+          .map((issue) => issue.code)
+          .join(', ')}`
+      )
+    }
+
+    const core = await backfillMultiOrgAuthCore(batchSize, trx)
+    const auth = await backfillMultiOrgAuthCredentials(batchSize, trx)
+    const verification = await verifyMultiOrgAuthCoreBackfill(trx)
+    if (Object.values(verification).some((count) => count > 0)) {
+      throw new Error(`one-shot cutover verification failed: ${JSON.stringify(verification)}`)
+    }
+
+    // A second pass must be a no-op. This detects incomplete batch predicates
+    // before the old application/data contract is removed.
+    const authVerification = await backfillMultiOrgAuthCredentials(batchSize, trx)
+    if (
+      authVerification.local_credentials > 0 ||
+      authVerification.oidc_identities > 0 ||
+      authVerification.oidc_links > 0
+    ) {
+      throw new Error(`one-shot auth verification failed: ${JSON.stringify(authVerification)}`)
+    }
+
+    await validateMultiOrgAuthExpandConstraints(trx)
+
+    const revokedSessions = await sql<{ id: string }>`
+      UPDATE sessions
+      SET revoked_at = COALESCE(revoked_at, now())
+      WHERE revoked_at IS NULL
+      RETURNING id
+    `.execute(trx)
+
+    return {
+      auth,
+      core,
+      revoked_sessions: revokedSessions.rows.length,
+      validated: true,
+    }
+  })

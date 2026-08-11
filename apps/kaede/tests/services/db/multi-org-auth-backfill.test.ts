@@ -5,6 +5,7 @@ import {
   backfillMultiOrgAuthCore,
   backfillMultiOrgAuthCredentials,
   canonicalGoogleIssuer,
+  executeOneShotMultiOrgAuthCutover,
   getMultiOrgAuthPreflightReport,
   validateMultiOrgAuthExpandConstraints,
   verifyMultiOrgAuthCoreBackfill,
@@ -399,5 +400,42 @@ describe('multi organization auth backfill', () => {
           throw error
         }
       })
+  })
+
+  it('migrates all rows and revokes legacy sessions in one cutover transaction', async () => {
+    const { organization, user } = await createLegacyUserAndMembership('one-shot')
+    await db
+      .insertInto('organization_auth_settings')
+      .values({
+        local_auth_enabled: true,
+        membership_grant_ttl_seconds: 3600,
+        oidc_auth_enabled: false,
+        organization_id: organization.id,
+        reauthentication_interval_seconds: 1800,
+      })
+      .execute()
+    await db
+      .insertInto('sessions')
+      .values({
+        expires_at: new Date('2026-08-20T00:00:00.000Z'),
+        session_hash: 'legacy-session-hash',
+        user_id: user.id,
+      })
+      .execute()
+
+    const result = await executeOneShotMultiOrgAuthCutover(1, db)
+
+    expect(result).toMatchObject({
+      auth: { local_credentials: 1 },
+      core: { memberships: 1, user_profiles: 1 },
+      revoked_sessions: 1,
+      validated: true,
+    })
+    await expect(
+      db.selectFrom('sessions').select('revoked_at').executeTakeFirstOrThrow()
+    ).resolves.toEqual({ revoked_at: expect.any(Date) })
+    await expect(
+      db.selectFrom('organization_local_credentials').select('id').executeTakeFirstOrThrow()
+    ).resolves.toEqual({ id: expect.any(String) })
   })
 })

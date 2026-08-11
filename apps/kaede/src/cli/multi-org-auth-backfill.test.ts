@@ -16,6 +16,13 @@ describe('multi-org-auth-backfill options', () => {
     })
   })
 
+  it('accepts the one-shot cutover command', () => {
+    expect(parseOptions(['cutover', '--batch-size', '1000'])).toEqual({
+      batchSize: 1000,
+      command: 'cutover',
+    })
+  })
+
   it.each(['0', '-1', '1.5', '10001', 'not-a-number'])('rejects invalid batch size %s', (value) => {
     expect(() => parseOptions(['verify', '--batch-size', value])).toThrow('usage:')
   })
