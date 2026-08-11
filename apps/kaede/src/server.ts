@@ -6,6 +6,7 @@ import { HTTPException } from 'hono/http-exception'
 import { getRuntimeConfig } from './config/runtime.js'
 import { requestActorMiddleware } from './middleware/request-actor.js'
 import { registerApiRoutes } from './routes/index.js'
+import { organizationLocalAuthRoutes } from './routes/organization-local-auth/index.js'
 
 export const createApp = () => {
   const app = new OpenAPIHono()
@@ -31,6 +32,9 @@ export const createApp = () => {
       })
     )
   }
+
+  // Local loginはSessionなしでも利用でき、Sessionがある場合だけreauthenticateとして扱う。
+  app.route('/api/organizations', organizationLocalAuthRoutes)
 
   app.onError((err, c) => {
     Sentry.captureException(err)
