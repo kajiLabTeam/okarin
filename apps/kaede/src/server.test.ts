@@ -84,6 +84,68 @@ describe('createApp auth wiring', { timeout: 60_000 }, () => {
     })
   })
 
+  it('OpenAPIでglobal session 401とmembership 403を別schemaとして公開する', async () => {
+    const app = await createTestApp()
+
+    const response = await app.request('/specification')
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      paths: {
+        '/api/auth/me': {
+          get: {
+            responses: {
+              '401': {
+                content: {
+                  'application/json': {
+                    schema: { $ref: '#/components/schemas/GlobalSessionErrorResponse' },
+                  },
+                },
+              },
+              '403': {
+                content: {
+                  'application/json': {
+                    schema: { $ref: '#/components/schemas/UserAccountErrorResponse' },
+                  },
+                },
+              },
+            },
+          },
+        },
+        '/api/organizations/{organizationSlug}/auth/methods': {
+          get: {
+            responses: {
+              '200': {
+                content: {
+                  'application/json': {
+                    schema: { $ref: '#/components/schemas/OrganizationAuthMethodsResponse' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      components: {
+        schemas: {
+          GlobalSessionErrorResponse: expect.any(Object),
+          OrganizationAuthorizationErrorResponse: expect.objectContaining({
+            oneOf: expect.arrayContaining([
+              expect.objectContaining({
+                properties: expect.objectContaining({
+                  error_code: {
+                    type: 'string',
+                    enum: ['AUTH_MEMBERSHIP_REAUTHENTICATION_REQUIRED'],
+                  },
+                }),
+              }),
+            ]),
+          }),
+        },
+      },
+    })
+  })
+
   it('FRONTEND_ORIGIN があれば credential 付き CORS preflight を許可する', async () => {
     process.env.FRONTEND_ORIGIN = 'https://mio.example.test'
     resetRuntimeConfigForTests()

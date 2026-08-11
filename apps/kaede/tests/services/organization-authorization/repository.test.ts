@@ -96,4 +96,49 @@ describe('organization authorization repository', () => {
     })
     expect(contexts[0]?.membership_id).not.toBe(leftMembership.id)
   })
+
+  it('Auth Settingsがないcurrent Membershipも落とさず明示contextで返す', async () => {
+    const user = await db
+      .insertInto('users')
+      .values({
+        email: 'missing-settings@example.com',
+        display_name: 'Missing Settings',
+        password_hash: passwordHash,
+        global_role: 'none',
+        status: 'active',
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    const organization = await db
+      .insertInto('organizations')
+      .values({ name: 'Missing Settings Organization' })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    const membership = await db
+      .insertInto('organization_memberships')
+      .values({ organization_id: organization.id, user_id: user.id, role: 'member' })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    const session = await db
+      .insertInto('sessions')
+      .values({
+        user_id: user.id,
+        session_hash: 'missing-settings-session',
+        expires_at: new Date('2026-08-13T00:00:00.000Z'),
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+
+    await expect(
+      findMembershipGrantContext(session.id, user.id, organization.id, db)
+    ).resolves.toMatchObject({
+      organization_id: organization.id,
+      organization_name: organization.name,
+      organization_slug: organization.slug,
+      membership_id: membership.id,
+      auth_settings_available: false,
+      local_auth_enabled: null,
+      oidc_auth_enabled: null,
+    })
+  })
 })

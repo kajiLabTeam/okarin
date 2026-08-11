@@ -1,4 +1,4 @@
-export { evaluateMembershipGrant } from './authorization.js'
+export { evaluateMembershipGrant, membershipAllowedAuthMethods } from './authorization.js'
 export type {
   MembershipGrantAuthorization,
   MembershipReauthenticationReason,
