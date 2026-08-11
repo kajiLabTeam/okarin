@@ -65,7 +65,6 @@ const memberContext = ({
   role,
   status,
   user_id: userId,
-  legacy_display_name: 'Legacy Name',
   display_name: 'Global Name',
   locale: 'ja-JP',
   timezone: 'Asia/Tokyo',
@@ -81,25 +80,23 @@ describe('profile usecases', () => {
     vi.clearAllMocks()
   })
 
-  it('User Profile未作成時はlegacy display nameとdefault preferenceへfallbackする', async () => {
+  it('移行済みUser Profileを返す', async () => {
     mocks.findUserProfileContext.mockResolvedValue({
       user_id: actorUserId,
-      legacy_display_name: 'Legacy Name',
-      legacy_updated_at: new Date('2026-08-10T00:00:00.000Z'),
-      display_name: null,
-      locale: null,
-      timezone: null,
-      profile_updated_at: null,
+      display_name: 'Global Name',
+      locale: 'ja-JP',
+      timezone: 'Asia/Tokyo',
+      profile_updated_at: new Date('2026-08-11T00:00:00.000Z'),
     })
 
     await expect(getMyUserProfile(userActor(), executor)).resolves.toEqual({
       ok: true,
       value: {
         user_id: actorUserId,
-        display_name: 'Legacy Name',
+        display_name: 'Global Name',
         locale: 'ja-JP',
         timezone: 'Asia/Tokyo',
-        updated_at: '2026-08-10T00:00:00.000Z',
+        updated_at: '2026-08-11T00:00:00.000Z',
       },
     })
   })

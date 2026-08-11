@@ -1,17 +1,18 @@
 interface Options {
   batchSize: number
-  command: 'preflight' | 'backfill-core' | 'backfill-auth' | 'verify' | 'validate'
+  command: 'cutover' | 'preflight' | 'backfill-core' | 'backfill-auth' | 'verify' | 'validate'
 }
 
 const usage = (): never => {
   throw new Error(
-    'usage: multi-org-auth-backfill <preflight|backfill-core|backfill-auth|verify|validate> [--batch-size POSITIVE_INTEGER]'
+    'usage: multi-org-auth-backfill <cutover|preflight|backfill-core|backfill-auth|verify|validate> [--batch-size POSITIVE_INTEGER]'
   )
 }
 
 export const parseOptions = (argv: string[]): Options => {
   const command = argv.shift()
   if (
+    command !== 'cutover' &&
     command !== 'preflight' &&
     command !== 'backfill-core' &&
     command !== 'backfill-auth' &&
@@ -38,10 +39,17 @@ export const main = async (argv = process.argv.slice(2)) => {
   const {
     backfillMultiOrgAuthCore,
     backfillMultiOrgAuthCredentials,
+    executeOneShotMultiOrgAuthCutover,
     getMultiOrgAuthPreflightReport,
     validateMultiOrgAuthExpandConstraints,
     verifyMultiOrgAuthCoreBackfill,
   } = await import('../services/migrations/multi-org-auth-backfill.js')
+
+  if (options.command === 'cutover') {
+    const result = await executeOneShotMultiOrgAuthCutover(options.batchSize)
+    process.stdout.write(`${JSON.stringify(result)}\n`)
+    return
+  }
 
   if (options.command === 'preflight') {
     const report = await getMultiOrgAuthPreflightReport()

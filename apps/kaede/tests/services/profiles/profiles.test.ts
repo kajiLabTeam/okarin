@@ -171,6 +171,15 @@ describe('profile usecases with database', () => {
       .values({ name: 'Rejoined Profile Organization' })
       .returningAll()
       .executeTakeFirstOrThrow()
+    await db
+      .insertInto('user_profiles')
+      .values({
+        user_id: user.id,
+        display_name: 'Rejoined Member',
+        locale: 'ja-JP',
+        timezone: 'Asia/Tokyo',
+      })
+      .execute()
 
     await db
       .transaction()
