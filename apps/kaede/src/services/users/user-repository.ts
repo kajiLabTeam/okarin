@@ -69,6 +69,7 @@ export const findOrganizationMembership = async (
     .selectAll()
     .where('organization_id', '=', organizationId)
     .where('user_id', '=', userId)
+    .where('status', '=', 'active')
     .executeTakeFirst()
 }
 
@@ -91,9 +92,12 @@ export const upsertOrganizationMembership = async (
     .insertInto('organization_memberships')
     .values(membership)
     .onConflict((oc) =>
-      oc.columns(['organization_id', 'user_id']).doUpdateSet({
-        role: membership.role,
-      })
+      oc
+        .columns(['organization_id', 'user_id'])
+        .where('status', 'in', ['active', 'suspended'])
+        .doUpdateSet({
+          role: membership.role,
+        })
     )
     .returningAll()
     .executeTakeFirstOrThrow()
@@ -122,6 +126,7 @@ const organizationUsersQuery = (executor: DbExecutor) =>
       'pedestrian.created_at as pedestrian_created_at',
       'pedestrian.updated_at as pedestrian_updated_at',
     ])
+    .where('membership.status', 'in', ['active', 'suspended'])
 
 export const listOrganizationUsers = async (
   organizationId: string,
@@ -158,6 +163,7 @@ export const listUserOrganizationMemberships = async (
       'membership.role as role',
     ])
     .where('membership.user_id', '=', userId)
+    .where('membership.status', 'in', ['active', 'suspended'])
     .orderBy('organization.name', 'asc')
     .execute()
 }

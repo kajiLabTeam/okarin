@@ -7,7 +7,7 @@ export interface MembershipGrantContext {
   organization_id: string
   membership_id: string
   membership_role: string
-  membership_status: string | null
+  membership_status: string
   membership_left_at: Date | null
   organization_status: string | null
   local_auth_enabled: boolean
@@ -85,8 +85,7 @@ export const findMembershipGrantContext = async (
     .where('membership.organization_id', '=', organizationId)
     .executeTakeFirst()
 
-  if (!context?.membership_id) return undefined
-  return { ...context, membership_id: context.membership_id }
+  return context
 }
 
 export const listMembershipGrantContexts = async (
@@ -98,7 +97,5 @@ export const listMembershipGrantContexts = async (
     .orderBy('organization_id', 'asc')
     .execute()
 
-  return contexts.filter(
-    (context): context is MembershipGrantContext => context.membership_id !== null
-  )
+  return contexts
 }

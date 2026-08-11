@@ -235,12 +235,12 @@ export interface OrganizationMemberProfiles {
 
 export interface OrganizationMemberships {
   created_at: Generated<Timestamp>
-  id: Generated<string | null>
-  joined_at: Generated<Timestamp | null>
+  id: Generated<string>
+  joined_at: Generated<Timestamp>
   left_at: Timestamp | null
   organization_id: string
   role: string
-  status: Generated<string | null>
+  status: Generated<string>
   updated_at: Generated<Timestamp>
   user_id: string
 }

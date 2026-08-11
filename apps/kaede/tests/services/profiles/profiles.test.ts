@@ -1,4 +1,3 @@
-import { sql } from 'kysely'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import type { RequestActor } from '../../../src/middleware/request-actor-context.js'
 import { createDb } from '../../../src/services/db/client.js'
@@ -176,10 +175,6 @@ describe('profile usecases with database', () => {
     await db
       .transaction()
       .execute(async (trx) => {
-        await sql`ALTER TABLE organization_memberships DROP CONSTRAINT organization_memberships_pkey`.execute(
-          trx
-        )
-
         const leftMembership = await trx
           .insertInto('organization_memberships')
           .values({
