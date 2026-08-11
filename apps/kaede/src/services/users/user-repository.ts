@@ -10,6 +10,7 @@ export type NewOrganizationMembership = Insertable<OrganizationMemberships>
 export type OrganizationMembership = Selectable<OrganizationMemberships>
 
 export interface OrganizationUserRow {
+  membership_id: string
   user_id: string
   email: string
   display_name: string
@@ -109,6 +110,7 @@ const organizationUsersQuery = (executor: DbExecutor) =>
     .innerJoin('users as user', 'user.id', 'membership.user_id')
     .leftJoin('pedestrians as pedestrian', 'pedestrian.user_id', 'user.id')
     .select([
+      'membership.id as membership_id',
       'user.id as user_id',
       'user.email as email',
       'user.display_name as display_name',
