@@ -78,8 +78,17 @@ pnpm multi-org-auth-backfill validate
 これはExpandで`NOT VALID`として追加した、今回のbackfillで安全に検証できるconstraintを`VALIDATE`し、
 Organization statusとMembership UUID/status/joined_atを`NOT NULL`へ昇格する。
 NOT NULL昇格では短い`lock_timeout`と一時的な`NOT VALID` CHECKの事前検証を利用し、長時間のlockと再scanを避ける。
-Membershipの旧`(organization_id, user_id)` PKと同じ意味になるcurrent Membership partial unique indexはこのPRでは追加しない。
-現行Repositoryが同制約をupsert conflict targetとして使っているため、UUID PKへの切替はRepository互換対応と同じPRで行う。
+
+全件が検証済みになった後、Membership Lifecycle migrationを適用する。このmigrationはcurrent Membership用の
+partial unique indexを先に作成してから、旧`(organization_id, user_id)` primary keyをUUID `id` primary keyへ
+切り替える。これ以降、`left` Membershipは履歴として残し、再参加時は新しいMembership IDを作成できる。
+
+```sh
+make db-up ENV=local
+```
+
+UUID primary key切替migrationは未backfill行がある場合に停止する。再参加後は旧primary keyへ戻せないため、
+本番運用はroll-forwardを基本とする。
 
 ## blocking issueの扱い
 

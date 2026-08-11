@@ -375,9 +375,9 @@ CREATE TABLE public.organization_memberships (
     role text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    id uuid DEFAULT gen_random_uuid(),
-    status text DEFAULT 'active'::text,
-    joined_at timestamp with time zone DEFAULT now(),
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    joined_at timestamp with time zone DEFAULT now() NOT NULL,
     left_at timestamp with time zone,
     CONSTRAINT organization_memberships_role_chk CHECK ((role = ANY (ARRAY['member'::text, 'manager'::text, 'owner'::text])))
 );
@@ -868,7 +868,7 @@ ALTER TABLE public.organization_memberships
 --
 
 ALTER TABLE ONLY public.organization_memberships
-    ADD CONSTRAINT organization_memberships_pkey PRIMARY KEY (organization_id, user_id);
+    ADD CONSTRAINT organization_memberships_pkey PRIMARY KEY (id);
 
 
 --
@@ -1252,10 +1252,10 @@ CREATE UNIQUE INDEX organization_member_oidc_active_provider_identity_key ON pub
 
 
 --
--- Name: organization_memberships_id_key; Type: INDEX; Schema: public; Owner: -
+-- Name: organization_memberships_current_user_org_key; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX organization_memberships_id_key ON public.organization_memberships USING btree (id);
+CREATE UNIQUE INDEX organization_memberships_current_user_org_key ON public.organization_memberships USING btree (organization_id, user_id) WHERE (status = ANY (ARRAY['active'::text, 'suspended'::text]));
 
 
 --
@@ -2057,4 +2057,6 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20260811010551'),
     ('20260811010552'),
     ('20260811010553'),
-    ('20260812010000');
+    ('20260812010000'),
+    ('20260812020000'),
+    ('20260812020100');

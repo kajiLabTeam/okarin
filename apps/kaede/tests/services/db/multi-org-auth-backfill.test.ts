@@ -1,5 +1,5 @@
 import { sql } from 'kysely'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createDb } from '../../../src/services/db/client.js'
 import {
   backfillMultiOrgAuthCore,
@@ -13,6 +13,45 @@ import { resetDatabase } from '../../db/helpers.js'
 
 const db = createDb()
 const passwordHash = '$argon2id$v=19$m=65536,t=3,p=4$ZHVtbXk$legacy-password-hash'
+
+const usePrePromotionMembershipSchema = async () => {
+  await sql`
+    ALTER TABLE organization_member_profiles
+      DROP CONSTRAINT organization_member_profiles_membership_id_fkey;
+    ALTER TABLE organization_memberships
+      DROP CONSTRAINT organization_memberships_pkey;
+    ALTER TABLE organization_memberships
+      ADD CONSTRAINT organization_memberships_pkey PRIMARY KEY (organization_id, user_id);
+    CREATE UNIQUE INDEX organization_memberships_id_key
+      ON organization_memberships (id);
+    ALTER TABLE organization_member_profiles
+      ADD CONSTRAINT organization_member_profiles_membership_id_fkey
+      FOREIGN KEY (membership_id)
+      REFERENCES organization_memberships(id) ON DELETE RESTRICT;
+    ALTER TABLE organization_memberships ALTER COLUMN id DROP NOT NULL;
+    ALTER TABLE organization_memberships ALTER COLUMN status DROP NOT NULL;
+    ALTER TABLE organization_memberships ALTER COLUMN joined_at DROP NOT NULL;
+  `.execute(db)
+}
+
+const restorePromotedMembershipSchema = async () => {
+  await sql`
+    ALTER TABLE organization_memberships ALTER COLUMN id SET NOT NULL;
+    ALTER TABLE organization_memberships ALTER COLUMN status SET NOT NULL;
+    ALTER TABLE organization_memberships ALTER COLUMN joined_at SET NOT NULL;
+    ALTER TABLE organization_member_profiles
+      DROP CONSTRAINT organization_member_profiles_membership_id_fkey;
+    ALTER TABLE organization_memberships
+      DROP CONSTRAINT organization_memberships_pkey;
+    ALTER TABLE organization_memberships
+      ADD CONSTRAINT organization_memberships_pkey
+      PRIMARY KEY USING INDEX organization_memberships_id_key;
+    ALTER TABLE organization_member_profiles
+      ADD CONSTRAINT organization_member_profiles_membership_id_fkey
+      FOREIGN KEY (membership_id)
+      REFERENCES organization_memberships(id) ON DELETE RESTRICT;
+  `.execute(db)
+}
 
 const withLegacyMeasurementConstraintsDisabled = async (insertRows: () => Promise<void>) => {
   await sql`
@@ -67,11 +106,18 @@ const createLegacyUserAndMembership = async (suffix: string) => {
 }
 
 describe('multi organization auth backfill', () => {
+  beforeAll(async () => {
+    await resetDatabase(db)
+    await usePrePromotionMembershipSchema()
+  })
+
   beforeEach(async () => {
     await resetDatabase(db)
   })
 
   afterAll(async () => {
+    await resetDatabase(db)
+    await restorePromotedMembershipSchema()
     await db.destroy()
   })
 
