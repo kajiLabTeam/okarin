@@ -144,6 +144,7 @@ const requirePedestrianOrganizationId = (
 }
 
 const toOrganizationUserResponse = (row: OrganizationUserRow): OrganizationUserResponse => ({
+  membership_id: row.membership_id,
   user_id: row.user_id,
   email: row.email,
   display_name: row.display_name,

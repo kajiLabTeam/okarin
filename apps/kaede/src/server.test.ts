@@ -152,6 +152,12 @@ describe('createApp auth wiring', { timeout: 60_000 }, () => {
               },
             },
           },
+          OrganizationUser: {
+            required: expect.arrayContaining(['membership_id']),
+            properties: {
+              membership_id: expect.objectContaining({ format: 'uuid' }),
+            },
+          },
           OrganizationAuthorizationErrorResponse: expect.objectContaining({
             oneOf: expect.arrayContaining([
               expect.objectContaining({

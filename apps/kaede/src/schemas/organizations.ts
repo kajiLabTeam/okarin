@@ -104,6 +104,7 @@ export const rejectOrganizationCreationRequestRequestSchema = z
 
 export const organizationUserSchema = z
   .object({
+    membership_id: uuidSchema,
     user_id: authUserSchema.shape.user_id,
     email: authUserSchema.shape.email,
     display_name: authUserSchema.shape.display_name,
