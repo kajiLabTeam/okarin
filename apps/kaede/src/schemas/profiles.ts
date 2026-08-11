@@ -1,9 +1,9 @@
 import { z } from '@hono/zod-openapi'
 import { isoDatetimeSchema, uuidSchema } from './common.js'
 
-const displayNameSchema = z.string().trim().min(1).max(255)
+export const displayNameSchema = z.string().trim().min(1).max(255)
 
-const localeSchema = z
+export const localeSchema = z
   .string()
   .trim()
   .min(1)
@@ -17,7 +17,7 @@ const localeSchema = z
     }
   }, 'locale must be a valid BCP 47 language tag')
 
-const timezoneSchema = z
+export const timezoneSchema = z
   .string()
   .trim()
   .min(1)
