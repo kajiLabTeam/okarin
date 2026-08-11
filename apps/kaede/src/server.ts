@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/node'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
 import { getRuntimeConfig } from './config/runtime.js'
+import { organizationAuthorizationMiddleware } from './middleware/organization-authorization.js'
 import { requestActorMiddleware } from './middleware/request-actor.js'
 import { registerApiRoutes } from './routes/index.js'
 import { organizationLocalAuthRoutes } from './routes/organization-local-auth/index.js'
@@ -60,6 +61,10 @@ export const createApp = () => {
       sharedToken: runtimeConfig.app.apiSharedToken,
     })
   )
+
+  const authorizeOrganization = organizationAuthorizationMiddleware()
+  app.use('/api/organizations/:organizationId', authorizeOrganization)
+  app.use('/api/organizations/:organizationId/*', authorizeOrganization)
 
   const healthRoute = createRoute({
     method: 'get',
