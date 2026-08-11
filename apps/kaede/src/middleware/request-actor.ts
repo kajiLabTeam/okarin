@@ -8,7 +8,7 @@ import { hasLocalAuthenticationGrantBySessionId } from '../services/organization
 import { findUserById, listUserOrganizationMemberships } from '../services/users/index.js'
 import { deriveAccountState } from '../usecases/authorization.js'
 import type { RequestActorHonoEnv } from './request-actor-context.js'
-import { setRequestActor } from './request-actor-context.js'
+import { setRequestActor, setRequestSessionId } from './request-actor-context.js'
 export type {
   RequestActor,
   RequestActorHonoEnv,
@@ -17,7 +17,13 @@ export type {
   UserActorMembership,
   UserRequestActor,
 } from './request-actor-context.js'
-export { getRequestActor, requireRequestActor, setRequestActor } from './request-actor-context.js'
+export {
+  getRequestActor,
+  getRequestSessionId,
+  requireRequestActor,
+  setRequestActor,
+  setRequestSessionId,
+} from './request-actor-context.js'
 
 type RequestActorContext = Context<RequestActorHonoEnv>
 
@@ -157,6 +163,7 @@ export const requestActorMiddleware = ({
         role: membership.role as 'member' | 'manager' | 'owner',
       })),
     })
+    setRequestSessionId(c, sessionResult.session.id)
 
     await next()
   }

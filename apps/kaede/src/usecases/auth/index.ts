@@ -29,6 +29,10 @@ import { hashPassword, verifyPassword } from '../../services/auth/password.js'
 import { db } from '../../services/db/index.js'
 import type { DbExecutor } from '../../services/executor.js'
 import {
+  evaluateMembershipGrant,
+  listMembershipGrantContexts,
+} from '../../services/organization-authorization/index.js'
+import {
   findUserByEmail,
   findUserById,
   insertUser,
@@ -170,9 +174,19 @@ const mapActiveSessionError = (
 const buildAuthUserResponse = async (
   user: User,
   sessionAuthMethod: 'password' | 'oidc',
-  executor?: DbExecutor
+  executor?: DbExecutor,
+  grantOptions?: { sessionId: string; now: Date }
 ): Promise<AuthUserResponse> => {
   const memberships = await listUserOrganizationMemberships(user.id, executor)
+  const grantContexts = grantOptions
+    ? await listMembershipGrantContexts(grantOptions.sessionId, user.id, executor)
+    : []
+  const grantsByOrganizationId = new Map(
+    grantContexts.map((context) => [context.organization_id, context])
+  )
+  const currentMemberships = grantOptions
+    ? memberships.filter((membership) => grantsByOrganizationId.has(membership.organization_id))
+    : memberships
 
   return {
     session_auth_method: sessionAuthMethod,
@@ -185,14 +199,38 @@ const buildAuthUserResponse = async (
       account_state: deriveAccountState({
         globalRole: user.global_role as 'none' | 'admin',
         status: user.status as 'pending_activation' | 'active' | 'disabled',
-        membershipCount: memberships.length,
+        membershipCount: currentMemberships.length,
       }),
       password_changed_at: toIsoOrNull(user.password_changed_at),
-      memberships: memberships.map((membership) => ({
-        organization_id: membership.organization_id,
-        organization_name: membership.organization_name,
-        role: membership.role as 'member' | 'manager' | 'owner',
-      })),
+      memberships: currentMemberships.map((membership) => {
+        const context = grantsByOrganizationId.get(membership.organization_id)
+        const authorization = grantOptions
+          ? evaluateMembershipGrant(context, 'member', grantOptions.now)
+          : undefined
+        const grantState = !authorization
+          ? undefined
+          : authorization.ok
+            ? {
+                status: 'granted' as const,
+                auth_method: authorization.authMethod,
+                authenticated_at: authorization.authenticatedAt.toISOString(),
+                expires_at: authorization.expiresAt.toISOString(),
+              }
+            : authorization.type === 'reauthentication_required'
+              ? {
+                  status: 'reauthentication_required' as const,
+                  reason: authorization.reason,
+                  allowed_auth_methods: authorization.allowedAuthMethods,
+                }
+              : { status: 'forbidden' as const }
+
+        return {
+          organization_id: membership.organization_id,
+          organization_name: membership.organization_name,
+          role: membership.role as 'member' | 'manager' | 'owner',
+          ...(grantState ? { grant_state: grantState } : {}),
+        }
+      }),
     },
   }
 }
@@ -635,7 +673,8 @@ export const getMe = async (
     value: await buildAuthUserResponse(
       user,
       sessionResult.session.auth_method as 'password' | 'oidc',
-      executor
+      executor,
+      { sessionId: sessionResult.session.id, now }
     ),
   }
 }

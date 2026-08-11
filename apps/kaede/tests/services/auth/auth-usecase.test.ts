@@ -985,6 +985,108 @@ describe('auth usecase', () => {
     expect(result.value.user.status).toBe('active')
   })
 
+  it('getMe はMembershipごとのgrant stateを返す', async () => {
+    const user = await insertUser()
+    const organization = await db
+      .insertInto('organizations')
+      .values({ name: 'Grant Organization' })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    const membership = await db
+      .insertInto('organization_memberships')
+      .values({ organization_id: organization.id, user_id: user.id, role: 'member' })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    if (!membership.id) throw new Error('membership id is required')
+    await db
+      .insertInto('organization_auth_settings')
+      .values({
+        organization_id: organization.id,
+        local_auth_enabled: true,
+        oidc_auth_enabled: false,
+        policy_version: 2,
+        membership_grant_ttl_seconds: 7200,
+        reauthentication_interval_seconds: 3600,
+      })
+      .execute()
+    const credential = await db
+      .insertInto('organization_local_credentials')
+      .values({
+        membership_id: membership.id,
+        organization_id: organization.id,
+        login_email: 'grant-user@example.com',
+        normalized_login_email: 'grant-user@example.com',
+        password_hash: await hashPassword('organization-password'),
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    const { session, token } = await createSession(
+      { userId: user.id, now: new Date('2026-08-11T10:00:00.000Z') },
+      db
+    )
+    await db
+      .insertInto('session_membership_authentications')
+      .values({
+        session_id: session.id,
+        membership_id: membership.id,
+        user_id: user.id,
+        auth_method: 'local',
+        policy_version: 2,
+        local_credential_id: credential.id,
+        authenticated_at: new Date('2026-08-11T11:00:00.000Z'),
+        expires_at: new Date('2026-08-11T13:00:00.000Z'),
+      })
+      .execute()
+    const secondOrganization = await db
+      .insertInto('organizations')
+      .values({ name: 'Missing Grant Organization' })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    await db
+      .insertInto('organization_memberships')
+      .values({ organization_id: secondOrganization.id, user_id: user.id, role: 'manager' })
+      .execute()
+    await db
+      .insertInto('organization_auth_settings')
+      .values({
+        organization_id: secondOrganization.id,
+        local_auth_enabled: true,
+        oidc_auth_enabled: false,
+        membership_grant_ttl_seconds: 7200,
+        reauthentication_interval_seconds: 3600,
+      })
+      .execute()
+
+    const result = await getMe(token, new Date('2026-08-11T11:30:00.000Z'), db)
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        user: {
+          memberships: [
+            {
+              organization_id: organization.id,
+              grant_state: {
+                status: 'granted',
+                auth_method: 'local',
+                authenticated_at: '2026-08-11T11:00:00.000Z',
+                expires_at: '2026-08-11T13:00:00.000Z',
+              },
+            },
+            {
+              organization_id: secondOrganization.id,
+              grant_state: {
+                status: 'reauthentication_required',
+                reason: 'grant_missing',
+                allowed_auth_methods: ['local'],
+              },
+            },
+          ],
+        },
+      },
+    })
+  })
+
   it('verifyActivationToken は valid token の表示情報を返し token を consume しない', async () => {
     const { activationToken, organization, token, user } = await insertActivationToken()
 

@@ -12,6 +12,31 @@ export const authMembershipSchema = z
     organization_id: uuidSchema,
     organization_name: z.string().min(1).max(255),
     role: membershipRoleSchema,
+    grant_state: z
+      .discriminatedUnion('status', [
+        z.object({
+          status: z.literal('granted'),
+          auth_method: z.enum(['local', 'oidc']),
+          authenticated_at: isoDatetimeSchema,
+          expires_at: isoDatetimeSchema,
+        }),
+        z.object({
+          status: z.literal('reauthentication_required'),
+          reason: z.enum([
+            'grant_missing',
+            'grant_revoked',
+            'grant_expired',
+            'reauthentication_interval_elapsed',
+            'policy_changed',
+            'auth_method_not_allowed',
+          ]),
+          allowed_auth_methods: z.array(z.enum(['local', 'oidc'])),
+        }),
+        z.object({
+          status: z.literal('forbidden'),
+        }),
+      ])
+      .optional(),
   })
   .openapi('AuthMembership')
 
