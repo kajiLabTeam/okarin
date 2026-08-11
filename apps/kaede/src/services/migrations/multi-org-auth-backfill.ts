@@ -940,16 +940,15 @@ export const executeOneShotMultiOrgAuthCutover = async (
       RETURNING id
     `.execute(trx)
 
+    const cutoverDetails = JSON.stringify({
+      revoked_sessions: revokedSessions.rows.length,
+      bootstrapped_auth_settings: bootstrappedAuthSettings,
+      bootstrapped_oidc_providers: bootstrappedOidcProviders,
+    })
+
     await sql`
       INSERT INTO application_data_migrations (name, details)
-      VALUES (
-        ${cutoverMigrationName},
-        jsonb_build_object(
-          'revoked_sessions', ${revokedSessions.rows.length},
-          'bootstrapped_auth_settings', ${bootstrappedAuthSettings},
-          'bootstrapped_oidc_providers', ${bootstrappedOidcProviders}
-        )
-      )
+      VALUES (${cutoverMigrationName}, ${cutoverDetails}::jsonb)
     `.execute(trx)
 
     return {
