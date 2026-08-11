@@ -68,6 +68,12 @@ export type CompleteOrganizationOidcError =
   | { type: 'AUTH_MEMBERSHIP_NOT_ACTIVE' }
   | { type: 'AUTH_SESSION_REQUIRED' }
   | { type: 'AUTH_USER_DISABLED' }
+  | { type: 'AUTH_METHOD_NOT_ALLOWED' }
+  | { type: 'INVITE_INVALID' }
+  | { type: 'INVITE_EXPIRED' }
+  | { type: 'INVITE_ALREADY_REDEEMED' }
+  | { type: 'INVITE_ALREADY_MEMBER' }
+  | { type: 'INVITE_MEMBERSHIP_SUSPENDED' }
 
 export type CompleteOrganizationOidcResult =
   | {

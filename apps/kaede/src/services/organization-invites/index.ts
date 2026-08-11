@@ -3,6 +3,7 @@ export {
   findActorMembership,
   findActorMembershipForUpdate,
   findEnabledLocalCredentialByEmail,
+  findInviteContextByIdForUpdate,
   findInviteContextByTokenHash,
   findInviteContextByTokenHashForUpdate,
   findMembershipStateForInvite,

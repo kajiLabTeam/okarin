@@ -2,6 +2,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { hashActivationToken } from '../../../src/services/auth/activation-token.js'
 import { createSession } from '../../../src/services/auth/session-repository.js'
 import { createDb } from '../../../src/services/db/client.js'
+import { acceptOrganizationInviteWithOidc } from '../../../src/usecases/organization-invites/index.js'
 import {
   completeOrganizationOidc,
   isOrganizationOidcTransactionState,
@@ -135,10 +136,14 @@ const startLogin = async (
 }
 
 const callbackClient = ({
+  email = 'oidc-user@example.test',
   hostedDomain = null,
+  name = 'OIDC User',
   subject = 'google-subject',
 }: {
+  email?: string
   hostedDomain?: string | null
+  name?: string
   subject?: string
 } = {}) => ({
   exchangeCodeForIdToken: () => Promise.resolve('id-token'),
@@ -146,12 +151,75 @@ const callbackClient = ({
     Promise.resolve({
       issuer: 'accounts.google.com',
       sub: subject,
-      email: 'oidc-user@example.test',
+      email,
       emailVerified: true,
-      name: 'OIDC User',
+      name,
       hostedDomain,
     }),
 })
+
+const createInvite = async (
+  fixture: Awaited<ReturnType<typeof createFixture>>,
+  token = 'single-use-invite-token'
+) => {
+  const invite = await db
+    .insertInto('organization_invites')
+    .values({
+      organization_id: fixture.organization.id,
+      created_by_user_id: fixture.user.id,
+      created_by_membership_id: fixture.membership.id,
+      email: 'legacy-unused@example.test',
+      token_hash: hashActivationToken(token),
+      role: 'member',
+      expires_at: new Date('2026-08-12T10:00:00.000Z'),
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow()
+  return { invite, token }
+}
+
+const startInvite = async (
+  fixture: Awaited<ReturnType<typeof createFixture>>,
+  token: string,
+  sessionToken?: string
+) => {
+  const result = await startOrganizationOidc(
+    fixture.organization.slug,
+    fixture.provider.id,
+    sessionToken,
+    { intent: 'accept_invite', invite_token: token, return_to: '/invites/complete' },
+    {
+      client: {
+        createAuthorizationUrl: ({ state }) =>
+          `https://accounts.google.com/o/oauth2/v2/auth?state=${encodeURIComponent(state)}`,
+      },
+      configuredClientId,
+      transactionSecret,
+      now,
+      executor: db,
+    }
+  )
+  expect(result.ok).toBe(true)
+  if (!result.ok) throw new Error(result.error.type)
+  const state = new URL(result.value.authorization_url).searchParams.get('state')
+  if (!state) throw new Error('state is required')
+  return state
+}
+
+const completeInvite = (
+  state: string,
+  client: ReturnType<typeof callbackClient>,
+  sessionToken?: string
+) =>
+  completeOrganizationOidc('authorization-code', state, {
+    client,
+    configuredClientId,
+    transactionSecret,
+    completeInvite: acceptOrganizationInviteWithOidc,
+    sessionToken,
+    now,
+    executor: db,
+  })
 
 describe('organization OIDC authentication', () => {
   beforeEach(async () => {
@@ -407,5 +475,220 @@ describe('organization OIDC authentication', () => {
       error: { type: 'OIDC_TRANSACTION_INVALID' },
     })
     expect(completeInvite).toHaveBeenCalledTimes(1)
+  })
+
+  it('OIDC Invite成功後にUserからGrantまでを一括作成してInviteを消費する', async () => {
+    const fixture = await createFixture()
+    const { invite, token } = await createInvite(fixture)
+    const state = await startInvite(fixture, token)
+
+    const result = await completeInvite(
+      state,
+      callbackClient({
+        subject: 'new-invite-subject',
+        email: 'new-invite-user@example.test',
+        name: 'New Invite User',
+      })
+    )
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { return_to: '/invites/complete', sessionToken: expect.any(String) },
+    })
+    const identity = await db
+      .selectFrom('oidc_identities')
+      .selectAll()
+      .where('subject', '=', 'new-invite-subject')
+      .executeTakeFirstOrThrow()
+    expect(identity.issuer).toBe('https://accounts.google.com')
+    const invitedUser = await db
+      .selectFrom('users')
+      .selectAll()
+      .where('id', '=', identity.user_id)
+      .executeTakeFirstOrThrow()
+    expect(invitedUser).toMatchObject({
+      contact_email: 'new-invite-user@example.test',
+      normalized_contact_email: 'new-invite-user@example.test',
+      status: 'active',
+    })
+    expect(invitedUser.contact_email_verified_at).toEqual(now)
+    const membership = await db
+      .selectFrom('organization_memberships')
+      .selectAll()
+      .where('organization_id', '=', fixture.organization.id)
+      .where('user_id', '=', identity.user_id)
+      .where('status', '=', 'active')
+      .executeTakeFirstOrThrow()
+    const redeemedInvite = await db
+      .selectFrom('organization_invites')
+      .selectAll()
+      .where('id', '=', invite.id)
+      .executeTakeFirstOrThrow()
+    expect(redeemedInvite).toMatchObject({ redeemed_membership_id: membership.id })
+    expect(redeemedInvite.redeemed_at).toEqual(now)
+    await expect(
+      db
+        .selectFrom('organization_member_profiles')
+        .selectAll()
+        .where('membership_id', '=', membership.id)
+        .executeTakeFirst()
+    ).resolves.toBeDefined()
+    await expect(
+      db
+        .selectFrom('session_membership_authentications')
+        .selectAll()
+        .where('membership_id', '=', membership.id)
+        .where('auth_method', '=', 'oidc')
+        .executeTakeFirst()
+    ).resolves.toMatchObject({ user_id: identity.user_id })
+
+    await expect(
+      completeInvite(
+        state,
+        callbackClient({ subject: 'new-invite-subject', email: 'new-invite-user@example.test' })
+      )
+    ).resolves.toEqual({ ok: false, error: { type: 'OIDC_TRANSACTION_INVALID' } })
+  })
+
+  it.each([
+    ['active', 'INVITE_ALREADY_MEMBER'],
+    ['suspended', 'INVITE_MEMBERSHIP_SUSPENDED'],
+  ] as const)(
+    '%s MembershipはInviteを消費せず拒否する',
+    async (membershipStatus, expectedError) => {
+      const fixture = await createFixture()
+      const { identity } = await linkIdentity(fixture)
+      if (membershipStatus === 'suspended') {
+        await db
+          .updateTable('organization_memberships')
+          .set({ status: 'suspended' })
+          .where('id', '=', fixture.membership.id)
+          .execute()
+      }
+      const { invite, token } = await createInvite(fixture)
+      const state = await startInvite(fixture, token)
+
+      await expect(completeInvite(state, callbackClient())).resolves.toEqual({
+        ok: false,
+        error: { type: expectedError },
+        return_to: '/invites/complete',
+      })
+      const untouchedInvite = await db
+        .selectFrom('organization_invites')
+        .selectAll()
+        .where('id', '=', invite.id)
+        .executeTakeFirstOrThrow()
+      expect(untouchedInvite.redeemed_at).toBeNull()
+      expect(untouchedInvite.redeemed_membership_id).toBeNull()
+      await expect(
+        db
+          .selectFrom('organization_memberships')
+          .select(({ fn }) => fn.countAll<string>().as('count'))
+          .where('organization_id', '=', fixture.organization.id)
+          .where('user_id', '=', identity.user_id)
+          .executeTakeFirstOrThrow()
+      ).resolves.toMatchObject({ count: '1' })
+    }
+  )
+
+  it('left Membershipは新しいMembershipを作りOIDC Linkを付け替える', async () => {
+    const fixture = await createFixture()
+    const { identity, link: oldLink } = await linkIdentity(fixture)
+    await db
+      .updateTable('organization_memberships')
+      .set({ status: 'left', left_at: new Date('2026-08-10T10:00:00.000Z') })
+      .where('id', '=', fixture.membership.id)
+      .execute()
+    const { token } = await createInvite(fixture)
+    const state = await startInvite(fixture, token)
+
+    await expect(completeInvite(state, callbackClient())).resolves.toMatchObject({ ok: true })
+    const memberships = await db
+      .selectFrom('organization_memberships')
+      .selectAll()
+      .where('organization_id', '=', fixture.organization.id)
+      .where('user_id', '=', fixture.user.id)
+      .orderBy('joined_at')
+      .execute()
+    expect(memberships).toHaveLength(2)
+    expect(memberships).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: fixture.membership.id, status: 'left' }),
+        expect.objectContaining({ status: 'active', left_at: null }),
+      ])
+    )
+    const links = await db
+      .selectFrom('organization_member_oidc_identities')
+      .selectAll()
+      .where('oidc_identity_id', '=', identity.id)
+      .orderBy('created_at')
+      .execute()
+    expect(links).toHaveLength(2)
+    expect(links.find((link) => link.id === oldLink.id)?.revoked_at).toEqual(now)
+    expect(links.find((link) => link.id !== oldLink.id)).toMatchObject({
+      membership_id: memberships.find((membership) => membership.status === 'active')?.id,
+      revoked_at: null,
+    })
+  })
+
+  it('Session UserとOIDC Identity Userが違う場合は自動統合せずInviteを消費しない', async () => {
+    const fixture = await createFixture()
+    await linkIdentity(fixture)
+    const otherUser = await createUser('invite-session-user@example.test')
+    const session = await createSession({ userId: otherUser.id, now }, db)
+    const { invite, token } = await createInvite(fixture)
+    const state = await startInvite(fixture, token, session.token)
+
+    await expect(completeInvite(state, callbackClient(), session.token)).resolves.toEqual({
+      ok: false,
+      error: { type: 'AUTH_IDENTITY_USER_MISMATCH' },
+      return_to: '/invites/complete',
+    })
+    const untouchedInvite = await db
+      .selectFrom('organization_invites')
+      .selectAll()
+      .where('id', '=', invite.id)
+      .executeTakeFirstOrThrow()
+    expect(untouchedInvite.redeemed_at).toBeNull()
+    await expect(
+      db
+        .selectFrom('organization_memberships')
+        .selectAll()
+        .where('organization_id', '=', fixture.organization.id)
+        .where('user_id', '=', otherUser.id)
+        .execute()
+    ).resolves.toEqual([])
+  })
+
+  it('OIDC開始後に取消されたInviteはcallbackで再検証して書き込まない', async () => {
+    const fixture = await createFixture()
+    const { invite, token } = await createInvite(fixture)
+    const state = await startInvite(fixture, token)
+    await db
+      .updateTable('organization_invites')
+      .set({ revoked_at: now })
+      .where('id', '=', invite.id)
+      .execute()
+
+    await expect(
+      completeInvite(
+        state,
+        callbackClient({
+          subject: 'revoked-invite-subject',
+          email: 'revoked-invite@example.test',
+        })
+      )
+    ).resolves.toEqual({
+      ok: false,
+      error: { type: 'INVITE_INVALID' },
+      return_to: '/invites/complete',
+    })
+    await expect(
+      db
+        .selectFrom('oidc_identities')
+        .selectAll()
+        .where('subject', '=', 'revoked-invite-subject')
+        .execute()
+    ).resolves.toEqual([])
   })
 })

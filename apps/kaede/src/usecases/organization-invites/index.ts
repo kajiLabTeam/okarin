@@ -22,6 +22,7 @@ import {
   findEnabledLocalCredentialByEmail,
   findInviteContextByTokenHash,
   findInviteContextByTokenHashForUpdate,
+  findInviteContextByIdForUpdate,
   findMembershipStateForInvite,
   findOrganizationInviteForUpdate,
   insertOrganizationInvite,
@@ -36,11 +37,25 @@ import {
   upsertLocalMembershipGrant,
 } from '../../services/organization-local-auth/index.js'
 import {
+  canonicalizeOidcIssuer,
+  findOidcIdentity,
+  findOrganizationOidcProviderContextById,
+  insertOidcIdentity,
+  revokeActiveOidcMembershipLink,
+  updateOidcIdentityClaims,
+  upsertOidcMembershipGrant,
+  upsertOidcMembershipLink,
+} from '../../services/organization-oidc-auth/index.js'
+import {
   insertAuditEvent,
   upsertOrganizationMemberProfile,
   upsertUserProfile,
 } from '../../services/profiles/index.js'
 import { findUserById, insertUser } from '../../services/users/index.js'
+import type {
+  CompleteOrganizationOidcResult,
+  OrganizationOidcInviteCompletionContext,
+} from '../organization-oidc-auth/callback.js'
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const LEGACY_INVITE_EMAIL = 'single-use-invite@invalid.local'
@@ -579,3 +594,246 @@ export const acceptOrganizationInviteWithLocalCredential = async (
     }
   })
 }
+
+export const acceptOrganizationInviteWithOidc = async (
+  context: OrganizationOidcInviteCompletionContext
+): Promise<CompleteOrganizationOidcResult> =>
+  runInTransaction(context.executor, async (trx) => {
+    const valid = validateInviteContext(
+      await findInviteContextByIdForUpdate(context.inviteId, context.organizationId, trx),
+      context.now
+    )
+    if (!valid.ok) {
+      return { ...valid, return_to: context.returnTo }
+    }
+    if (!valid.context.oidc_auth_enabled) {
+      return {
+        ok: false,
+        error: { type: 'AUTH_METHOD_NOT_ALLOWED' },
+        return_to: context.returnTo,
+      }
+    }
+
+    const provider = await findOrganizationOidcProviderContextById(context.providerId, trx)
+    if (
+      provider?.organization_id !== valid.context.organization_id ||
+      provider.organization_status !== 'active' ||
+      !provider.oidc_auth_enabled ||
+      !provider.provider_enabled
+    ) {
+      return {
+        ok: false,
+        error: { type: 'AUTH_METHOD_NOT_ALLOWED' },
+        return_to: context.returnTo,
+      }
+    }
+
+    let activeSession
+    if (context.transactionSessionId) {
+      if (!context.callbackSessionToken) {
+        return {
+          ok: false,
+          error: { type: 'AUTH_SESSION_REQUIRED' },
+          return_to: context.returnTo,
+        }
+      }
+      const foundSession = await findValidSessionByToken(
+        context.callbackSessionToken,
+        context.now,
+        trx
+      )
+      if (!foundSession.ok || foundSession.session.id !== context.transactionSessionId) {
+        return {
+          ok: false,
+          error: { type: 'AUTH_SESSION_REQUIRED' },
+          return_to: context.returnTo,
+        }
+      }
+      activeSession = foundSession.session
+    } else if (context.callbackSessionToken) {
+      return {
+        ok: false,
+        error: { type: 'AUTH_IDENTITY_USER_MISMATCH' },
+        return_to: context.returnTo,
+      }
+    }
+
+    const issuer = canonicalizeOidcIssuer(context.claims.issuer)
+    let identity = await findOidcIdentity(issuer, context.claims.sub, trx)
+    if (identity && activeSession && identity.user_id !== activeSession.user_id) {
+      return {
+        ok: false,
+        error: { type: 'AUTH_IDENTITY_USER_MISMATCH' },
+        return_to: context.returnTo,
+      }
+    }
+
+    const existingUserId = identity?.user_id ?? activeSession?.user_id
+    const userId = existingUserId ?? randomUUID()
+    if (existingUserId) {
+      const user = await findUserById(userId, trx)
+      if (user?.status !== 'active') {
+        return {
+          ok: false,
+          error: { type: 'AUTH_USER_DISABLED' },
+          return_to: context.returnTo,
+        }
+      }
+    }
+
+    // Membership conflict is checked before creating any User/Identity rows. Returning an
+    // expected conflict must not leave callback-side mutations committed.
+    const priorMembership = await findMembershipStateForInvite(
+      valid.context.organization_id,
+      userId,
+      trx
+    )
+    const conflict = membershipConflict(priorMembership?.status ?? null)
+    if (conflict) {
+      return { ok: false, error: conflict, return_to: context.returnTo }
+    }
+
+    if (!existingUserId) {
+      const displayName = context.claims.name.trim()
+      const contactEmail = context.claims.email.trim()
+      await insertUser(
+        {
+          id: userId,
+          email: `${userId}@invite.local.invalid`,
+          display_name: displayName,
+          password_hash: null,
+          password_changed_at: null,
+          status: 'active',
+          global_role: 'none',
+          contact_email: contactEmail,
+          normalized_contact_email: contactEmail.toLowerCase(),
+          contact_email_verified_at: context.now,
+          locked_until: null,
+        },
+        trx
+      )
+      await upsertUserProfile(
+        {
+          user_id: userId,
+          display_name: displayName,
+          locale: 'ja-JP',
+          timezone: 'Asia/Tokyo',
+        },
+        { display_name: displayName, locale: 'ja-JP', timezone: 'Asia/Tokyo' },
+        trx
+      )
+    }
+
+    if (!identity) {
+      identity = await insertOidcIdentity(
+        {
+          user_id: userId,
+          issuer,
+          subject: context.claims.sub,
+          last_claimed_email: context.claims.email,
+          last_claimed_email_verified: context.claims.emailVerified,
+        },
+        trx
+      )
+    } else {
+      identity = await updateOidcIdentityClaims(
+        identity.id,
+        {
+          last_claimed_email: context.claims.email,
+          last_claimed_email_verified: context.claims.emailVerified,
+        },
+        trx
+      )
+    }
+
+    const membership = await insertOrganizationMembershipForInvite(
+      {
+        id: randomUUID(),
+        organization_id: valid.context.organization_id,
+        user_id: userId,
+        role: valid.context.role,
+        status: 'active',
+        joined_at: context.now,
+        left_at: null,
+      },
+      trx
+    )
+    if (!membership.id) {
+      // This cannot occur for newly inserted rows. Throw so an executor supplied by an
+      // outer transaction also observes the failure and rolls the whole acceptance back.
+      throw new Error('Inserted Organization Membership has no id')
+    }
+    await upsertOrganizationMemberProfile(
+      {
+        membership_id: membership.id,
+        display_name: null,
+        height_meters: null,
+        stride_length_meters: null,
+      },
+      { display_name: null, height_meters: null, stride_length_meters: null },
+      trx
+    )
+
+    await revokeActiveOidcMembershipLink(provider.provider_id, identity.id, context.now, trx)
+    const link = await upsertOidcMembershipLink(
+      {
+        membership_id: membership.id,
+        organization_id: valid.context.organization_id,
+        user_id: userId,
+        organization_oidc_provider_id: provider.provider_id,
+        oidc_identity_id: identity.id,
+        revoked_at: null,
+      },
+      trx
+    )
+    if (
+      !(await consumeOrganizationInvite(valid.context.invite_id, membership.id, context.now, trx))
+    ) {
+      // The locked Invite was revalidated above, so a conditional consume miss signals an
+      // invariant violation. Propagate it to guarantee rollback instead of committing links.
+      throw new Error('Locked Organization Invite could not be consumed')
+    }
+
+    let createdSessionToken: string | undefined
+    if (!activeSession) {
+      const created = await createSession({ authMethod: 'oidc', userId, now: context.now }, trx)
+      activeSession = created.session
+      createdSessionToken = created.token
+    }
+    await upsertOidcMembershipGrant(
+      {
+        session_id: activeSession.id,
+        membership_id: membership.id,
+        user_id: userId,
+        auth_method: 'oidc',
+        policy_version: provider.policy_version,
+        local_credential_id: null,
+        member_oidc_identity_id: link.id,
+        authenticated_at: context.now,
+        expires_at: new Date(context.now.getTime() + provider.membership_grant_ttl_seconds * 1000),
+        revoked_at: null,
+      },
+      trx
+    )
+    await insertAuthenticationEvent(
+      {
+        event_type: 'oidc_invite_accept',
+        outcome: 'success',
+        user_id: userId,
+        organization_id: valid.context.organization_id,
+        membership_id: membership.id,
+        session_id: activeSession.id,
+        auth_method: 'oidc',
+        credential_reference_id: identity.id,
+      },
+      trx
+    )
+
+    return {
+      ok: true,
+      value: {
+        return_to: context.returnTo,
+        sessionToken: createdSessionToken,
+      },
+    }
+  })

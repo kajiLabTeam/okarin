@@ -3,6 +3,7 @@ import type { OpenAPIHono } from '@hono/zod-openapi'
 import { getAppRuntimeConfig, getOidcRuntimeConfig } from '../../config/runtime.js'
 import { GoogleOidcClient } from '../../services/auth/index.js'
 import { completeGoogleOidcLink, completeGoogleOidcLogin } from '../../usecases/auth/index.js'
+import { acceptOrganizationInviteWithOidc } from '../../usecases/organization-invites/index.js'
 import {
   completeOrganizationOidc,
   isOrganizationOidcTransactionState,
@@ -80,6 +81,7 @@ export const registerGoogleOidcCallbackRoute = (app: OpenAPIHono) => {
           configuredClientId: config.googleClientId,
           transactionSecret: config.stateCookieSecret,
           sessionToken: getSessionTokenFromCookie(c),
+          completeInvite: acceptOrganizationInviteWithOidc,
         }
       )
       if (!result.ok) {

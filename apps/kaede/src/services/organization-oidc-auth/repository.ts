@@ -228,6 +228,21 @@ export const findActiveOidcMembershipLink = async (
     .where('link.revoked_at', 'is', null)
     .executeTakeFirst()
 
+export const revokeActiveOidcMembershipLink = async (
+  providerId: string,
+  identityId: string,
+  revokedAt: Date,
+  executor: DbExecutor
+) =>
+  executor
+    .updateTable('organization_member_oidc_identities')
+    .set({ revoked_at: revokedAt })
+    .where('organization_oidc_provider_id', '=', providerId)
+    .where('oidc_identity_id', '=', identityId)
+    .where('revoked_at', 'is', null)
+    .returningAll()
+    .executeTakeFirst()
+
 export const upsertOidcMembershipLink = async (
   link: Insertable<OrganizationMemberOidcIdentities>,
   executor: DbExecutor
