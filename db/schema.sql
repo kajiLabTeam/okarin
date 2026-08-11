@@ -832,11 +832,27 @@ ALTER TABLE ONLY public.organization_member_oidc_identities
 
 
 --
+-- Name: organization_member_profiles organization_member_profiles_height_meter_bounds_chk; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.organization_member_profiles
+    ADD CONSTRAINT organization_member_profiles_height_meter_bounds_chk CHECK (((height_meters IS NULL) OR (height_meters <= (3)::numeric))) NOT VALID;
+
+
+--
 -- Name: organization_member_profiles organization_member_profiles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.organization_member_profiles
     ADD CONSTRAINT organization_member_profiles_pkey PRIMARY KEY (membership_id);
+
+
+--
+-- Name: organization_member_profiles organization_member_profiles_stride_meter_bounds_chk; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.organization_member_profiles
+    ADD CONSTRAINT organization_member_profiles_stride_meter_bounds_chk CHECK (((stride_length_meters IS NULL) OR (stride_length_meters <= (3)::numeric))) NOT VALID;
 
 
 --
@@ -912,11 +928,27 @@ ALTER TABLE public.organizations
 
 
 --
+-- Name: pedestrians pedestrians_height_meter_bounds_chk; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.pedestrians
+    ADD CONSTRAINT pedestrians_height_meter_bounds_chk CHECK (((height IS NULL) OR ((height > (0)::double precision) AND (height <= (3)::double precision)))) NOT VALID;
+
+
+--
 -- Name: pedestrians pedestrians_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.pedestrians
     ADD CONSTRAINT pedestrians_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: pedestrians pedestrians_stride_meter_bounds_chk; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.pedestrians
+    ADD CONSTRAINT pedestrians_stride_meter_bounds_chk CHECK (((stride_length IS NULL) OR ((stride_length > (0)::double precision) AND (stride_length <= (3)::double precision)))) NOT VALID;
 
 
 --
@@ -2024,4 +2056,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20260811010500'),
     ('20260811010551'),
     ('20260811010552'),
-    ('20260811010553');
+    ('20260811010553'),
+    ('20260812010000');

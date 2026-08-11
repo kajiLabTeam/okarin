@@ -14,6 +14,25 @@ import { resetDatabase } from '../../db/helpers.js'
 const db = createDb()
 const passwordHash = '$argon2id$v=19$m=65536,t=3,p=4$ZHVtbXk$legacy-password-hash'
 
+const withLegacyMeasurementConstraintsDisabled = async (insertRows: () => Promise<void>) => {
+  await sql`
+    ALTER TABLE pedestrians
+      DROP CONSTRAINT pedestrians_height_meter_bounds_chk,
+      DROP CONSTRAINT pedestrians_stride_meter_bounds_chk
+  `.execute(db)
+  try {
+    await insertRows()
+  } finally {
+    await sql`
+      ALTER TABLE pedestrians
+        ADD CONSTRAINT pedestrians_height_meter_bounds_chk
+          CHECK (height IS NULL OR (height > 0 AND height <= 3)) NOT VALID,
+        ADD CONSTRAINT pedestrians_stride_meter_bounds_chk
+          CHECK (stride_length IS NULL OR (stride_length > 0 AND stride_length <= 3)) NOT VALID
+    `.execute(db)
+  }
+}
+
 const createLegacyUserAndMembership = async (suffix: string) => {
   const user = await db
     .insertInto('users')
@@ -111,13 +130,13 @@ describe('multi organization auth backfill', () => {
     expect(memberProfile.stride_length_meters).toBeNull()
   })
 
-  it('normalizes meter and centimeter measurements and reports their classifications', async () => {
+  it('copies meter measurements without guessing another unit', async () => {
     const { organization, user } = await createLegacyUserAndMembership('measurements')
     await db
       .insertInto('pedestrians')
       .values({
         display_name: 'Measured User',
-        height: 170,
+        height: 1.7,
         organization_id: organization.id,
         stride_length: 0.7,
         user_id: user.id,
@@ -125,7 +144,7 @@ describe('multi organization auth backfill', () => {
       .execute()
 
     const report = await getMultiOrgAuthPreflightReport(db)
-    expect(report.measurements).toEqual({ already_m: 1, converted_cm: 1, invalid: 0 })
+    expect(report.measurements).toEqual({ valid_meters: 2, invalid: 0 })
 
     const result = await backfillMultiOrgAuthCore(10, db)
     const profile = await db
@@ -133,22 +152,23 @@ describe('multi organization auth backfill', () => {
       .select(['height_meters', 'stride_length_meters'])
       .executeTakeFirstOrThrow()
     expect(profile).toEqual({ height_meters: '1.700', stride_length_meters: '0.700' })
-    expect(result.measurement_values_already_m).toBe(1)
-    expect(result.measurement_values_converted_cm).toBe(1)
+    expect(result.measurement_values_copied_meters).toBe(2)
   })
 
   it('blocks values that cannot be represented safely after normalization', async () => {
     const { organization, user } = await createLegacyUserAndMembership('invalid-measurement')
-    await db
-      .insertInto('pedestrians')
-      .values({
-        display_name: 'Invalid Measurement',
-        height: 0.0001,
-        organization_id: organization.id,
-        stride_length: 301,
-        user_id: user.id,
-      })
-      .execute()
+    await withLegacyMeasurementConstraintsDisabled(async () => {
+      await db
+        .insertInto('pedestrians')
+        .values({
+          display_name: 'Invalid Measurement',
+          height: 170,
+          organization_id: organization.id,
+          stride_length: 70,
+          user_id: user.id,
+        })
+        .execute()
+    })
 
     const report = await getMultiOrgAuthPreflightReport(db)
     expect(report.measurements.invalid).toBe(2)
@@ -159,16 +179,18 @@ describe('multi organization auth backfill', () => {
 
   it('returns an exact issue count with at most twenty samples', async () => {
     const { organization } = await createLegacyUserAndMembership('bounded-samples')
-    await db
-      .insertInto('pedestrians')
-      .values(
-        Array.from({ length: 25 }, (_, index) => ({
-          display_name: `Invalid ${index}`,
-          height: 301,
-          organization_id: organization.id,
-        }))
-      )
-      .execute()
+    await withLegacyMeasurementConstraintsDisabled(async () => {
+      await db
+        .insertInto('pedestrians')
+        .values(
+          Array.from({ length: 25 }, (_, index) => ({
+            display_name: `Invalid ${index}`,
+            height: 301,
+            organization_id: organization.id,
+          }))
+        )
+        .execute()
+    })
 
     const report = await getMultiOrgAuthPreflightReport(db)
     const issue = report.issues.find(

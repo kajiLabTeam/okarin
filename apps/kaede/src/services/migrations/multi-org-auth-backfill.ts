@@ -23,8 +23,7 @@ export interface PreflightReport {
 }
 
 export interface MeasurementClassification {
-  already_m: number
-  converted_cm: number
+  valid_meters: number
   invalid: number
 }
 
@@ -33,8 +32,7 @@ export interface BackfillResult {
   contact_emails: number
   invite_creators: number
   local_credentials: number
-  measurement_values_already_m: number
-  measurement_values_converted_cm: number
+  measurement_values_copied_meters: number
   memberships: number
   member_profiles: number
   oidc_identities: number
@@ -49,8 +47,7 @@ const emptyResult = (): BackfillResult => ({
   contact_emails: 0,
   invite_creators: 0,
   local_credentials: 0,
-  measurement_values_already_m: 0,
-  measurement_values_converted_cm: 0,
+  measurement_values_copied_meters: 0,
   memberships: 0,
   member_profiles: 0,
   oidc_identities: 0,
@@ -196,8 +193,7 @@ export const getMultiOrgAuthPreflightReport = async (
         {
           blocking: true,
           code: 'PEDESTRIAN_MEASUREMENT_OUT_OF_RANGE',
-          description:
-            'Legacy measurements must be greater than 0 and at most 300 before meter normalization.',
+          description: 'Legacy measurements must be in meters, greater than 0, and at most 3.',
           scope: 'measurements',
         },
         sql<{ sample: string }>`
@@ -205,20 +201,16 @@ export const getMultiOrgAuthPreflightReport = async (
         FROM pedestrians AS p
         WHERE p.height IS NOT NULL
           AND (
-            NOT (p.height > 0 AND p.height <= 300)
-            OR round((CASE WHEN p.height <= 3 THEN p.height ELSE p.height / 100 END)::numeric, 3)
-              <= 0
+            NOT (p.height > 0 AND p.height <= 3)
+            OR round(p.height::numeric, 3) <= 0
           )
         UNION ALL
         SELECT p.id::text || ':stride_length=' || p.stride_length::text AS sample
         FROM pedestrians AS p
         WHERE p.stride_length IS NOT NULL
           AND (
-            NOT (p.stride_length > 0 AND p.stride_length <= 300)
-            OR round((CASE
-                WHEN p.stride_length <= 3 THEN p.stride_length
-                ELSE p.stride_length / 100
-              END)::numeric, 3) <= 0
+            NOT (p.stride_length > 0 AND p.stride_length <= 3)
+            OR round(p.stride_length::numeric, 3) <= 0
           )
       `
       ),
@@ -284,34 +276,20 @@ export const getMultiOrgAuthPreflightReport = async (
                 AND stride_length <= 3
                 AND round(stride_length::numeric, 3) > 0
             )
-        )::integer AS already_m,
-        (
-          count(*) FILTER (
-              WHERE height > 3 AND height <= 300 AND round((height / 100)::numeric, 3) > 0
-            )
-          + count(*) FILTER (
-              WHERE stride_length > 3
-                AND stride_length <= 300
-                AND round((stride_length / 100)::numeric, 3) > 0
-            )
-        )::integer AS converted_cm,
+        )::integer AS valid_meters,
         (
           count(*) FILTER (
               WHERE height IS NOT NULL
                 AND (
-                  NOT (height > 0 AND height <= 300)
-                  OR round((CASE WHEN height <= 3 THEN height ELSE height / 100 END)::numeric, 3)
-                    <= 0
+                  NOT (height > 0 AND height <= 3)
+                  OR round(height::numeric, 3) <= 0
                 )
             )
           + count(*) FILTER (
               WHERE stride_length IS NOT NULL
                 AND (
-                  NOT (stride_length > 0 AND stride_length <= 300)
-                  OR round((CASE
-                      WHEN stride_length <= 3 THEN stride_length
-                      ELSE stride_length / 100
-                    END)::numeric, 3) <= 0
+                  NOT (stride_length > 0 AND stride_length <= 3)
+                  OR round(stride_length::numeric, 3) <= 0
                 )
             )
         )::integer AS invalid
@@ -323,7 +301,7 @@ export const getMultiOrgAuthPreflightReport = async (
   return {
     blocking: issues.some((issue) => issue.blocking),
     issues,
-    measurements: measurementRows.rows[0] ?? { already_m: 0, converted_cm: 0, invalid: 0 },
+    measurements: measurementRows.rows[0] ?? { valid_meters: 0, invalid: 0 },
   }
 }
 
@@ -466,10 +444,8 @@ export const backfillMultiOrgAuthCore = async (
 
   for (;;) {
     const rows = await sql<{
-      height_already_m: boolean
-      height_converted_cm: boolean
-      stride_already_m: boolean
-      stride_converted_cm: boolean
+      height_copied_meters: boolean
+      stride_copied_meters: boolean
     }>`
       WITH target AS (
         SELECT
@@ -494,30 +470,24 @@ export const backfillMultiOrgAuthCore = async (
         height_meters = CASE
           WHEN profile.height_meters IS NOT NULL OR target.height IS NULL
             THEN profile.height_meters
-          WHEN target.height <= 3 THEN round(target.height::numeric, 3)
-          ELSE round((target.height / 100)::numeric, 3)
+          ELSE round(target.height::numeric, 3)
         END,
         stride_length_meters = CASE
           WHEN profile.stride_length_meters IS NOT NULL OR target.stride_length IS NULL
             THEN profile.stride_length_meters
-          WHEN target.stride_length <= 3 THEN round(target.stride_length::numeric, 3)
-          ELSE round((target.stride_length / 100)::numeric, 3)
+          ELSE round(target.stride_length::numeric, 3)
         END
       FROM target
       WHERE profile.membership_id = target.membership_id
       RETURNING
-        target.height_needs_backfill AND target.height <= 3 AS height_already_m,
-        target.height_needs_backfill AND target.height > 3 AS height_converted_cm,
-        target.stride_needs_backfill AND target.stride_length <= 3 AS stride_already_m,
-        target.stride_needs_backfill AND target.stride_length > 3 AS stride_converted_cm
+        target.height_needs_backfill AS height_copied_meters,
+        target.stride_needs_backfill AS stride_copied_meters
     `.execute(executor)
 
     if (rows.rows.length === 0) break
     for (const row of rows.rows) {
-      if (row.height_already_m) result.measurement_values_already_m += 1
-      if (row.height_converted_cm) result.measurement_values_converted_cm += 1
-      if (row.stride_already_m) result.measurement_values_already_m += 1
-      if (row.stride_converted_cm) result.measurement_values_converted_cm += 1
+      if (row.height_copied_meters) result.measurement_values_copied_meters += 1
+      if (row.stride_copied_meters) result.measurement_values_copied_meters += 1
     }
   }
 
@@ -759,8 +729,16 @@ export const validateMultiOrgAuthExpandConstraints = async (
       VALIDATE CONSTRAINT organization_memberships_status_chk;
     ALTER TABLE organization_memberships
       VALIDATE CONSTRAINT organization_memberships_left_at_chk;
+    ALTER TABLE organization_member_profiles
+      VALIDATE CONSTRAINT organization_member_profiles_height_meter_bounds_chk;
+    ALTER TABLE organization_member_profiles
+      VALIDATE CONSTRAINT organization_member_profiles_stride_meter_bounds_chk;
     ALTER TABLE pedestrians
       VALIDATE CONSTRAINT pedestrians_membership_organization_fkey;
+    ALTER TABLE pedestrians
+      VALIDATE CONSTRAINT pedestrians_height_meter_bounds_chk;
+    ALTER TABLE pedestrians
+      VALIDATE CONSTRAINT pedestrians_stride_meter_bounds_chk;
     ALTER TABLE organization_invites
       VALIDATE CONSTRAINT organization_invites_creator_org_fkey;
     ALTER TABLE organization_invites
