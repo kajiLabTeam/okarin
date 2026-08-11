@@ -1,5 +1,6 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
 import { registerAnalysisRunRoutes } from './analysis-runs.js'
+import { registerOrganizationAuthSettingsRoutes } from './auth-settings.js'
 import { registerCreateOrganizationBuildingFloorRoute } from './create-organization-building-floor.js'
 import { registerCreateOrganizationBuildingRoute } from './create-organization-building.js'
 import { registerCreateOrganizationMembershipRoute } from './create-organization-membership.js'
@@ -39,6 +40,7 @@ registerCreateOrganizationUserActivationLinkRoute(organizationsRoutes)
 registerCreateOrganizationMembershipRoute(organizationsRoutes)
 registerCreateStayHeatmapRoute(organizationsRoutes)
 registerAnalysisRunRoutes(organizationsRoutes)
+registerOrganizationAuthSettingsRoutes(organizationsRoutes)
 registerOrganizationMemberProfileRoutes(organizationsRoutes)
 registerOrganizationOidcProviderRoutes(organizationsRoutes)
 registerOrganizationInviteRoutes(organizationsRoutes)
