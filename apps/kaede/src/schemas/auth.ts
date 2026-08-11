@@ -40,15 +40,19 @@ export const authMembershipSchema = z
   })
   .openapi('AuthMembership')
 
+const authUserBaseShape = {
+  user_id: uuidSchema,
+  email: z.string().email().max(255),
+  display_name: z.string().min(1).max(255),
+  global_role: z.enum(['none', 'admin']),
+  status: userStatusSchema,
+  account_state: accountStateSchema,
+  password_changed_at: isoDatetimeSchema.nullable(),
+}
+
 export const authUserSchema = z
   .object({
-    user_id: uuidSchema,
-    email: z.string().email().max(255),
-    display_name: z.string().min(1).max(255),
-    global_role: z.enum(['none', 'admin']),
-    status: userStatusSchema,
-    account_state: accountStateSchema,
-    password_changed_at: isoDatetimeSchema.nullable(),
+    ...authUserBaseShape,
     memberships: z.array(authMembershipSchema),
   })
   .openapi('AuthUser')
@@ -123,11 +127,17 @@ export const authMeMembershipSchema = z
   })
   .openapi('AuthMeMembership')
 
-export const authMeResponseSchema = authUserResponseSchema
-  .extend({
-    user: authUserSchema.extend({
-      memberships: z.array(authMeMembershipSchema),
-    }),
+export const authMeUserSchema = z
+  .object({
+    ...authUserBaseShape,
+    memberships: z.array(authMeMembershipSchema),
+  })
+  .openapi('AuthMeUser')
+
+export const authMeResponseSchema = z
+  .object({
+    session_auth_method: authUserResponseSchema.shape.session_auth_method,
+    user: authMeUserSchema,
   })
   .openapi('AuthMeResponse')
 
