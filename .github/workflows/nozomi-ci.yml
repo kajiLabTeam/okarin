@@ -7,7 +7,7 @@ on:
       - "apps/nozomi/**"
       - ".github/workflows/nozomi-ci.yml"
   pull_request:
-    branches: [main]
+    branches: [main, 219/main]
     paths:
       - "apps/nozomi/**"
       - ".github/workflows/nozomi-ci.yml"
