@@ -17,6 +17,7 @@ import { registerListOrganizationTrajectoriesRoute } from './list-organization-t
 import { registerListOrganizationUsersRoute } from './list-organization-users.js'
 import { registerListOrganizationsRoute } from './list-organizations.js'
 import { registerOrganizationMemberProfileRoutes } from './member-profiles.js'
+import { registerOrganizationOidcProviderRoutes } from './oidc-providers.js'
 
 export const organizationsRoutes = new OpenAPIHono()
 
@@ -38,3 +39,4 @@ registerCreateOrganizationMembershipRoute(organizationsRoutes)
 registerCreateStayHeatmapRoute(organizationsRoutes)
 registerAnalysisRunRoutes(organizationsRoutes)
 registerOrganizationMemberProfileRoutes(organizationsRoutes)
+registerOrganizationOidcProviderRoutes(organizationsRoutes)

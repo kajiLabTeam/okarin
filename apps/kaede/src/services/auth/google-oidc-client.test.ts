@@ -100,6 +100,7 @@ describe('GoogleOidcClient', () => {
     )
 
     await expect(client.verifyIdToken({ idToken, nonce: 'nonce-value' })).resolves.toEqual({
+      issuer: 'https://accounts.google.com',
       sub: 'google-subject',
       email: 'user@example.com',
       emailVerified: true,
@@ -109,5 +110,41 @@ describe('GoogleOidcClient', () => {
     await expect(client.verifyIdToken({ idToken, nonce: 'wrong-nonce' })).rejects.toThrow(
       'Google ID token nonce mismatch'
     )
+  }, 15_000)
+
+  it('Google の issuer alias と複数 audience の authorized party を検証する', async () => {
+    const { publicKey, privateKey } = await generateKeyPair('RS256')
+    const publicJwk = await exportJWK(publicKey)
+    const createToken = (azp: string) =>
+      new SignJWT({
+        sub: 'google-subject',
+        email: 'user@example.com',
+        email_verified: true,
+        nonce: 'nonce-value',
+        azp,
+      })
+        .setProtectedHeader({ alg: 'RS256', kid: 'test-key' })
+        .setIssuedAt()
+        .setIssuer('accounts.google.com')
+        .setAudience(['client-id', 'another-audience'])
+        .setExpirationTime('5m')
+        .sign(privateKey)
+    const client = new GoogleOidcClient(
+      {
+        clientId: 'client-id',
+        clientSecret: 'client-secret',
+        redirectUri: 'https://api.example.test/callback',
+      },
+      {
+        jwks: { keys: [{ ...publicJwk, kid: 'test-key', alg: 'RS256', use: 'sig' }] },
+      }
+    )
+
+    await expect(
+      client.verifyIdToken({ idToken: await createToken('client-id'), nonce: 'nonce-value' })
+    ).resolves.toMatchObject({ issuer: 'accounts.google.com', sub: 'google-subject' })
+    await expect(
+      client.verifyIdToken({ idToken: await createToken('another-client'), nonce: 'nonce-value' })
+    ).rejects.toThrow('Google ID token authorized party mismatch')
   }, 15_000)
 })
