@@ -134,6 +134,18 @@ export const findInviteContextByTokenHashForUpdate = async (
     .executeTakeFirst()
 }
 
+export const findInviteContextByIdForUpdate = async (
+  inviteId: string,
+  organizationId: string,
+  executor: DbExecutor
+) => {
+  return inviteContextQuery(executor)
+    .where('invite.id', '=', inviteId)
+    .where('invite.organization_id', '=', organizationId)
+    .forUpdate('invite')
+    .executeTakeFirst()
+}
+
 export const findMembershipStateForInvite = async (
   organizationId: string,
   userId: string,

@@ -15,6 +15,7 @@ const {
   loginMock,
   logoutMock,
   completeOrganizationOidcMock,
+  acceptOrganizationInviteWithOidcMock,
   isOrganizationOidcTransactionStateMock,
   requireActiveSessionUserMock,
   verifyActivationTokenMock,
@@ -27,6 +28,7 @@ const {
   loginMock: vi.fn(),
   logoutMock: vi.fn(),
   completeOrganizationOidcMock: vi.fn(),
+  acceptOrganizationInviteWithOidcMock: vi.fn(),
   isOrganizationOidcTransactionStateMock: vi.fn(),
   requireActiveSessionUserMock: vi.fn(),
   verifyActivationTokenMock: vi.fn(),
@@ -35,6 +37,10 @@ const {
 vi.mock('../../usecases/organization-oidc-auth/index.js', () => ({
   completeOrganizationOidc: completeOrganizationOidcMock,
   isOrganizationOidcTransactionState: isOrganizationOidcTransactionStateMock,
+}))
+
+vi.mock('../../usecases/organization-invites/index.js', () => ({
+  acceptOrganizationInviteWithOidc: acceptOrganizationInviteWithOidcMock,
 }))
 
 vi.mock('../../services/auth/index.js', () => ({
@@ -434,7 +440,10 @@ describe('auth routes', () => {
     expect(completeOrganizationOidcMock).toHaveBeenCalledWith(
       'authorization-code',
       'organization-state',
-      expect.objectContaining({ sessionToken: undefined })
+      expect.objectContaining({
+        sessionToken: undefined,
+        completeInvite: acceptOrganizationInviteWithOidcMock,
+      })
     )
     expect(completeGoogleOidcLoginMock).not.toHaveBeenCalled()
     expect(completeGoogleOidcLinkMock).not.toHaveBeenCalled()
