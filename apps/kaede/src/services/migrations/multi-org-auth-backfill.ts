@@ -44,11 +44,22 @@ export interface BackfillResult {
 }
 
 export interface OneShotCutoverResult {
+  already_completed: boolean
   auth: BackfillResult
+  bootstrapped_auth_settings: number
+  bootstrapped_oidc_providers: number
   core: BackfillResult
   revoked_sessions: number
   validated: true
 }
+
+export interface LegacyAuthPolicyBootstrap {
+  google_client_id: string
+  local_auth_enabled: boolean
+  oidc_auth_enabled: boolean
+}
+
+const cutoverMigrationName = 'multi-organization-auth-v1'
 
 const emptyResult = (): BackfillResult => ({
   auth_settings_unchanged: 0,
@@ -808,9 +819,90 @@ export const validateMultiOrgAuthExpandConstraints = async (
  */
 export const executeOneShotMultiOrgAuthCutover = async (
   batchSize: number,
-  database: Kysely<DB> = db
+  database: Kysely<DB> = db,
+  bootstrap?: LegacyAuthPolicyBootstrap
 ): Promise<OneShotCutoverResult> =>
   database.transaction().execute(async (trx) => {
+    await sql`SELECT pg_advisory_xact_lock(hashtext(${cutoverMigrationName}))`.execute(trx)
+
+    const completed = await sql<{ completed: boolean }>`
+      SELECT EXISTS (
+        SELECT 1 FROM application_data_migrations WHERE name = ${cutoverMigrationName}
+      ) AS completed
+    `.execute(trx)
+    if (completed.rows[0]?.completed) {
+      return {
+        already_completed: true,
+        auth: emptyResult(),
+        bootstrapped_auth_settings: 0,
+        bootstrapped_oidc_providers: 0,
+        core: emptyResult(),
+        revoked_sessions: 0,
+        validated: true,
+      }
+    }
+
+    let bootstrappedAuthSettings = 0
+    let bootstrappedOidcProviders = 0
+    if (bootstrap) {
+      if (!bootstrap.local_auth_enabled && !bootstrap.oidc_auth_enabled) {
+        throw new Error('one-shot cutover requires at least one enabled authentication method')
+      }
+
+      const settings = await sql<{ organization_id: string }>`
+        INSERT INTO organization_auth_settings (
+          organization_id,
+          local_auth_enabled,
+          oidc_auth_enabled,
+          membership_grant_ttl_seconds,
+          reauthentication_interval_seconds
+        )
+        SELECT id, ${bootstrap.local_auth_enabled}, ${bootstrap.oidc_auth_enabled}, 28800, 14400
+        FROM organizations
+        ON CONFLICT (organization_id) DO NOTHING
+        RETURNING organization_id
+      `.execute(trx)
+      bootstrappedAuthSettings = settings.rows.length
+
+      if (bootstrap.oidc_auth_enabled) {
+        if (!bootstrap.google_client_id) {
+          throw new Error('one-shot OIDC cutover requires the configured Google client id')
+        }
+        const providers = await sql<{ id: string }>`
+          INSERT INTO organization_oidc_providers (
+            organization_id,
+            name,
+            issuer,
+            client_id,
+            client_secret_ref,
+            scopes,
+            allowed_hosted_domains,
+            enabled
+          )
+          SELECT
+            settings.organization_id,
+            'Google',
+            ${canonicalGoogleIssuer},
+            ${bootstrap.google_client_id},
+            NULL,
+            ARRAY['openid', 'email', 'profile']::text[],
+            NULL,
+            true
+          FROM organization_auth_settings AS settings
+          WHERE settings.oidc_auth_enabled
+            AND NOT EXISTS (
+              SELECT 1
+              FROM organization_oidc_providers AS provider
+              WHERE provider.organization_id = settings.organization_id
+                AND provider.issuer = ${canonicalGoogleIssuer}
+                AND provider.enabled
+            )
+          RETURNING id
+        `.execute(trx)
+        bootstrappedOidcProviders = providers.rows.length
+      }
+    }
+
     const preflight = await getMultiOrgAuthPreflightReport(trx)
     if (preflight.blocking) {
       throw new Error(
@@ -848,8 +940,22 @@ export const executeOneShotMultiOrgAuthCutover = async (
       RETURNING id
     `.execute(trx)
 
+    const cutoverDetails = JSON.stringify({
+      revoked_sessions: revokedSessions.rows.length,
+      bootstrapped_auth_settings: bootstrappedAuthSettings,
+      bootstrapped_oidc_providers: bootstrappedOidcProviders,
+    })
+
+    await sql`
+      INSERT INTO application_data_migrations (name, details)
+      VALUES (${cutoverMigrationName}, ${cutoverDetails}::jsonb)
+    `.execute(trx)
+
     return {
+      already_completed: false,
       auth,
+      bootstrapped_auth_settings: bootstrappedAuthSettings,
+      bootstrapped_oidc_providers: bootstrappedOidcProviders,
       core,
       revoked_sessions: revokedSessions.rows.length,
       validated: true,

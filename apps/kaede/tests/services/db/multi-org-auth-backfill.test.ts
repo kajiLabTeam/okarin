@@ -403,17 +403,7 @@ describe('multi organization auth backfill', () => {
   })
 
   it('migrates all rows and revokes legacy sessions in one cutover transaction', async () => {
-    const { organization, user } = await createLegacyUserAndMembership('one-shot')
-    await db
-      .insertInto('organization_auth_settings')
-      .values({
-        local_auth_enabled: true,
-        membership_grant_ttl_seconds: 3600,
-        oidc_auth_enabled: false,
-        organization_id: organization.id,
-        reauthentication_interval_seconds: 1800,
-      })
-      .execute()
+    const { user } = await createLegacyUserAndMembership('one-shot')
     await db
       .insertInto('sessions')
       .values({
@@ -423,10 +413,16 @@ describe('multi organization auth backfill', () => {
       })
       .execute()
 
-    const result = await executeOneShotMultiOrgAuthCutover(1, db)
+    const result = await executeOneShotMultiOrgAuthCutover(1, db, {
+      google_client_id: '',
+      local_auth_enabled: true,
+      oidc_auth_enabled: false,
+    })
 
     expect(result).toMatchObject({
+      already_completed: false,
       auth: { local_credentials: 1 },
+      bootstrapped_auth_settings: 1,
       core: { memberships: 1, user_profiles: 1 },
       revoked_sessions: 1,
       validated: true,
@@ -437,5 +433,27 @@ describe('multi organization auth backfill', () => {
     await expect(
       db.selectFrom('organization_local_credentials').select('id').executeTakeFirstOrThrow()
     ).resolves.toEqual({ id: expect.any(String) })
+
+    await db
+      .insertInto('sessions')
+      .values({
+        expires_at: new Date('2026-08-20T00:00:00.000Z'),
+        session_hash: 'post-cutover-session-hash',
+        user_id: user.id,
+      })
+      .execute()
+    const repeated = await executeOneShotMultiOrgAuthCutover(1, db, {
+      google_client_id: '',
+      local_auth_enabled: true,
+      oidc_auth_enabled: false,
+    })
+    expect(repeated).toMatchObject({ already_completed: true, revoked_sessions: 0 })
+    await expect(
+      db
+        .selectFrom('sessions')
+        .select('revoked_at')
+        .where('session_hash', '=', 'post-cutover-session-hash')
+        .executeTakeFirstOrThrow()
+    ).resolves.toEqual({ revoked_at: null })
   })
 })

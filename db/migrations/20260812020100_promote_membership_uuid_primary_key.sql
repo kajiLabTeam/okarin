@@ -2,6 +2,20 @@
 
 SET LOCAL lock_timeout = '5s';
 
+-- dbmate applies all pending migrations in one run. Populate the fields needed
+-- by the primary-key change here so the schema can be promoted before the
+-- application-level one-shot cutover migrates profiles and credentials.
+UPDATE organizations
+SET status = 'active'
+WHERE status IS NULL;
+
+UPDATE organization_memberships
+SET
+  id = COALESCE(id, gen_random_uuid()),
+  status = COALESCE(status, 'active'),
+  joined_at = COALESCE(joined_at, created_at)
+WHERE id IS NULL OR status IS NULL OR joined_at IS NULL;
+
 DO $$
 BEGIN
   IF EXISTS (
