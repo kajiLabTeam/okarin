@@ -16,7 +16,9 @@ export type MembershipGrantAuthorization =
       role: MembershipRole
       authMethod: MembershipGrantAuthMethod
       authenticatedAt: Date
+      reauthenticationRequiredAt: Date
       expiresAt: Date
+      effectiveExpiresAt: Date
     }
   | { ok: false; type: 'organization_forbidden' }
   | { ok: false; type: 'role_forbidden'; membershipId: string }
@@ -36,10 +38,12 @@ const roleRanks = {
 
 const isMembershipRole = (role: string): role is MembershipRole => role in roleRanks
 
-const allowedAuthMethods = (context: MembershipGrantContext): MembershipGrantAuthMethod[] => {
+export const membershipAllowedAuthMethods = (
+  context: MembershipGrantContext
+): MembershipGrantAuthMethod[] => {
   const methods: MembershipGrantAuthMethod[] = []
   if (context.local_auth_enabled) methods.push('local')
-  if (context.oidc_auth_enabled) methods.push('oidc')
+  if (context.oidc_auth_enabled && context.has_enabled_oidc_provider) methods.push('oidc')
   return methods
 }
 
@@ -50,6 +54,7 @@ export const evaluateMembershipGrant = (
 ): MembershipGrantAuthorization => {
   if (
     context?.organization_status !== 'active' ||
+    !context.auth_settings_available ||
     context.membership_status !== 'active' ||
     context.membership_left_at !== null ||
     !isMembershipRole(context.membership_role)
@@ -64,14 +69,15 @@ export const evaluateMembershipGrant = (
     type: 'reauthentication_required',
     membershipId: context.membership_id,
     reason,
-    allowedAuthMethods: allowedAuthMethods(context),
+    allowedAuthMethods: membershipAllowedAuthMethods(context),
   })
 
   if (
     !context.grant_auth_method ||
     !context.grant_policy_version ||
     !context.grant_authenticated_at ||
-    !context.grant_expires_at
+    !context.grant_expires_at ||
+    context.reauthentication_interval_seconds === null
   ) {
     return reauthenticationRequired('grant_missing')
   }
@@ -105,12 +111,21 @@ export const evaluateMembershipGrant = (
     return { ok: false, type: 'role_forbidden', membershipId: context.membership_id }
   }
 
+  const reauthenticationRequiredAt = new Date(
+    context.grant_authenticated_at.getTime() + context.reauthentication_interval_seconds * 1000
+  )
+
   return {
     ok: true,
     membershipId: context.membership_id,
     role: context.membership_role,
     authMethod: context.grant_auth_method as MembershipGrantAuthMethod,
     authenticatedAt: context.grant_authenticated_at,
+    reauthenticationRequiredAt,
     expiresAt: context.grant_expires_at,
+    effectiveExpiresAt:
+      reauthenticationRequiredAt <= context.grant_expires_at
+        ? reauthenticationRequiredAt
+        : context.grant_expires_at,
   }
 }

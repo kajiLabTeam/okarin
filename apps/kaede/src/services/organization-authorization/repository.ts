@@ -1,3 +1,4 @@
+import { sql } from 'kysely'
 import { db } from '../db/index.js'
 import type { DbExecutor } from '../executor.js'
 
@@ -5,15 +6,19 @@ export type MembershipGrantAuthMethod = 'local' | 'oidc'
 
 export interface MembershipGrantContext {
   organization_id: string
+  organization_name: string
+  organization_slug: string
   membership_id: string
   membership_role: string
   membership_status: string
   membership_left_at: Date | null
   organization_status: string | null
-  local_auth_enabled: boolean
-  oidc_auth_enabled: boolean
-  current_policy_version: string
-  reauthentication_interval_seconds: number
+  auth_settings_available: boolean
+  local_auth_enabled: boolean | null
+  oidc_auth_enabled: boolean | null
+  has_enabled_oidc_provider: boolean
+  current_policy_version: string | null
+  reauthentication_interval_seconds: number | null
   grant_auth_method: string | null
   grant_policy_version: string | null
   grant_authenticated_at: Date | null
@@ -28,7 +33,7 @@ const membershipGrantContextQuery = (sessionId: string, userId: string, executor
   executor
     .selectFrom('organization_memberships as membership')
     .innerJoin('organizations as organization', 'organization.id', 'membership.organization_id')
-    .innerJoin(
+    .leftJoin(
       'organization_auth_settings as auth_settings',
       'auth_settings.organization_id',
       'membership.organization_id'
@@ -54,13 +59,22 @@ const membershipGrantContextQuery = (sessionId: string, userId: string, executor
     )
     .select([
       'membership.organization_id',
+      'organization.name as organization_name',
+      'organization.slug as organization_slug',
       'membership.id as membership_id',
       'membership.role as membership_role',
       'membership.status as membership_status',
       'membership.left_at as membership_left_at',
       'organization.status as organization_status',
+      sql<boolean>`auth_settings.organization_id IS NOT NULL`.as('auth_settings_available'),
       'auth_settings.local_auth_enabled',
       'auth_settings.oidc_auth_enabled',
+      sql<boolean>`EXISTS (
+        SELECT 1
+        FROM organization_oidc_providers AS available_provider
+        WHERE available_provider.organization_id = membership.organization_id
+          AND available_provider.enabled = true
+      )`.as('has_enabled_oidc_provider'),
       'auth_settings.policy_version as current_policy_version',
       'auth_settings.reauthentication_interval_seconds',
       'grant.auth_method as grant_auth_method',

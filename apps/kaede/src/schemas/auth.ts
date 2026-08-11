@@ -67,6 +67,70 @@ export const authUserResponseSchema = z
   })
   .openapi('AuthUserResponse')
 
+export const authMeGrantStateSchema = z
+  .discriminatedUnion('status', [
+    z.object({
+      status: z.literal('granted'),
+      reason: z.null(),
+      auth_method: z.enum(['local', 'oidc']),
+      authenticated_at: isoDatetimeSchema,
+      reauthentication_required_at: isoDatetimeSchema,
+      expires_at: isoDatetimeSchema,
+      effective_expires_at: isoDatetimeSchema,
+    }),
+    z.object({
+      status: z.literal('reauthentication_required'),
+      reason: z.enum([
+        'grant_missing',
+        'grant_revoked',
+        'grant_expired',
+        'reauthentication_interval_elapsed',
+        'policy_changed',
+        'auth_method_not_allowed',
+      ]),
+      auth_method: z.enum(['local', 'oidc']).nullable(),
+      authenticated_at: isoDatetimeSchema.nullable(),
+      reauthentication_required_at: isoDatetimeSchema.nullable(),
+      expires_at: isoDatetimeSchema.nullable(),
+      effective_expires_at: isoDatetimeSchema.nullable(),
+    }),
+    z.object({
+      status: z.literal('forbidden'),
+      reason: z.enum([
+        'membership_suspended',
+        'organization_unavailable',
+        'auth_settings_unavailable',
+      ]),
+      auth_method: z.null(),
+      authenticated_at: z.null(),
+      reauthentication_required_at: z.null(),
+      expires_at: z.null(),
+      effective_expires_at: z.null(),
+    }),
+  ])
+  .openapi('AuthMeGrantState')
+
+export const authMeMembershipSchema = z
+  .object({
+    membership_id: uuidSchema,
+    organization_id: uuidSchema,
+    organization_name: z.string().min(1).max(255),
+    organization_slug: z.string().min(1).max(63),
+    role: membershipRoleSchema,
+    status: z.enum(['active', 'suspended']),
+    allowed_auth_methods: z.array(z.enum(['local', 'oidc'])),
+    grant_state: authMeGrantStateSchema,
+  })
+  .openapi('AuthMeMembership')
+
+export const authMeResponseSchema = authUserResponseSchema
+  .extend({
+    user: authUserSchema.extend({
+      memberships: z.array(authMeMembershipSchema),
+    }),
+  })
+  .openapi('AuthMeResponse')
+
 export const changePasswordRequestSchema = z
   .object({
     current_password: z.string().min(1).max(100),
@@ -112,5 +176,6 @@ export type ActivationCompleteRequest = z.infer<typeof activationCompleteRequest
 export type ActivationVerifyRequest = z.infer<typeof activationVerifyRequestSchema>
 export type ActivationVerifyResponse = z.infer<typeof activationVerifyResponseSchema>
 export type AuthUserResponse = z.infer<typeof authUserResponseSchema>
+export type AuthMeResponse = z.infer<typeof authMeResponseSchema>
 export type ChangePasswordRequest = z.infer<typeof changePasswordRequestSchema>
 export type LoginRequest = z.infer<typeof loginRequestSchema>

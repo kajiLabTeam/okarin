@@ -7,13 +7,20 @@ import { getRuntimeConfig } from './config/runtime.js'
 import { organizationAuthorizationMiddleware } from './middleware/organization-authorization.js'
 import { requestActorMiddleware } from './middleware/request-actor.js'
 import { registerApiRoutes } from './routes/index.js'
+import { organizationAuthMethodsRoutes } from './routes/organization-auth-methods/index.js'
 import { organizationInvitesRoutes } from './routes/organization-invites/index.js'
 import { organizationLocalAuthRoutes } from './routes/organization-local-auth/index.js'
 import { organizationOidcAuthRoutes } from './routes/organization-oidc-auth/index.js'
 import { organizationSessionAuthRoutes } from './routes/organization-session-auth/index.js'
+import { organizationAuthorizationErrorResponseSchema } from './schemas/common.js'
 
 export const createApp = () => {
   const app = new OpenAPIHono()
+  // Middleware responseは個別route handlerに紐づかないため、Mio向けcomponentを明示登録する。
+  app.openAPIRegistry.register(
+    'OrganizationAuthorizationErrorResponse',
+    organizationAuthorizationErrorResponseSchema
+  )
   const runtimeConfig = getRuntimeConfig()
   const deployRef = runtimeConfig.app.deployRef
   const revision = runtimeConfig.app.revision
@@ -42,6 +49,8 @@ export const createApp = () => {
   app.route('/api/organizations', organizationOidcAuthRoutes)
   // Grantが失効済みでも対象Organizationからlogoutできるよう、Membership Guardより前に手動でSessionを検証する。
   app.route('/api/organizations', organizationSessionAuthRoutes)
+  // 認証前にも必要なため、global Session / Membership grant middlewareより先に公開する。
+  app.route('/api/organizations', organizationAuthMethodsRoutes)
   // 招待確認・Local招待受領はSessionなしでも利用する。
   app.route('/api/invites', organizationInvitesRoutes)
 

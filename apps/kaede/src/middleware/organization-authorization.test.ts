@@ -19,13 +19,17 @@ const now = new Date('2026-08-11T12:00:00.000Z')
 
 const activeContext = {
   organization_id: organizationId,
+  organization_name: 'Example',
+  organization_slug: 'example',
   membership_id: membershipId,
   membership_role: 'manager',
   membership_status: 'active',
   membership_left_at: null,
   organization_status: 'active',
+  auth_settings_available: true,
   local_auth_enabled: true,
   oidc_auth_enabled: true,
+  has_enabled_oidc_provider: true,
   current_policy_version: '2',
   reauthentication_interval_seconds: 7200,
   grant_auth_method: 'local',

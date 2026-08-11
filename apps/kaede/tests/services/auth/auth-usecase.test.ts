@@ -1042,10 +1042,11 @@ describe('auth usecase', () => {
       .values({ name: 'Missing Grant Organization' })
       .returningAll()
       .executeTakeFirstOrThrow()
-    await db
+    const secondMembership = await db
       .insertInto('organization_memberships')
       .values({ organization_id: secondOrganization.id, user_id: user.id, role: 'manager' })
-      .execute()
+      .returningAll()
+      .executeTakeFirstOrThrow()
     await db
       .insertInto('organization_auth_settings')
       .values({
@@ -1056,35 +1057,121 @@ describe('auth usecase', () => {
         reauthentication_interval_seconds: 3600,
       })
       .execute()
+    const missingSettingsOrganization = await db
+      .insertInto('organizations')
+      .values({ name: 'Missing Settings Organization' })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    const missingSettingsMembership = await db
+      .insertInto('organization_memberships')
+      .values({
+        organization_id: missingSettingsOrganization.id,
+        user_id: user.id,
+        role: 'member',
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    const suspendedOrganization = await db
+      .insertInto('organizations')
+      .values({ name: 'Suspended Membership Organization' })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    const suspendedMembership = await db
+      .insertInto('organization_memberships')
+      .values({
+        organization_id: suspendedOrganization.id,
+        user_id: user.id,
+        role: 'member',
+        status: 'suspended',
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    await db
+      .insertInto('organization_auth_settings')
+      .values({
+        organization_id: suspendedOrganization.id,
+        local_auth_enabled: true,
+        oidc_auth_enabled: false,
+        membership_grant_ttl_seconds: 7200,
+        reauthentication_interval_seconds: 3600,
+      })
+      .execute()
 
     const result = await getMe(token, new Date('2026-08-11T11:30:00.000Z'), db)
 
-    expect(result).toMatchObject({
-      ok: true,
-      value: {
-        user: {
-          memberships: [
-            {
-              organization_id: organization.id,
-              grant_state: {
-                status: 'granted',
-                auth_method: 'local',
-                authenticated_at: '2026-08-11T11:00:00.000Z',
-                expires_at: '2026-08-11T13:00:00.000Z',
-              },
-            },
-            {
-              organization_id: secondOrganization.id,
-              grant_state: {
-                status: 'reauthentication_required',
-                reason: 'grant_missing',
-                allowed_auth_methods: ['local'],
-              },
-            },
-          ],
-        },
-      },
-    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.user.memberships).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          membership_id: membership.id,
+          organization_id: organization.id,
+          organization_name: organization.name,
+          organization_slug: organization.slug,
+          role: 'member',
+          status: 'active',
+          allowed_auth_methods: ['local'],
+          grant_state: {
+            status: 'granted',
+            reason: null,
+            auth_method: 'local',
+            authenticated_at: '2026-08-11T11:00:00.000Z',
+            reauthentication_required_at: '2026-08-11T12:00:00.000Z',
+            expires_at: '2026-08-11T13:00:00.000Z',
+            effective_expires_at: '2026-08-11T12:00:00.000Z',
+          },
+        }),
+        expect.objectContaining({
+          membership_id: secondMembership.id,
+          organization_id: secondOrganization.id,
+          organization_slug: secondOrganization.slug,
+          role: 'manager',
+          status: 'active',
+          allowed_auth_methods: ['local'],
+          grant_state: {
+            status: 'reauthentication_required',
+            reason: 'grant_missing',
+            auth_method: null,
+            authenticated_at: null,
+            reauthentication_required_at: null,
+            expires_at: null,
+            effective_expires_at: null,
+          },
+        }),
+        expect.objectContaining({
+          membership_id: missingSettingsMembership.id,
+          organization_id: missingSettingsOrganization.id,
+          organization_slug: missingSettingsOrganization.slug,
+          status: 'active',
+          allowed_auth_methods: [],
+          grant_state: {
+            status: 'forbidden',
+            reason: 'auth_settings_unavailable',
+            auth_method: null,
+            authenticated_at: null,
+            reauthentication_required_at: null,
+            expires_at: null,
+            effective_expires_at: null,
+          },
+        }),
+        expect.objectContaining({
+          membership_id: suspendedMembership.id,
+          organization_id: suspendedOrganization.id,
+          organization_slug: suspendedOrganization.slug,
+          status: 'suspended',
+          allowed_auth_methods: [],
+          grant_state: {
+            status: 'forbidden',
+            reason: 'membership_suspended',
+            auth_method: null,
+            authenticated_at: null,
+            reauthentication_required_at: null,
+            expires_at: null,
+            effective_expires_at: null,
+          },
+        }),
+      ])
+    )
   })
 
   it('verifyActivationToken は valid token の表示情報を返し token を consume しない', async () => {
