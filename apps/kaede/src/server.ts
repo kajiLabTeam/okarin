@@ -10,6 +10,7 @@ import { registerApiRoutes } from './routes/index.js'
 import { organizationInvitesRoutes } from './routes/organization-invites/index.js'
 import { organizationLocalAuthRoutes } from './routes/organization-local-auth/index.js'
 import { organizationOidcAuthRoutes } from './routes/organization-oidc-auth/index.js'
+import { organizationSessionAuthRoutes } from './routes/organization-session-auth/index.js'
 
 export const createApp = () => {
   const app = new OpenAPIHono()
@@ -39,6 +40,8 @@ export const createApp = () => {
   // Local loginはSessionなしでも利用でき、Sessionがある場合だけreauthenticateとして扱う。
   app.route('/api/organizations', organizationLocalAuthRoutes)
   app.route('/api/organizations', organizationOidcAuthRoutes)
+  // Grantが失効済みでも対象Organizationからlogoutできるよう、Membership Guardより前に手動でSessionを検証する。
+  app.route('/api/organizations', organizationSessionAuthRoutes)
   // 招待確認・Local招待受領はSessionなしでも利用する。
   app.route('/api/invites', organizationInvitesRoutes)
 
