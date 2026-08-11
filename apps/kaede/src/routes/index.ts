@@ -11,6 +11,7 @@ import { pedestriansRoutes } from './pedestrians/index.js'
 import { platformRoutes } from './platform/index.js'
 import { recordingsRoutes } from './recordings/index.js'
 import { trajectoriesRoutes } from './trajectories/index.js'
+import { usersRoutes } from './users/index.js'
 
 export const registerApiRoutes = (app: OpenAPIHono) => {
   const api = new OpenAPIHono()
@@ -27,6 +28,7 @@ export const registerApiRoutes = (app: OpenAPIHono) => {
   api.route('/platform', platformRoutes)
   api.route('/recordings', recordingsRoutes)
   api.route('/trajectories', trajectoriesRoutes)
+  api.route('/users', usersRoutes)
 
   app.route('/api', api)
 }

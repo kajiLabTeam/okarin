@@ -4,10 +4,11 @@ import { timingSafeEqual } from 'node:crypto'
 import { sessionCookieName } from '../routes/auth/cookie.js'
 import { toAuthErrorResponse } from '../schemas/common.js'
 import { findValidSessionByToken } from '../services/auth/index.js'
+import { hasLocalAuthenticationGrantBySessionId } from '../services/organization-local-auth/index.js'
 import { findUserById, listUserOrganizationMemberships } from '../services/users/index.js'
 import { deriveAccountState } from '../usecases/authorization.js'
 import type { RequestActorHonoEnv } from './request-actor-context.js'
-import { setRequestActor } from './request-actor-context.js'
+import { setRequestActor, setRequestSessionId } from './request-actor-context.js'
 export type {
   RequestActor,
   RequestActorHonoEnv,
@@ -16,7 +17,13 @@ export type {
   UserActorMembership,
   UserRequestActor,
 } from './request-actor-context.js'
-export { getRequestActor, requireRequestActor, setRequestActor } from './request-actor-context.js'
+export {
+  getRequestActor,
+  getRequestSessionId,
+  requireRequestActor,
+  setRequestActor,
+  setRequestSessionId,
+} from './request-actor-context.js'
 
 type RequestActorContext = Context<RequestActorHonoEnv>
 
@@ -130,7 +137,12 @@ export const requestActorMiddleware = ({
     }
 
     if (sessionResult.session.auth_method === 'password' && !user.password_hash) {
-      return authError(c, 'AUTH_PASSWORD_CHANGE_REQUIRED')
+      const isMembershipLocalSession = await hasLocalAuthenticationGrantBySessionId(
+        sessionResult.session.id
+      )
+      if (!isMembershipLocalSession) {
+        return authError(c, 'AUTH_PASSWORD_CHANGE_REQUIRED')
+      }
     }
 
     const memberships = await listUserOrganizationMemberships(user.id)
@@ -151,6 +163,7 @@ export const requestActorMiddleware = ({
         role: membership.role as 'member' | 'manager' | 'owner',
       })),
     })
+    setRequestSessionId(c, sessionResult.session.id)
 
     await next()
   }

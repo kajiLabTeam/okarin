@@ -36,6 +36,7 @@ import {
   findOrganizationCreationRequestByIdForUpdate,
   findPendingOrganizationCreationRequestByRequester,
   findOrganizationById,
+  insertDefaultOrganizationAuthSettings,
   insertOrganization,
   insertOrganizationCreationRequest,
   listOrganizationCreationRequests,
@@ -143,6 +144,7 @@ const requirePedestrianOrganizationId = (
 }
 
 const toOrganizationUserResponse = (row: OrganizationUserRow): OrganizationUserResponse => ({
+  membership_id: row.membership_id,
   user_id: row.user_id,
   email: row.email,
   display_name: row.display_name,
@@ -581,12 +583,16 @@ export const createOrganizationForSession = async (
     return admin
   }
 
-  const organization = await insertOrganization(
-    {
-      name: payload.name.trim(),
-    },
-    executor
-  )
+  const organization = await runInTransaction(executor, async (trx) => {
+    const created = await insertOrganization(
+      {
+        name: payload.name.trim(),
+      },
+      trx
+    )
+    await insertDefaultOrganizationAuthSettings(created.id, trx)
+    return created
+  })
 
   return {
     ok: true,
@@ -786,6 +792,8 @@ export const approveOrganizationCreationRequestForAdminSession = async (
       },
       trx
     )
+
+    await insertDefaultOrganizationAuthSettings(organization.id, trx)
 
     await insertOrganizationMembership(
       {

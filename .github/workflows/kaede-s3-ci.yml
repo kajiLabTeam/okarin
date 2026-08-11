@@ -7,7 +7,7 @@ on:
       - "apps/kaede/**"
       - ".github/workflows/kaede-s3-ci.yml"
   pull_request:
-    branches: [main]
+    branches: [main, 219/main]
     paths:
       - "apps/kaede/**"
       - ".github/workflows/kaede-s3-ci.yml"

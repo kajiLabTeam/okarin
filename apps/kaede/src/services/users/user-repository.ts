@@ -10,6 +10,7 @@ export type NewOrganizationMembership = Insertable<OrganizationMemberships>
 export type OrganizationMembership = Selectable<OrganizationMemberships>
 
 export interface OrganizationUserRow {
+  membership_id: string
   user_id: string
   email: string
   display_name: string
@@ -69,6 +70,7 @@ export const findOrganizationMembership = async (
     .selectAll()
     .where('organization_id', '=', organizationId)
     .where('user_id', '=', userId)
+    .where('status', '=', 'active')
     .executeTakeFirst()
 }
 
@@ -91,9 +93,12 @@ export const upsertOrganizationMembership = async (
     .insertInto('organization_memberships')
     .values(membership)
     .onConflict((oc) =>
-      oc.columns(['organization_id', 'user_id']).doUpdateSet({
-        role: membership.role,
-      })
+      oc
+        .columns(['organization_id', 'user_id'])
+        .where('status', 'in', ['active', 'suspended'])
+        .doUpdateSet({
+          role: membership.role,
+        })
     )
     .returningAll()
     .executeTakeFirstOrThrow()
@@ -105,6 +110,7 @@ const organizationUsersQuery = (executor: DbExecutor) =>
     .innerJoin('users as user', 'user.id', 'membership.user_id')
     .leftJoin('pedestrians as pedestrian', 'pedestrian.user_id', 'user.id')
     .select([
+      'membership.id as membership_id',
       'user.id as user_id',
       'user.email as email',
       'user.display_name as display_name',
@@ -122,6 +128,7 @@ const organizationUsersQuery = (executor: DbExecutor) =>
       'pedestrian.created_at as pedestrian_created_at',
       'pedestrian.updated_at as pedestrian_updated_at',
     ])
+    .where('membership.status', 'in', ['active', 'suspended'])
 
 export const listOrganizationUsers = async (
   organizationId: string,
@@ -158,6 +165,7 @@ export const listUserOrganizationMemberships = async (
       'membership.role as role',
     ])
     .where('membership.user_id', '=', userId)
+    .where('membership.status', 'in', ['active', 'suspended'])
     .orderBy('organization.name', 'asc')
     .execute()
 }

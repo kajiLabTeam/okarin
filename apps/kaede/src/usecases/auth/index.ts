@@ -3,6 +3,7 @@ import type {
   ActivationCompleteRequest,
   ActivationVerifyRequest,
   ActivationVerifyResponse,
+  AuthMeResponse,
   AuthUserResponse,
   ChangePasswordRequest,
   LoginRequest,
@@ -28,6 +29,12 @@ import {
 import { hashPassword, verifyPassword } from '../../services/auth/password.js'
 import { db } from '../../services/db/index.js'
 import type { DbExecutor } from '../../services/executor.js'
+import {
+  evaluateMembershipGrant,
+  listMembershipGrantContexts,
+  membershipAllowedAuthMethods,
+} from '../../services/organization-authorization/index.js'
+import type { MembershipGrantContext } from '../../services/organization-authorization/index.js'
 import {
   findUserByEmail,
   findUserById,
@@ -72,6 +79,10 @@ export type ActiveSessionUserResult =
       ok: false
       error: ActiveSessionUserError
     }
+
+export type GetMeResult =
+  | { ok: true; value: AuthMeResponse }
+  | { ok: false; error: ActiveSessionUserError }
 
 export interface LoginResultValue extends AuthUserResponse {
   sessionToken: string
@@ -192,6 +203,147 @@ const buildAuthUserResponse = async (
         organization_id: membership.organization_id,
         organization_name: membership.organization_name,
         role: membership.role as 'member' | 'manager' | 'owner',
+      })),
+    },
+  }
+}
+
+const grantTimeline = (context: MembershipGrantContext) => {
+  const authenticatedAt = context.grant_authenticated_at
+  const expiresAt = context.grant_expires_at
+  const intervalSeconds = context.reauthentication_interval_seconds
+  if (!authenticatedAt || !expiresAt || intervalSeconds === null) {
+    return {
+      authenticated_at: null,
+      reauthentication_required_at: null,
+      expires_at: expiresAt?.toISOString() ?? null,
+      effective_expires_at: null,
+    }
+  }
+
+  const reauthenticationRequiredAt = new Date(authenticatedAt.getTime() + intervalSeconds * 1000)
+  const effectiveExpiresAt =
+    reauthenticationRequiredAt <= expiresAt ? reauthenticationRequiredAt : expiresAt
+  return {
+    authenticated_at: authenticatedAt.toISOString(),
+    reauthentication_required_at: reauthenticationRequiredAt.toISOString(),
+    expires_at: expiresAt.toISOString(),
+    effective_expires_at: effectiveExpiresAt.toISOString(),
+  }
+}
+
+const membershipGrantState = (
+  context: MembershipGrantContext,
+  now: Date
+): AuthMeResponse['user']['memberships'][number]['grant_state'] => {
+  if (context.membership_status === 'suspended') {
+    return {
+      status: 'forbidden',
+      reason: 'membership_suspended',
+      auth_method: null,
+      authenticated_at: null,
+      reauthentication_required_at: null,
+      expires_at: null,
+      effective_expires_at: null,
+    }
+  }
+  if (context.organization_status !== 'active') {
+    return {
+      status: 'forbidden',
+      reason: 'organization_unavailable',
+      auth_method: null,
+      authenticated_at: null,
+      reauthentication_required_at: null,
+      expires_at: null,
+      effective_expires_at: null,
+    }
+  }
+  if (!context.auth_settings_available) {
+    return {
+      status: 'forbidden',
+      reason: 'auth_settings_unavailable',
+      auth_method: null,
+      authenticated_at: null,
+      reauthentication_required_at: null,
+      expires_at: null,
+      effective_expires_at: null,
+    }
+  }
+
+  const authorization = evaluateMembershipGrant(context, 'member', now)
+  if (authorization.ok) {
+    return {
+      status: 'granted',
+      reason: null,
+      auth_method: authorization.authMethod,
+      authenticated_at: authorization.authenticatedAt.toISOString(),
+      reauthentication_required_at: authorization.reauthenticationRequiredAt.toISOString(),
+      expires_at: authorization.expiresAt.toISOString(),
+      effective_expires_at: authorization.effectiveExpiresAt.toISOString(),
+    }
+  }
+
+  if (authorization.type === 'reauthentication_required') {
+    const timeline = grantTimeline(context)
+    return {
+      status: 'reauthentication_required',
+      reason: authorization.reason,
+      auth_method:
+        context.grant_auth_method === 'local' || context.grant_auth_method === 'oidc'
+          ? context.grant_auth_method
+          : null,
+      ...timeline,
+    }
+  }
+
+  return {
+    status: 'forbidden',
+    reason: 'organization_unavailable',
+    auth_method: null,
+    authenticated_at: null,
+    reauthentication_required_at: null,
+    expires_at: null,
+    effective_expires_at: null,
+  }
+}
+
+const buildAuthMeResponse = async (
+  user: User,
+  sessionAuthMethod: 'password' | 'oidc',
+  sessionId: string,
+  now: Date,
+  executor?: DbExecutor
+): Promise<AuthMeResponse> => {
+  const memberships = await listMembershipGrantContexts(sessionId, user.id, executor)
+
+  return {
+    session_auth_method: sessionAuthMethod,
+    user: {
+      user_id: user.id,
+      email: user.email,
+      display_name: user.display_name,
+      global_role: user.global_role as 'none' | 'admin',
+      status: user.status as 'pending_activation' | 'active' | 'disabled',
+      account_state: deriveAccountState({
+        globalRole: user.global_role as 'none' | 'admin',
+        status: user.status as 'pending_activation' | 'active' | 'disabled',
+        membershipCount: memberships.length,
+      }),
+      password_changed_at: toIsoOrNull(user.password_changed_at),
+      memberships: memberships.map((membership) => ({
+        membership_id: membership.membership_id,
+        organization_id: membership.organization_id,
+        organization_name: membership.organization_name,
+        organization_slug: membership.organization_slug,
+        role: membership.membership_role as 'member' | 'manager' | 'owner',
+        status: membership.membership_status as 'active' | 'suspended',
+        allowed_auth_methods:
+          membership.membership_status === 'active' &&
+          membership.organization_status === 'active' &&
+          membership.auth_settings_available
+            ? membershipAllowedAuthMethods(membership)
+            : [],
+        grant_state: membershipGrantState(membership, now),
       })),
     },
   }
@@ -597,7 +749,7 @@ export const getMe = async (
   sessionToken: string | undefined,
   now: Date = new Date(),
   executor?: DbExecutor
-): Promise<AuthResult<AuthUserResponse>> => {
+): Promise<GetMeResult> => {
   if (!sessionToken) {
     return {
       ok: false,
@@ -632,9 +784,11 @@ export const getMe = async (
 
   return {
     ok: true,
-    value: await buildAuthUserResponse(
+    value: await buildAuthMeResponse(
       user,
       sessionResult.session.auth_method as 'password' | 'oidc',
+      sessionResult.session.id,
+      now,
       executor
     ),
   }

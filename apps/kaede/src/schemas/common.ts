@@ -111,6 +111,7 @@ export const authErrorCodes = [
   'AUTH_PASSWORD_LOGIN_DISABLED',
   'AUTH_DASHBOARD_FORBIDDEN',
   'AUTH_ORGANIZATION_FORBIDDEN',
+  'AUTH_MEMBERSHIP_REAUTHENTICATION_REQUIRED',
 ] as const
 
 export const authErrorCodeSchema = z.enum(authErrorCodes).openapi({
@@ -123,11 +124,57 @@ export const authErrorResponseSchema = errorResponseSchema
   })
   .openapi('AuthErrorResponse')
 
-export const authErrorMessages: Record<AuthErrorCode, string> = {
+const authErrorVariant = <TCode extends AuthErrorCode>(errorCode: TCode) =>
+  z.object({
+    error_code: z.literal(errorCode),
+    error_message: z.string().min(1),
+    details: z.record(z.string(), z.unknown()).optional(),
+  })
+
+export const globalSessionErrorResponseSchema = z
+  .discriminatedUnion('error_code', [
+    authErrorVariant('AUTH_UNAUTHENTICATED'),
+    authErrorVariant('AUTH_SESSION_EXPIRED'),
+    authErrorVariant('AUTH_SESSION_REVOKED'),
+  ])
+  .openapi('GlobalSessionErrorResponse')
+
+export const userAccountErrorResponseSchema = authErrorVariant('AUTH_USER_DISABLED').openapi(
+  'UserAccountErrorResponse'
+)
+
+export const organizationAuthorizationErrorResponseSchema = z
+  .discriminatedUnion('error_code', [
+    authErrorVariant('AUTH_USER_DISABLED'),
+    authErrorVariant('AUTH_PASSWORD_CHANGE_REQUIRED'),
+    authErrorVariant('AUTH_DASHBOARD_FORBIDDEN'),
+    authErrorVariant('AUTH_ORGANIZATION_FORBIDDEN'),
+    z.object({
+      error_code: z.literal('AUTH_MEMBERSHIP_REAUTHENTICATION_REQUIRED'),
+      error_message: z.string().min(1),
+      details: z.object({
+        organization_id: uuidSchema,
+        membership_id: uuidSchema,
+        reason: z.enum([
+          'grant_missing',
+          'grant_revoked',
+          'grant_expired',
+          'reauthentication_interval_elapsed',
+          'policy_changed',
+          'auth_method_not_allowed',
+        ]),
+        allowed_auth_methods: z.array(z.enum(['local', 'oidc'])),
+      }),
+    }),
+  ])
+  .openapi('OrganizationAuthorizationErrorResponse')
+
+export const authErrorMessages = {
   AUTH_DASHBOARD_FORBIDDEN: 'dashboard access forbidden',
   AUTH_ACTIVATION_TOKEN_INVALID: 'activation token is invalid',
   AUTH_INVALID_CREDENTIALS: 'invalid email or password',
   AUTH_ORGANIZATION_FORBIDDEN: 'organization access forbidden',
+  AUTH_MEMBERSHIP_REAUTHENTICATION_REQUIRED: 'organization membership reauthentication required',
   AUTH_PASSWORD_CHANGE_REQUIRED: 'password change required',
   AUTH_PASSWORD_LOGIN_DISABLED: 'password login is disabled',
   AUTH_SESSION_EXPIRED: 'session expired',
@@ -135,13 +182,14 @@ export const authErrorMessages: Record<AuthErrorCode, string> = {
   AUTH_UNAUTHENTICATED: 'login required',
   AUTH_USER_DISABLED: 'user is disabled',
   AUTH_USER_LOCKED: 'account is locked due to too many failed attempts',
-}
+} as const satisfies Record<AuthErrorCode, string>
 
-export const authErrorStatuses: Record<AuthErrorCode, 401 | 403> = {
+export const authErrorStatuses = {
   AUTH_DASHBOARD_FORBIDDEN: 403,
   AUTH_ACTIVATION_TOKEN_INVALID: 401,
   AUTH_INVALID_CREDENTIALS: 401,
   AUTH_ORGANIZATION_FORBIDDEN: 403,
+  AUTH_MEMBERSHIP_REAUTHENTICATION_REQUIRED: 403,
   AUTH_PASSWORD_CHANGE_REQUIRED: 403,
   AUTH_PASSWORD_LOGIN_DISABLED: 403,
   AUTH_SESSION_EXPIRED: 401,
@@ -149,9 +197,9 @@ export const authErrorStatuses: Record<AuthErrorCode, 401 | 403> = {
   AUTH_UNAUTHENTICATED: 401,
   AUTH_USER_DISABLED: 403,
   AUTH_USER_LOCKED: 403,
-}
+} as const satisfies Record<AuthErrorCode, 401 | 403>
 
-export const toAuthErrorResponse = (errorCode: AuthErrorCode) => {
+export const toAuthErrorResponse = <TCode extends AuthErrorCode>(errorCode: TCode) => {
   return {
     body: {
       error_code: errorCode,

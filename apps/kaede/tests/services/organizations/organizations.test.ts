@@ -184,6 +184,25 @@ describe('organizations usecase', () => {
       .executeTakeFirstOrThrow()
 
     expect(organization.name).toBe('Group A')
+    await expect(
+      db
+        .selectFrom('organization_auth_settings')
+        .select([
+          'local_auth_enabled',
+          'oidc_auth_enabled',
+          'policy_version',
+          'membership_grant_ttl_seconds',
+          'reauthentication_interval_seconds',
+        ])
+        .where('organization_id', '=', organization.id)
+        .executeTakeFirstOrThrow()
+    ).resolves.toEqual({
+      local_auth_enabled: true,
+      oidc_auth_enabled: false,
+      policy_version: '1',
+      membership_grant_ttl_seconds: 28_800,
+      reauthentication_interval_seconds: 14_400,
+    })
   })
 
   it('admin can list organizations', async () => {
@@ -1282,8 +1301,8 @@ describe('organizations usecase', () => {
         create_pedestrian: true,
         pedestrian: {
           display_name: 'Pedestrian A',
-          height: 170.5,
-          stride_length: 72,
+          height: 1.705,
+          stride_length: 0.72,
           attributes: {
             team: 'A',
           },
@@ -1301,8 +1320,8 @@ describe('organizations usecase', () => {
         pedestrian: {
           organization_id: organization.id,
           display_name: 'Pedestrian A',
-          height: 170.5,
-          stride_length: 72,
+          height: 1.705,
+          stride_length: 0.72,
           attributes: {
             team: 'A',
           },

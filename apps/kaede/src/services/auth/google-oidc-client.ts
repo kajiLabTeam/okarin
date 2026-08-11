@@ -21,6 +21,7 @@ export interface GoogleOidcClientOptions {
 }
 
 export interface GoogleIdTokenClaims {
+  issuer: string
   sub: string
   email: string
   emailVerified: boolean
@@ -29,6 +30,7 @@ export interface GoogleIdTokenClaims {
 }
 
 interface GoogleIdTokenPayload extends JWTPayload {
+  azp?: unknown
   email?: unknown
   email_verified?: unknown
   name?: unknown
@@ -142,8 +144,13 @@ export class GoogleOidcClient {
     if (googlePayload.nonce !== nonce) {
       throw new Error('Google ID token nonce mismatch')
     }
+    const audiences = Array.isArray(googlePayload.aud) ? googlePayload.aud : [googlePayload.aud]
+    if (audiences.length > 1 && googlePayload.azp !== this.config.clientId) {
+      throw new Error('Google ID token authorized party mismatch')
+    }
 
     return {
+      issuer: requireStringClaim(googlePayload, 'iss'),
       sub: requireStringClaim(googlePayload, 'sub'),
       email: requireStringClaim(googlePayload, 'email'),
       emailVerified: googlePayload.email_verified === true,

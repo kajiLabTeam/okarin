@@ -155,8 +155,8 @@ describe('POST /api/organizations/:organizationId/users', () => {
           pedestrian_id: '33333333-3333-4333-8333-333333333333',
           organization_id: '11111111-1111-4111-8111-111111111111',
           display_name: 'Pedestrian A',
-          height: 170.5,
-          stride_length: 72,
+          height: 1.705,
+          stride_length: 0.72,
           attributes: {
             team: 'A',
           },
@@ -182,8 +182,8 @@ describe('POST /api/organizations/:organizationId/users', () => {
           create_pedestrian: true,
           pedestrian: {
             display_name: 'Pedestrian A',
-            height: 170.5,
-            stride_length: 72,
+            height: 1.705,
+            stride_length: 0.72,
             attributes: {
               team: 'A',
             },
@@ -210,8 +210,8 @@ describe('POST /api/organizations/:organizationId/users', () => {
         create_pedestrian: true,
         pedestrian: {
           display_name: 'Pedestrian A',
-          height: 170.5,
-          stride_length: 72,
+          height: 1.705,
+          stride_length: 0.72,
           attributes: {
             team: 'A',
           },

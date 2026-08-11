@@ -233,6 +233,24 @@ describe('POST /api/pedestrians', () => {
     expect(createPedestrianMock).not.toHaveBeenCalled()
   })
 
+  it('meterではない height はバリデーションエラーを返し usecase を呼ばない', async () => {
+    const app = createRouteTestApp('/pedestrians', registerCreatePedestrianRoute)
+    const response = await app.request('/api/pedestrians', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        organization_id: '99999999-9999-4999-8999-999999999999',
+        display_name: 'test participant',
+        height: 170,
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(createPedestrianMock).not.toHaveBeenCalled()
+  })
+
   it('organization_id がない場合はバリデーションエラーを返し usecase を呼ばない', async () => {
     const app = createRouteTestApp('/pedestrians', registerCreatePedestrianRoute)
     const response = await app.request('/api/pedestrians', {

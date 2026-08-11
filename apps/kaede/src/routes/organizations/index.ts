@@ -1,5 +1,6 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
 import { registerAnalysisRunRoutes } from './analysis-runs.js'
+import { registerOrganizationAuthSettingsRoutes } from './auth-settings.js'
 import { registerCreateOrganizationBuildingFloorRoute } from './create-organization-building-floor.js'
 import { registerCreateOrganizationBuildingRoute } from './create-organization-building.js'
 import { registerCreateOrganizationMembershipRoute } from './create-organization-membership.js'
@@ -9,6 +10,7 @@ import { registerCreateOrganizationRoute } from './create-organization.js'
 import { registerCreateStayHeatmapRoute } from './create-stay-heatmap.js'
 import { registerGetOrganizationUserRoute } from './get-organization-user.js'
 import { registerGetOrganizationRoute } from './get-organization.js'
+import { registerOrganizationInviteRoutes } from './invites.js'
 import { registerListOrganizationBuildingFloorsRoute } from './list-organization-building-floors.js'
 import { registerListOrganizationBuildingsRoute } from './list-organization-buildings.js'
 import { registerListOrganizationFloorsRoute } from './list-organization-floors.js'
@@ -16,6 +18,10 @@ import { registerListOrganizationRecordingsRoute } from './list-organization-rec
 import { registerListOrganizationTrajectoriesRoute } from './list-organization-trajectories.js'
 import { registerListOrganizationUsersRoute } from './list-organization-users.js'
 import { registerListOrganizationsRoute } from './list-organizations.js'
+import { registerOrganizationMemberProfileRoutes } from './member-profiles.js'
+import { registerMembershipAdministrationRoutes } from './membership-administration.js'
+import { registerOrganizationOidcLinkRoutes } from './oidc-links.js'
+import { registerOrganizationOidcProviderRoutes } from './oidc-providers.js'
 
 export const organizationsRoutes = new OpenAPIHono()
 
@@ -36,3 +42,9 @@ registerCreateOrganizationUserActivationLinkRoute(organizationsRoutes)
 registerCreateOrganizationMembershipRoute(organizationsRoutes)
 registerCreateStayHeatmapRoute(organizationsRoutes)
 registerAnalysisRunRoutes(organizationsRoutes)
+registerOrganizationAuthSettingsRoutes(organizationsRoutes)
+registerOrganizationMemberProfileRoutes(organizationsRoutes)
+registerMembershipAdministrationRoutes(organizationsRoutes)
+registerOrganizationOidcLinkRoutes(organizationsRoutes)
+registerOrganizationOidcProviderRoutes(organizationsRoutes)
+registerOrganizationInviteRoutes(organizationsRoutes)

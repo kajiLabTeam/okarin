@@ -1,0 +1,35 @@
+{
+  "analyze_request": {
+    "trajectory_id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    "recording_id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    "floor_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    "floor_scale": 0.01,
+    "constraints": [
+      {
+        "seq": 0,
+        "point_type": "start",
+        "x": 12.34,
+        "y": 56.78,
+        "direction": 90.0
+      }
+    ],
+    "raw_data_urls": {
+      "acce": "https://storage.example.test/raw/acce.csv?signature=acce",
+      "gyro": "https://storage.example.test/raw/gyro.csv?signature=gyro"
+    },
+    "result_upload_url": "https://storage.example.test/result.csv?signature=result",
+    "result_object_key": "organizations/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/trajectories/dddddddd-dddd-4ddd-8ddd-dddddddddddd/analyzed/result.csv",
+    "callback_url": "https://kaede.example.test/api/trajectories/callback",
+    "callback_token": "signed-callback-token"
+  },
+  "accepted_response": {
+    "trajectory_id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    "status": "accepted"
+  },
+  "completed_callback": {
+    "trajectory_id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    "status": "completed",
+    "callback_token": "signed-callback-token",
+    "result_object_key": "organizations/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/trajectories/dddddddd-dddd-4ddd-8ddd-dddddddddddd/analyzed/result.csv"
+  }
+}

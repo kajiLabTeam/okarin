@@ -25,6 +25,7 @@ export type RequestActor = UserRequestActor | ServiceClientRequestActor
 
 export interface RequestActorVariables {
   requestActor?: RequestActor
+  requestSessionId?: string
 }
 
 export interface RequestActorHonoEnv {
@@ -34,6 +35,7 @@ export interface RequestActorHonoEnv {
 export type RequestActorContext = Context<RequestActorHonoEnv>
 
 const requestActorKey = 'requestActor' satisfies keyof RequestActorVariables
+const requestSessionIdKey = 'requestSessionId' satisfies keyof RequestActorVariables
 
 export const setRequestActor = (c: RequestActorContext, actor: RequestActor) => {
   c.set(requestActorKey, actor)
@@ -41,6 +43,14 @@ export const setRequestActor = (c: RequestActorContext, actor: RequestActor) => 
 
 export const getRequestActor = (c: RequestActorContext): RequestActor | undefined => {
   return c.get(requestActorKey)
+}
+
+export const setRequestSessionId = (c: RequestActorContext, sessionId: string) => {
+  c.set(requestSessionIdKey, sessionId)
+}
+
+export const getRequestSessionId = (c: RequestActorContext): string | undefined => {
+  return c.get(requestSessionIdKey)
 }
 
 export const requireRequestActor = (c: RequestActorContext): RequestActor => {

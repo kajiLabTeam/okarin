@@ -1,7 +1,10 @@
 import { createRoute } from '@hono/zod-openapi'
 import type { OpenAPIHono } from '@hono/zod-openapi'
-import { authUserResponseSchema } from '../../schemas/auth.js'
-import { errorResponseSchema } from '../../schemas/common.js'
+import { authMeResponseSchema } from '../../schemas/auth.js'
+import {
+  globalSessionErrorResponseSchema,
+  userAccountErrorResponseSchema,
+} from '../../schemas/common.js'
 import { getMe } from '../../usecases/auth/index.js'
 import { getSessionTokenFromCookie } from './cookie.js'
 import { toAuthErrorResponse } from './error.js'
@@ -17,7 +20,7 @@ export const registerMeRoute = (app: OpenAPIHono) => {
         description: 'current user',
         content: {
           'application/json': {
-            schema: authUserResponseSchema,
+            schema: authMeResponseSchema,
           },
         },
       },
@@ -25,7 +28,7 @@ export const registerMeRoute = (app: OpenAPIHono) => {
         description: 'login required',
         content: {
           'application/json': {
-            schema: errorResponseSchema,
+            schema: globalSessionErrorResponseSchema,
           },
         },
       },
@@ -33,7 +36,7 @@ export const registerMeRoute = (app: OpenAPIHono) => {
         description: 'user disabled',
         content: {
           'application/json': {
-            schema: errorResponseSchema,
+            schema: userAccountErrorResponseSchema,
           },
         },
       },
@@ -44,6 +47,11 @@ export const registerMeRoute = (app: OpenAPIHono) => {
     const result = await getMe(getSessionTokenFromCookie(c))
 
     if (!result.ok) {
+      if (result.error.type === 'AUTH_USER_DISABLED') {
+        const error = toAuthErrorResponse(result.error)
+        return c.json(error.body, error.status)
+      }
+
       const error = toAuthErrorResponse(result.error)
       return c.json(error.body, error.status)
     }

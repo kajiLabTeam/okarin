@@ -181,8 +181,14 @@ compose_cmd pull postgres seaweedfs
 log "Starting dependent services for env: test"
 compose_cmd up -d postgres seaweedfs
 
+log "Building Kaede migration runner for env: test"
+compose_cmd build kaede
+
 log "Running database migrations for env: test"
 compose_cmd --profile tools run --rm -e DBMATE_SCHEMA_FILE=/tmp/schema.sql dbmate up
+
+log "Running one-shot multi-organization auth cutover for env: test"
+compose_cmd run --rm --no-deps kaede node dist/cli/multi-org-auth-backfill.js cutover
 
 log "Initializing object storage for env: test"
 compose_cmd --profile tools run --rm storage-bootstrap

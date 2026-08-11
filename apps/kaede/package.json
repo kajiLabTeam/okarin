@@ -16,7 +16,8 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "storage-prefix-migration": "tsx src/cli/storage-prefix-migration.ts",
-    "floor-map-dimension-backfill": "tsx src/cli/floor-map-dimension-backfill.ts"
+    "floor-map-dimension-backfill": "tsx src/cli/floor-map-dimension-backfill.ts",
+    "multi-org-auth-backfill": "tsx src/cli/multi-org-auth-backfill.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",
