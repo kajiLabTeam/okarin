@@ -24,6 +24,17 @@ const invites = vi.hoisted(() => ({
   listOrganizationInvites: vi.fn(),
   revokeOrganizationInvite: vi.fn(),
 }))
+const oidc = vi.hoisted(() => ({
+  canonicalizeOidcIssuer: vi.fn(),
+  findOidcIdentity: vi.fn(),
+  findOrganizationOidcProviderContextById: vi.fn(),
+  insertOidcIdentity: vi.fn(),
+  listOidcProviders: vi.fn(),
+  revokeActiveOidcMembershipLink: vi.fn(),
+  updateOidcIdentityClaims: vi.fn(),
+  upsertOidcMembershipGrant: vi.fn(),
+  upsertOidcMembershipLink: vi.fn(),
+}))
 const local = vi.hoisted(() => ({
   insertAuthenticationEvent: vi.fn(),
   normalizeLocalLoginEmail: vi.fn((email: string) => email.trim().toLowerCase()),
@@ -39,6 +50,7 @@ const users = vi.hoisted(() => ({ findUserById: vi.fn(), insertUser: vi.fn() }))
 vi.mock('../../services/auth/index.js', () => auth)
 vi.mock('../../services/organization-invites/index.js', () => invites)
 vi.mock('../../services/organization-local-auth/index.js', () => local)
+vi.mock('../../services/organization-oidc-auth/index.js', () => oidc)
 vi.mock('../../services/profiles/index.js', () => profiles)
 vi.mock('../../services/users/index.js', () => users)
 vi.mock('../../services/db/index.js', () => ({ db: {} }))
@@ -86,6 +98,7 @@ const inviteContext = (overrides: Record<string, unknown> = {}) => ({
   revoked_at: null,
   redeemed_at: null,
   organization_name: 'Example',
+  organization_slug: 'example',
   organization_status: 'active',
   local_auth_enabled: true,
   oidc_auth_enabled: true,
@@ -101,6 +114,10 @@ describe('organization invite usecases', () => {
     auth.hashActivationToken.mockImplementation((token: string) => `hash:${token}`)
     auth.hashPassword.mockResolvedValue('password-hash')
     invites.findInviteContextByTokenHash.mockResolvedValue(inviteContext())
+    oidc.listOidcProviders.mockResolvedValue([
+      { id: '55555555-5555-4555-8555-555555555555', name: 'Google', enabled: true },
+      { id: '66666666-6666-4666-8666-666666666666', name: 'Disabled', enabled: false },
+    ])
     profiles.insertAuditEvent.mockResolvedValue(undefined)
   })
 
@@ -176,10 +193,11 @@ describe('organization invite usecases', () => {
     expect(result).toEqual({
       ok: true,
       value: {
-        organization: { name: 'Example' },
+        organization: { id: organizationId, name: 'Example', slug: 'example' },
         role: 'member',
         expires_at: '2026-08-18T10:00:00.000Z',
         authentication_methods: { local: true, oidc: true },
+        oidc_providers: [{ id: '55555555-5555-4555-8555-555555555555', display_name: 'Google' }],
       },
     })
     expect(JSON.stringify(result)).not.toContain('plain-token')

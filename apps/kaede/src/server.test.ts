@@ -125,10 +125,33 @@ describe('createApp auth wiring', { timeout: 60_000 }, () => {
             },
           },
         },
+        '/api/invites/verify': {
+          post: {
+            responses: {
+              '200': {
+                content: {
+                  'application/json': {
+                    schema: { $ref: '#/components/schemas/VerifyOrganizationInviteResponse' },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
       components: {
         schemas: {
           GlobalSessionErrorResponse: expect.any(Object),
+          VerifyOrganizationInviteResponse: {
+            properties: {
+              organization: {
+                required: ['id', 'name', 'slug'],
+              },
+              oidc_providers: {
+                type: 'array',
+              },
+            },
+          },
           OrganizationAuthorizationErrorResponse: expect.objectContaining({
             oneOf: expect.arrayContaining([
               expect.objectContaining({

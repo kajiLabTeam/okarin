@@ -32,10 +32,20 @@ describe('public organization invite routes', () => {
     usecases.verifyOrganizationInvite.mockResolvedValue({
       ok: true,
       value: {
-        organization: { name: 'Example' },
+        organization: {
+          id: '11111111-1111-4111-8111-111111111111',
+          name: 'Example',
+          slug: 'example',
+        },
         role: 'member',
         expires_at: '2026-08-18T10:00:00.000Z',
         authentication_methods: { local: true, oidc: true },
+        oidc_providers: [
+          {
+            id: '22222222-2222-4222-8222-222222222222',
+            display_name: 'Google',
+          },
+        ],
       },
     })
     const response = await app().request('/api/invites/verify', {

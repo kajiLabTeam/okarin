@@ -1,5 +1,6 @@
 import { z } from '@hono/zod-openapi'
 import { isoDatetimeSchema, uuidSchema } from './common.js'
+import { organizationSlugSchema } from './organizations.js'
 import { displayNameSchema, localeSchema, timezoneSchema } from './profiles.js'
 
 export const inviteRoleSchema = z.enum(['member', 'manager'])
@@ -39,13 +40,23 @@ export const verifyOrganizationInviteRequestSchema = z.object({
 
 export const verifyOrganizationInviteResponseSchema = z
   .object({
-    organization: z.object({ name: z.string().min(1) }),
+    organization: z.object({
+      id: uuidSchema,
+      name: z.string().min(1),
+      slug: organizationSlugSchema,
+    }),
     role: inviteRoleSchema,
     expires_at: isoDatetimeSchema,
     authentication_methods: z.object({
       local: z.boolean(),
       oidc: z.boolean(),
     }),
+    oidc_providers: z.array(
+      z.object({
+        id: uuidSchema,
+        display_name: z.string().min(1).max(255),
+      })
+    ),
   })
   .openapi('VerifyOrganizationInviteResponse')
 
