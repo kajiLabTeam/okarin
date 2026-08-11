@@ -10,6 +10,8 @@ export type Generated<T> =
     ? ColumnType<S, I | undefined, U>
     : ColumnType<T, T | undefined, T>
 
+export type Int8 = ColumnType<string, bigint | number | string, bigint | number | string>
+
 export type Json = JsonValue
 
 export type JsonArray = JsonValue[]
@@ -22,19 +24,9 @@ export type JsonPrimitive = boolean | number | string | null
 
 export type JsonValue = JsonArray | JsonObject | JsonPrimitive
 
-export type Timestamp = ColumnType<Date, Date | string, Date | string>
+export type Numeric = ColumnType<string, number | string, number | string>
 
-export interface AuthIdentities {
-  created_at: Generated<Timestamp>
-  email: string
-  email_verified: Generated<boolean>
-  hosted_domain: string | null
-  id: Generated<string>
-  provider: string
-  provider_subject: string
-  updated_at: Generated<Timestamp>
-  user_id: string
-}
+export type Timestamp = ColumnType<Date, Date | string, Date | string>
 
 export interface AnalysisRuns {
   analysis_type: string
@@ -58,6 +50,50 @@ export interface AnalysisRunTrajectories {
   trajectory_id: string
 }
 
+export interface AuditEvents {
+  action: string
+  actor_membership_id: string | null
+  actor_user_id: string | null
+  after_values: Json | null
+  before_values: Json | null
+  changed_fields: string[]
+  id: Generated<string>
+  occurred_at: Generated<Timestamp>
+  organization_id: string | null
+  request_id: string | null
+  target_id: string
+  target_type: string
+}
+
+export interface AuthenticationEvents {
+  auth_method: string | null
+  credential_reference_id: string | null
+  event_type: string
+  failure_code: string | null
+  id: Generated<string>
+  ip_address_hash: string | null
+  membership_id: string | null
+  occurred_at: Generated<Timestamp>
+  organization_id: string | null
+  outcome: string
+  request_id: string | null
+  session_id: string | null
+  user_agent: string | null
+  user_id: string | null
+}
+
+export interface AuthIdentities {
+  created_at: Generated<Timestamp>
+  email: string
+  email_verified: Generated<boolean>
+  hosted_domain: string | null
+  id: Generated<string>
+  provider: string
+  provider_subject: string
+  updated_at: Generated<Timestamp>
+  user_id: string
+}
+
 export interface Buildings {
   created_at: Generated<Timestamp>
   id: Generated<string>
@@ -79,6 +115,44 @@ export interface Floors {
   name: string
   organization_id: string
   scale: number | null
+  updated_at: Generated<Timestamp>
+}
+
+export interface OidcIdentities {
+  created_at: Generated<Timestamp>
+  id: Generated<string>
+  issuer: string
+  last_claimed_email: string | null
+  last_claimed_email_verified: boolean | null
+  subject: string
+  updated_at: Generated<Timestamp>
+  user_id: string
+}
+
+export interface OidcLoginTransactions {
+  consumed_at: Timestamp | null
+  created_at: Generated<Timestamp>
+  expires_at: Timestamp
+  id: Generated<string>
+  intent: string
+  invite_id: string | null
+  nonce: string
+  organization_id: string
+  organization_oidc_provider_id: string
+  pkce_code_verifier_ciphertext: string
+  return_to: string
+  session_id: string | null
+  state_hash: string
+}
+
+export interface OrganizationAuthSettings {
+  created_at: Generated<Timestamp>
+  local_auth_enabled: boolean
+  membership_grant_ttl_seconds: number
+  oidc_auth_enabled: boolean
+  organization_id: string
+  policy_version: Generated<Int8>
+  reauthentication_interval_seconds: number
   updated_at: Generated<Timestamp>
 }
 
@@ -107,12 +181,15 @@ export interface OrganizationInviteRedemptions {
 
 export interface OrganizationInvites {
   created_at: Generated<Timestamp>
+  created_by_membership_id: string | null
   created_by_user_id: string
   email: string
   expires_at: Timestamp
   id: Generated<string>
   max_uses: Generated<number>
   organization_id: string
+  redeemed_at: Timestamp | null
+  redeemed_membership_id: string | null
   revoked_at: Timestamp | null
   role: Generated<string>
   token_hash: string
@@ -120,12 +197,66 @@ export interface OrganizationInvites {
   used_count: Generated<number>
 }
 
-export interface OrganizationMemberships {
+export interface OrganizationLocalCredentials {
   created_at: Generated<Timestamp>
+  enabled: Generated<boolean>
+  failed_login_attempts: Generated<number>
+  id: Generated<string>
+  locked_until: Timestamp | null
+  login_email: string
+  membership_id: string
+  normalized_login_email: string
   organization_id: string
-  role: string
+  password_changed_at: Generated<Timestamp>
+  password_hash: string
+  updated_at: Generated<Timestamp>
+}
+
+export interface OrganizationMemberOidcIdentities {
+  created_at: Generated<Timestamp>
+  id: Generated<string>
+  membership_id: string
+  oidc_identity_id: string
+  organization_id: string
+  organization_oidc_provider_id: string
+  revoked_at: Timestamp | null
   updated_at: Generated<Timestamp>
   user_id: string
+}
+
+export interface OrganizationMemberProfiles {
+  created_at: Generated<Timestamp>
+  display_name: string | null
+  height_meters: Numeric | null
+  membership_id: string
+  stride_length_meters: Numeric | null
+  updated_at: Generated<Timestamp>
+}
+
+export interface OrganizationMemberships {
+  created_at: Generated<Timestamp>
+  id: Generated<string | null>
+  joined_at: Generated<Timestamp | null>
+  left_at: Timestamp | null
+  organization_id: string
+  role: string
+  status: Generated<string | null>
+  updated_at: Generated<Timestamp>
+  user_id: string
+}
+
+export interface OrganizationOidcProviders {
+  allowed_hosted_domains: string[] | null
+  client_id: string
+  client_secret_ref: string | null
+  created_at: Generated<Timestamp>
+  enabled: Generated<boolean>
+  id: Generated<string>
+  issuer: string
+  name: string
+  organization_id: string
+  scopes: string[]
+  updated_at: Generated<Timestamp>
 }
 
 export interface Organizations {
@@ -133,6 +264,7 @@ export interface Organizations {
   id: Generated<string>
   name: string
   slug: Generated<string>
+  status: Generated<string | null>
   updated_at: Generated<Timestamp>
 }
 
@@ -142,6 +274,7 @@ export interface Pedestrians {
   display_name: string
   height: number | null
   id: Generated<string>
+  membership_id: string | null
   organization_id: string
   stride_length: number | null
   updated_at: Generated<Timestamp>
@@ -159,6 +292,21 @@ export interface Recordings {
   updated_at: Generated<Timestamp>
   upload_status: Generated<string>
   upload_targets: string[]
+}
+
+export interface SessionMembershipAuthentications {
+  auth_method: string
+  authenticated_at: Timestamp
+  created_at: Generated<Timestamp>
+  expires_at: Timestamp
+  local_credential_id: string | null
+  member_oidc_identity_id: string | null
+  membership_id: string
+  policy_version: Int8
+  revoked_at: Timestamp | null
+  session_id: string
+  updated_at: Generated<Timestamp>
+  user_id: string
 }
 
 export interface Sessions {
@@ -199,7 +347,18 @@ export interface UserActivationTokens {
   user_id: string
 }
 
+export interface UserProfiles {
+  created_at: Generated<Timestamp>
+  display_name: string
+  locale: Generated<string>
+  timezone: Generated<string>
+  updated_at: Generated<Timestamp>
+  user_id: string
+}
+
 export interface Users {
+  contact_email: string | null
+  contact_email_verified_at: Timestamp | null
   created_at: Generated<Timestamp>
   display_name: string
   email: string
@@ -207,6 +366,7 @@ export interface Users {
   global_role: Generated<string>
   id: Generated<string>
   locked_until: Timestamp | null
+  normalized_contact_email: string | null
   password_changed_at: Timestamp | null
   password_hash: string | null
   status: string
@@ -216,18 +376,29 @@ export interface Users {
 export interface DB {
   analysis_run_trajectories: AnalysisRunTrajectories
   analysis_runs: AnalysisRuns
+  audit_events: AuditEvents
   auth_identities: AuthIdentities
+  authentication_events: AuthenticationEvents
   buildings: Buildings
   floors: Floors
+  oidc_identities: OidcIdentities
+  oidc_login_transactions: OidcLoginTransactions
+  organization_auth_settings: OrganizationAuthSettings
   organization_creation_requests: OrganizationCreationRequests
   organization_invite_redemptions: OrganizationInviteRedemptions
   organization_invites: OrganizationInvites
+  organization_local_credentials: OrganizationLocalCredentials
+  organization_member_oidc_identities: OrganizationMemberOidcIdentities
+  organization_member_profiles: OrganizationMemberProfiles
   organization_memberships: OrganizationMemberships
+  organization_oidc_providers: OrganizationOidcProviders
   organizations: Organizations
   pedestrians: Pedestrians
   recordings: Recordings
+  session_membership_authentications: SessionMembershipAuthentications
   sessions: Sessions
   trajectories: Trajectories
   user_activation_tokens: UserActivationTokens
+  user_profiles: UserProfiles
   users: Users
 }

@@ -122,7 +122,7 @@ describe('OIDC onboarding schema', () => {
     ).rejects.toThrow()
   })
 
-  it('organization invite は member role と usage bounds を制約する', async () => {
+  it('organization invite は member/manager role と usage bounds を制約する', async () => {
     const user = await createUser('invite-creator@example.com')
     const organization = await createOrganization()
 
@@ -134,6 +134,23 @@ describe('OIDC onboarding schema', () => {
           token_hash: 'invite-token-hash',
           email: 'invitee@example.com',
           role: 'manager',
+          max_uses: 1,
+          used_count: 0,
+          expires_at: new Date('2026-06-17T00:00:00.000Z'),
+          revoked_at: null,
+          created_by_user_id: user.id,
+        })
+        .execute()
+    ).resolves.toBeDefined()
+
+    await expect(
+      db
+        .insertInto('organization_invites')
+        .values({
+          organization_id: organization.id,
+          token_hash: 'owner-invite-token-hash',
+          email: 'owner@example.com',
+          role: 'owner',
           max_uses: 1,
           used_count: 0,
           expires_at: new Date('2026-06-17T00:00:00.000Z'),
