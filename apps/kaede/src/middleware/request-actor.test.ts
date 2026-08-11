@@ -3,15 +3,24 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RequestActorHonoEnv } from './request-actor.js'
 import { getRequestActor, requestActorMiddleware } from './request-actor.js'
 
-const { findUserByIdMock, findValidSessionByTokenMock, listUserOrganizationMembershipsMock } =
-  vi.hoisted(() => ({
-    findUserByIdMock: vi.fn(),
-    findValidSessionByTokenMock: vi.fn(),
-    listUserOrganizationMembershipsMock: vi.fn(),
-  }))
+const {
+  findUserByIdMock,
+  findValidSessionByTokenMock,
+  hasLocalAuthenticationGrantBySessionIdMock,
+  listUserOrganizationMembershipsMock,
+} = vi.hoisted(() => ({
+  findUserByIdMock: vi.fn(),
+  findValidSessionByTokenMock: vi.fn(),
+  hasLocalAuthenticationGrantBySessionIdMock: vi.fn(),
+  listUserOrganizationMembershipsMock: vi.fn(),
+}))
 
 vi.mock('../services/auth/index.js', () => ({
   findValidSessionByToken: findValidSessionByTokenMock,
+}))
+
+vi.mock('../services/organization-local-auth/index.js', () => ({
+  hasLocalAuthenticationGrantBySessionId: hasLocalAuthenticationGrantBySessionIdMock,
 }))
 
 vi.mock('../services/users/index.js', () => ({
@@ -50,6 +59,7 @@ const mockActiveSessionUser = ({
   findValidSessionByTokenMock.mockResolvedValue({
     ok: true,
     session: {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       auth_method: authMethod,
       user_id: '11111111-1111-4111-8111-111111111111',
     },
@@ -73,6 +83,7 @@ const mockActiveSessionUser = ({
 describe('requestActorMiddleware', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    hasLocalAuthenticationGrantBySessionIdMock.mockResolvedValue(false)
   })
 
   it('正しい shared token があれば service client actor を設定する', async () => {
@@ -204,6 +215,23 @@ describe('requestActorMiddleware', () => {
     expect(response.status).toBe(200)
     const body = await response.json()
     expect(body.actor.account_state).toBe('active')
+  })
+
+  it('Membership Local Grantを持つsessionは共通password未設定でも利用できる', async () => {
+    mockActiveSessionUser({ passwordHash: null })
+    hasLocalAuthenticationGrantBySessionIdMock.mockResolvedValue(true)
+    const app = createTestApp()
+
+    const response = await app.request('/api/ping', {
+      headers: {
+        cookie: 'okarin_session=session-token',
+      },
+    })
+
+    expect(response.status).toBe(200)
+    expect(hasLocalAuthenticationGrantBySessionIdMock).toHaveBeenCalledWith(
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    )
   })
 
   it('membership がない user は pending_membership actor として設定する', async () => {
