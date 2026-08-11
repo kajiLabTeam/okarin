@@ -10,6 +10,7 @@ import { registerApiRoutes } from './routes/index.js'
 import { organizationAuthMethodsRoutes } from './routes/organization-auth-methods/index.js'
 import { organizationInvitesRoutes } from './routes/organization-invites/index.js'
 import { organizationLocalAuthRoutes } from './routes/organization-local-auth/index.js'
+import { organizationLocalCredentialRoutes } from './routes/organization-local-credentials/index.js'
 import { organizationOidcAuthRoutes } from './routes/organization-oidc-auth/index.js'
 import { organizationSessionAuthRoutes } from './routes/organization-session-auth/index.js'
 import { organizationAuthorizationErrorResponseSchema } from './schemas/common.js'
@@ -76,6 +77,10 @@ export const createApp = () => {
       sharedToken: runtimeConfig.app.apiSharedToken,
     })
   )
+
+  // Credential変更はcurrent passwordでも認可できるため、通常のMembership Grant Guardより前で
+  // 本人Session・Membership・再認証条件を専用Use Caseが検証する。
+  app.route('/api/organizations', organizationLocalCredentialRoutes)
 
   const authorizeOrganization = organizationAuthorizationMiddleware()
   app.use('/api/organizations/:organizationId', authorizeOrganization)
