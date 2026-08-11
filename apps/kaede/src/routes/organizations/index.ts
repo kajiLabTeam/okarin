@@ -9,6 +9,7 @@ import { registerCreateOrganizationRoute } from './create-organization.js'
 import { registerCreateStayHeatmapRoute } from './create-stay-heatmap.js'
 import { registerGetOrganizationUserRoute } from './get-organization-user.js'
 import { registerGetOrganizationRoute } from './get-organization.js'
+import { registerOrganizationInviteRoutes } from './invites.js'
 import { registerListOrganizationBuildingFloorsRoute } from './list-organization-building-floors.js'
 import { registerListOrganizationBuildingsRoute } from './list-organization-buildings.js'
 import { registerListOrganizationFloorsRoute } from './list-organization-floors.js'
@@ -40,3 +41,4 @@ registerCreateStayHeatmapRoute(organizationsRoutes)
 registerAnalysisRunRoutes(organizationsRoutes)
 registerOrganizationMemberProfileRoutes(organizationsRoutes)
 registerOrganizationOidcProviderRoutes(organizationsRoutes)
+registerOrganizationInviteRoutes(organizationsRoutes)
