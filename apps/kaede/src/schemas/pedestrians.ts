@@ -23,10 +23,10 @@ export const pedestrianSchema = z
       description: 'pedestrian を画面上で識別する表示名',
     }),
     height: z.number().nullable().openapi({
-      description: '身長。未設定の場合は null',
+      description: '身長（メートル）。未設定の場合は null',
     }),
     stride_length: z.number().nullable().openapi({
-      description: '歩幅。未設定の場合は null',
+      description: '歩幅（メートル）。未設定の場合は null',
     }),
     attributes: jsonObjectSchema.openapi({
       description: 'pedestrian に紐づく任意属性',
@@ -53,11 +53,11 @@ export const createPedestrianWithoutOrganizationRequestSchema = z
     display_name: z.string().min(1).openapi({
       description: 'pedestrian を画面上で識別する表示名',
     }),
-    height: z.number().positive().nullable().optional().openapi({
-      description: '身長。未設定の場合は null',
+    height: z.number().positive().max(3).nullable().optional().openapi({
+      description: '身長（メートル）。未設定の場合は null',
     }),
-    stride_length: z.number().positive().nullable().optional().openapi({
-      description: '歩幅。未設定の場合は null',
+    stride_length: z.number().positive().max(3).nullable().optional().openapi({
+      description: '歩幅（メートル）。未設定の場合は null',
     }),
     attributes: jsonObjectSchema.optional().openapi({
       description: 'pedestrian に紐づく任意属性',

@@ -13,17 +13,18 @@
 
 ## 測定値の正規化
 
-`pedestrians.height` と `pedestrians.stride_length` は次の規則でmeterへ統一する。
+`pedestrians.height` と `pedestrians.stride_length` は現行APIと同じくmeterとして扱う。
+値の大きさからcentimeterと推測して自動変換しない。
 
-| 既存値                      | 判定       | 保存値                             |
-| --------------------------- | ---------- | ---------------------------------- |
-| `NULL`                      | 未設定     | `NULL`                             |
-| `0 < value <= 3`            | 既にmeter  | 小数第3位へ丸める                  |
-| `3 < value <= 300`          | centimeter | `value / 100`後、小数第3位へ丸める |
-| 上記以外、または丸め後に`0` | 不正       | blocking issue。自動修正しない     |
+| 既存値                      | 判定             | 保存値                         |
+| --------------------------- | ---------------- | ------------------------------ |
+| `NULL`                      | 未設定           | `NULL`                         |
+| `0 < value <= 3`            | meter            | 小数第3位へ丸める              |
+| `value > 3`                 | 単位不一致の疑い | blocking issue。自動変換しない |
+| 上記以外、または丸め後に`0` | 不正             | blocking issue。自動修正しない |
 
-`preflight` は `already_m / converted_cm / invalid` の値数を返す。`backfill-core`も実際に書き込んだ
-`measurement_values_already_m / measurement_values_converted_cm`を返す。
+`preflight` は `valid_meters / invalid` の値数を返す。`backfill-core`も実際に書き込んだ
+`measurement_values_copied_meters`を返す。
 
 ## 実行コマンド
 
@@ -41,7 +42,7 @@ pnpm multi-org-auth-backfill verify
 - Membership UUID/status/joined_at（`joined_at`は旧Membershipの`created_at`を使用）
 - User contact emailと共通Profile
 - PedestrianとMembershipの関連
-- Organization member profile（表示名override、meterへ正規化した身長・歩幅）
+- Organization member profile（表示名override、meterの身長・歩幅）
 - Invite creator Membership
 
 ## 認証設定とCredential移行
