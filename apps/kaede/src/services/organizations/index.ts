@@ -1,6 +1,7 @@
 export {
   findOrganizationById,
   findOrganizationBySlug,
+  insertDefaultOrganizationAuthSettings,
   insertOrganization,
   listOrganizations,
 } from './organization-repository.js'

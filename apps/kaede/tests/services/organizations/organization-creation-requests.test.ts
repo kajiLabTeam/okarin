@@ -188,6 +188,25 @@ describe('organization creation request usecase', () => {
       .where('user_id', '=', requester.user.id)
       .executeTakeFirstOrThrow()
     expect(membership.role).toBe('owner')
+    await expect(
+      db
+        .selectFrom('organization_auth_settings')
+        .select([
+          'local_auth_enabled',
+          'oidc_auth_enabled',
+          'policy_version',
+          'membership_grant_ttl_seconds',
+          'reauthentication_interval_seconds',
+        ])
+        .where('organization_id', '=', organization.id)
+        .executeTakeFirstOrThrow()
+    ).resolves.toEqual({
+      local_auth_enabled: true,
+      oidc_auth_enabled: false,
+      policy_version: '1',
+      membership_grant_ttl_seconds: 28_800,
+      reauthentication_interval_seconds: 14_400,
+    })
   })
 
   it('approve rejects duplicate slug', async () => {
