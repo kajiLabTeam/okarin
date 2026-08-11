@@ -1,11 +1,3 @@
-import {
-  backfillMultiOrgAuthCore,
-  backfillMultiOrgAuthCredentials,
-  getMultiOrgAuthPreflightReport,
-  validateMultiOrgAuthExpandConstraints,
-  verifyMultiOrgAuthCoreBackfill,
-} from '../services/migrations/multi-org-auth-backfill.js'
-
 interface Options {
   batchSize: number
   command: 'preflight' | 'backfill-core' | 'backfill-auth' | 'verify' | 'validate'
@@ -43,6 +35,13 @@ export const parseOptions = (argv: string[]): Options => {
 
 export const main = async (argv = process.argv.slice(2)) => {
   const options = parseOptions([...argv])
+  const {
+    backfillMultiOrgAuthCore,
+    backfillMultiOrgAuthCredentials,
+    getMultiOrgAuthPreflightReport,
+    validateMultiOrgAuthExpandConstraints,
+    verifyMultiOrgAuthCoreBackfill,
+  } = await import('../services/migrations/multi-org-auth-backfill.js')
 
   if (options.command === 'preflight') {
     const report = await getMultiOrgAuthPreflightReport()
