@@ -110,6 +110,7 @@ const inviteContextQuery = (executor: DbExecutor) =>
       'invite.revoked_at',
       'invite.redeemed_at',
       'organization.name as organization_name',
+      'organization.slug as organization_slug',
       'organization.status as organization_status',
       'auth_settings.local_auth_enabled',
       'auth_settings.oidc_auth_enabled',

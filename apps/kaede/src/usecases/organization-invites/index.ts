@@ -45,6 +45,7 @@ import {
   updateOidcIdentityClaims,
   upsertOidcMembershipGrant,
   upsertOidcMembershipLink,
+  listOidcProviders,
 } from '../../services/organization-oidc-auth/index.js'
 import {
   insertAuditEvent,
@@ -351,16 +352,26 @@ export const verifyOrganizationInvite = async (
     now
   )
   if (!valid.ok) return valid
+  const oidcProviders = valid.context.oidc_auth_enabled
+    ? (await listOidcProviders(valid.context.organization_id, executor))
+        .filter((provider) => provider.enabled)
+        .map((provider) => ({ id: provider.id, display_name: provider.name }))
+    : []
   return {
     ok: true,
     value: {
-      organization: { name: valid.context.organization_name },
+      organization: {
+        id: valid.context.organization_id,
+        name: valid.context.organization_name,
+        slug: valid.context.organization_slug,
+      },
       role: valid.context.role as InviteRole,
       expires_at: valid.context.expires_at.toISOString(),
       authentication_methods: {
         local: valid.context.local_auth_enabled === true,
         oidc: valid.context.oidc_auth_enabled === true,
       },
+      oidc_providers: oidcProviders,
     },
   } as const
 }
