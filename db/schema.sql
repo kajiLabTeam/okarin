@@ -75,6 +75,18 @@ CREATE TABLE public.analysis_runs (
 -- Name: audit_events; Type: TABLE; Schema: public; Owner: -
 --
 
+CREATE TABLE public.application_data_migrations (
+    name text NOT NULL,
+    completed_at timestamp with time zone DEFAULT now() NOT NULL,
+    details jsonb DEFAULT '{}'::jsonb NOT NULL,
+    CONSTRAINT application_data_migrations_name_nonempty_chk CHECK ((length(btrim(name)) > 0))
+);
+
+
+ALTER TABLE ONLY public.application_data_migrations
+    ADD CONSTRAINT application_data_migrations_pkey PRIMARY KEY (name);
+
+
 CREATE TABLE public.audit_events (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     occurred_at timestamp with time zone DEFAULT now() NOT NULL,

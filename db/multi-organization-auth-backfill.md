@@ -28,7 +28,8 @@ Membership主キー昇格、旧契約削除までを完了し、新Application�
    - `INVITE_CREATOR_MEMBERSHIP_NOT_FOUND`
    - `LEGACY_MULTI_USE_INVITE`
    - `PENDING_ACTIVATION_USER`
-4. Organizationごとの認証PolicyとOIDC Providerを明示的に決定する。email domainやglobal設定から推測しない。
+4. 既存Organizationの初期認証Policyは、Cutover時点の明示的な`PASSWORD_LOGIN_ENABLED` / `OIDC_ENABLED`
+   とGoogle Client IDから作成される。Organization固有設定がすでに存在する場合は上書きしない。
 5. Database backupを取得し、restoreできることを確認する。
 
 `pedestrians.height`と`stride_length`はmeterとして扱います。`0 < value <= 3`以外はblocking issueとし、
@@ -41,10 +42,9 @@ Kaede directoryで実行します。
 ```sh
 # 1. maintenance modeへ切り替え、Kaede/Mio/workerからの全書込みを停止
 
-# 2. 新Table・Columnを追加するmigrationを適用
+# 2. deploy scriptがKaede migration runnerをbuild
+# 3. 新Table・Columnを追加するmigrationを適用
 make db-up ENV=production
-
-# 3. OrganizationごとのAuth Settings / OIDC Providerを確定・登録
 
 # 4. 最終preflight
 pnpm multi-org-auth-backfill preflight
@@ -52,23 +52,23 @@ pnpm multi-org-auth-backfill preflight
 # 5. 全データを1 transactionで移行・検証し、全Sessionをrevoke
 pnpm multi-org-auth-backfill cutover --batch-size 500
 
-# 6. Membership UUID primary key昇格と同時リリース対象のContract migrationを適用
-make db-up ENV=production
-
-# 7. 新Kaedeを起動し、smoke test後に新Mioを公開
+# 6. 新Kaedeを起動し、smoke test後に新Mioを公開
 ```
 
 `cutover`は次を単一transactionで実行します。
 
-1. 全scopeのpreflightを再検証する。
-2. Organization、Membership、contact email、User Profile、Member Profile、Pedestrian、Invite creatorを全件移行する。
-3. Membership単位Local Credential、canonical OIDC Identity、Membership OIDC Linkを全件移行する。
-4. core migrationの未移行件数がすべて0であることを検証する。
-5. auth backfillを再実行し、追加行が0であることを検証する。
-6. FK/CHECK/NOT NULL制約をvalidateする。
-7. 既存Sessionをすべてrevokeする。
+1. advisory lockを取得し、完了markerがあれば安全にno-opで終了する。
+2. 未設定Organizationだけに既存環境の認証方式を初期Policyとして登録する。
+3. 全scopeのpreflightを再検証する。
+4. Organization、Membership、contact email、User Profile、Member Profile、Pedestrian、Invite creatorを全件移行する。
+5. Membership単位Local Credential、canonical OIDC Identity、Membership OIDC Linkを全件移行する。
+6. core migrationの未移行件数がすべて0であることを検証する。
+7. auth backfillを再実行し、追加行が0であることを検証する。
+8. FK/CHECK/NOT NULL制約をvalidateする。
+9. 既存Sessionをすべてrevokeし、完了markerを保存する。
 
-途中で失敗した場合はtransaction全体がrollbackされます。原因を修正して最初から再実行します。
+途中で失敗した場合はtransaction全体がrollbackされます。原因を修正して最初から再実行します。完了後の通常deployでは
+markerを検出してno-opになるため、既存Sessionを再度revokeしません。
 
 ## 移行内容
 

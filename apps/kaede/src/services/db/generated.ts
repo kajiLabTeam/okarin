@@ -50,6 +50,12 @@ export interface AnalysisRunTrajectories {
   trajectory_id: string
 }
 
+export interface ApplicationDataMigrations {
+  completed_at: Generated<Timestamp>
+  details: Generated<Json>
+  name: string
+}
+
 export interface AuditEvents {
   action: string
   actor_membership_id: string | null
@@ -376,6 +382,7 @@ export interface Users {
 export interface DB {
   analysis_run_trajectories: AnalysisRunTrajectories
   analysis_runs: AnalysisRuns
+  application_data_migrations: ApplicationDataMigrations
   audit_events: AuditEvents
   auth_identities: AuthIdentities
   authentication_events: AuthenticationEvents

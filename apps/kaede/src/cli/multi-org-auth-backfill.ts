@@ -46,7 +46,13 @@ export const main = async (argv = process.argv.slice(2)) => {
   } = await import('../services/migrations/multi-org-auth-backfill.js')
 
   if (options.command === 'cutover') {
-    const result = await executeOneShotMultiOrgAuthCutover(options.batchSize)
+    const { getOidcRuntimeConfig } = await import('../config/runtime.js')
+    const config = getOidcRuntimeConfig()
+    const result = await executeOneShotMultiOrgAuthCutover(options.batchSize, undefined, {
+      google_client_id: config.googleClientId,
+      local_auth_enabled: config.passwordLoginEnabled,
+      oidc_auth_enabled: config.enabled,
+    })
     process.stdout.write(`${JSON.stringify(result)}\n`)
     return
   }

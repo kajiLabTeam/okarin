@@ -5,6 +5,7 @@ import type { DB } from '../../src/services/db/generated.js'
 export const resetDatabase = async (db: Kysely<DB>) => {
   await sql`
     TRUNCATE TABLE
+      application_data_migrations,
       audit_events,
       authentication_events,
       oidc_login_transactions,
