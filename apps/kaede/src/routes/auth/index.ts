@@ -5,6 +5,7 @@ import { registerChangePasswordRoute } from './change-password.js'
 import { registerLoginRoute } from './login.js'
 import { registerLogoutRoute } from './logout.js'
 import { registerMeRoute } from './me.js'
+import { registerMobileSessionExchangeRoute } from './mobile-session-exchange.js'
 import { registerGoogleOidcCallbackRoute } from './oidc-google-callback.js'
 import { registerGoogleOidcLinkRoute } from './oidc-google-link.js'
 import { registerGoogleOidcLoginRoute } from './oidc-google-login.js'
@@ -20,3 +21,4 @@ registerActivationCompleteRoute(authRoutes)
 registerLogoutRoute(authRoutes)
 registerMeRoute(authRoutes)
 registerChangePasswordRoute(authRoutes)
+registerMobileSessionExchangeRoute(authRoutes)

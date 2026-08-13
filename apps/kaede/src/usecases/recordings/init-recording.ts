@@ -13,6 +13,10 @@ import { requireRecordingAccess } from '../authorization.js'
 export type InitRecordingError =
   | AuthorizationError
   | {
+      type: 'RESOURCE_NOT_FOUND'
+      resourceId: string
+    }
+  | {
       type: 'PEDESTRIAN_NOT_FOUND'
       pedestrianId: string
     }
@@ -63,7 +67,11 @@ const throwOrganizationInvariantError = (message: string): never => {
   throw error
 }
 
-export const initRecording = async (actor: RequestActor, payload: InitRecordingRequest) => {
+export const initRecording = async (
+  actor: RequestActor,
+  payload: InitRecordingRequest,
+  organizationId?: string
+): Promise<InitRecordingResult> => {
   const [pedestrian, floor] = await Promise.all([
     findPedestrianById(payload.pedestrian_id),
     findFloorById(payload.floor_id),
@@ -73,8 +81,9 @@ export const initRecording = async (actor: RequestActor, payload: InitRecordingR
     return {
       ok: false,
       error: {
-        type: 'PEDESTRIAN_NOT_FOUND',
-        pedestrianId: payload.pedestrian_id,
+        ...(organizationId
+          ? { type: 'RESOURCE_NOT_FOUND' as const, resourceId: payload.pedestrian_id }
+          : { type: 'PEDESTRIAN_NOT_FOUND' as const, pedestrianId: payload.pedestrian_id }),
       },
     } satisfies InitRecordingResult
   }
@@ -83,8 +92,9 @@ export const initRecording = async (actor: RequestActor, payload: InitRecordingR
     return {
       ok: false,
       error: {
-        type: 'FLOOR_NOT_FOUND',
-        floorId: payload.floor_id,
+        ...(organizationId
+          ? { type: 'RESOURCE_NOT_FOUND' as const, resourceId: payload.floor_id }
+          : { type: 'FLOOR_NOT_FOUND' as const, floorId: payload.floor_id }),
       },
     } satisfies InitRecordingResult
   }
@@ -95,6 +105,20 @@ export const initRecording = async (actor: RequestActor, payload: InitRecordingR
 
   if (!floor.organization_id) {
     throwOrganizationInvariantError(`floor ${floor.id} does not have organization_id`)
+  }
+
+  if (organizationId && pedestrian.organization_id !== organizationId) {
+    return {
+      ok: false,
+      error: { type: 'RESOURCE_NOT_FOUND', resourceId: payload.pedestrian_id },
+    } satisfies InitRecordingResult
+  }
+
+  if (organizationId && floor.organization_id !== organizationId) {
+    return {
+      ok: false,
+      error: { type: 'RESOURCE_NOT_FOUND', resourceId: payload.floor_id },
+    } satisfies InitRecordingResult
   }
 
   if (pedestrian.organization_id !== floor.organization_id) {

@@ -1,5 +1,6 @@
 export {
   findPedestrianById,
+  findPedestrianByUserIdAndOrganizationId,
   findPedestrianByUserId,
   insertPedestrian,
   listPedestrians,

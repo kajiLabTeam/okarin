@@ -117,6 +117,20 @@ export const findValidSessionByToken = async (
   }
 }
 
+export const findValidSessionById = async (
+  sessionId: string,
+  now: Date = new Date(),
+  executor: DbExecutor = db
+): Promise<Session | undefined> => {
+  return executor
+    .selectFrom('sessions')
+    .selectAll()
+    .where('id', '=', sessionId)
+    .where('revoked_at', 'is', null)
+    .where('expires_at', '>', now)
+    .executeTakeFirst()
+}
+
 export const revokeSessionByToken = async (
   token: string,
   revokedAt: Date = new Date(),
@@ -166,4 +180,20 @@ export const updateSessionLastSeen = async (
     .where('id', '=', sessionId)
     .returningAll()
     .executeTakeFirst()
+}
+
+export const rotateSessionToken = async (
+  sessionId: string,
+  executor: DbExecutor = db
+): Promise<{ token: string; session: Session } | undefined> => {
+  const token = generateSessionToken()
+  const session = await executor
+    .updateTable('sessions')
+    .set({ session_hash: hashSessionToken(token) })
+    .where('id', '=', sessionId)
+    .where('revoked_at', 'is', null)
+    .where('expires_at', '>', new Date())
+    .returningAll()
+    .executeTakeFirst()
+  return session ? { token, session } : undefined
 }

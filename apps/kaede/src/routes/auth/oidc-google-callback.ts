@@ -90,6 +90,14 @@ export const registerGoogleOidcCallbackRoute = (app: OpenAPIHono) => {
           302
         )
       }
+      if (result.value.mobileSessionExchangeCode && result.value.mobileRedirectUri) {
+        const mobileRedirect = new URL(result.value.mobileRedirectUri)
+        mobileRedirect.searchParams.set(
+          'mobile_session_exchange_code',
+          result.value.mobileSessionExchangeCode
+        )
+        return c.redirect(mobileRedirect.toString(), 302)
+      }
       if (result.value.sessionToken) setSessionCookie(c, result.value.sessionToken)
 
       return c.redirect(organizationCompletionUrl('success', result.value.return_to), 302)

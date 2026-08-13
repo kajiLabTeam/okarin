@@ -44,6 +44,24 @@ export const findRecordingById = async (
     .executeTakeFirst()
 }
 
+export const findRecordingByIdForOrganization = async (
+  recordingId: string,
+  organizationId: string,
+  executor: DbExecutor = db
+): Promise<Recording | undefined> => {
+  return executor
+    .selectFrom('recordings as recording')
+    .innerJoin('pedestrians as pedestrian', 'pedestrian.id', 'recording.pedestrian_id')
+    .innerJoin('floors as floor', 'floor.id', 'recording.floor_id')
+    .selectAll('recording')
+    .where('recording.id', '=', recordingId)
+    .where('recording.deleted_at', 'is', null)
+    .where('recording.organization_id', '=', organizationId)
+    .where('pedestrian.organization_id', '=', organizationId)
+    .where('floor.organization_id', '=', organizationId)
+    .executeTakeFirst()
+}
+
 export const listRecordingsByOrganizationIdPaginated = async (
   organizationId: string,
   options: PaginationOptions,
@@ -131,6 +149,27 @@ export const findRecordingAuthorizationById = async (
       'pedestrians.user_id as pedestrian_user_id',
     ])
     .where('recordings.id', '=', recordingId)
+    .executeTakeFirst()
+}
+
+export const findRecordingAuthorizationByIdForOrganization = async (
+  recordingId: string,
+  organizationId: string,
+  executor: DbExecutor = db
+): Promise<RecordingAuthorizationRow | undefined> => {
+  return activeRecordingsQuery(executor)
+    .innerJoin('pedestrians', 'pedestrians.id', 'recordings.pedestrian_id')
+    .innerJoin('floors', 'floors.id', 'recordings.floor_id')
+    .select([
+      'recordings.id as id',
+      'recordings.organization_id as organization_id',
+      'recordings.pedestrian_id as pedestrian_id',
+      'pedestrians.user_id as pedestrian_user_id',
+    ])
+    .where('recordings.id', '=', recordingId)
+    .where('recordings.organization_id', '=', organizationId)
+    .where('pedestrians.organization_id', '=', organizationId)
+    .where('floors.organization_id', '=', organizationId)
     .executeTakeFirst()
 }
 

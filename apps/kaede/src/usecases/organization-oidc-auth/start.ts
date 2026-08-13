@@ -36,6 +36,8 @@ export interface StartOrganizationOidcOptions {
 export type StartOrganizationOidcError =
   | { type: 'AUTH_METHOD_NOT_ALLOWED' }
   | { type: 'AUTH_SESSION_REQUIRED' }
+  | { type: 'AUTH_UNAUTHENTICATED' }
+  | { type: 'AUTH_SESSION_ALREADY_EXISTS' }
   | { type: 'AUTH_SESSION_EXPIRED' }
   | { type: 'AUTH_SESSION_REVOKED' }
   | { type: 'AUTH_MEMBERSHIP_NOT_ACTIVE' }
@@ -95,12 +97,15 @@ export const startOrganizationOidc = async (
     if (sessionToken) {
       const session = await findValidSessionByToken(sessionToken, now, trx)
       if (!session.ok) return { ok: false, error: mapSessionError(session.error) } as const
+      if (payload.intent === 'login') {
+        return { ok: false, error: { type: 'AUTH_SESSION_ALREADY_EXISTS' } } as const
+      }
       sessionId = session.session.id
       sessionUserId = session.session.user_id
     }
     if (payload.intent === 'reauthenticate' || payload.intent === 'link_identity') {
       if (!sessionId || !sessionUserId) {
-        return { ok: false, error: { type: 'AUTH_SESSION_REQUIRED' } } as const
+        return { ok: false, error: { type: 'AUTH_UNAUTHENTICATED' } } as const
       }
       const membership = await findActiveMembershipByOrganizationAndUser(
         provider.organization_id,
@@ -168,7 +173,11 @@ export const startOrganizationOidc = async (
           codeVerifier,
           options.transactionSecret
         ),
-        return_to: payload.return_to,
+        return_to: payload.return_to ?? '/',
+        expected_user_id: payload.intent === 'reauthenticate' ? sessionUserId : null,
+        mobile_redirect_uri: payload.mobile?.redirect_uri ?? null,
+        mobile_code_challenge: payload.mobile?.code_challenge ?? null,
+        mobile_code_challenge_method: payload.mobile?.code_challenge_method ?? null,
         expires_at: new Date(now.getTime() + OIDC_TRANSACTION_TTL_MS),
         consumed_at: null,
       },

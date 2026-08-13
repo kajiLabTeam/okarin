@@ -1,6 +1,9 @@
 import type { RequestActor } from '../../middleware/request-actor-context.js'
 import type { PedestrianResponse } from '../../schemas/pedestrians.js'
-import { findPedestrianByUserId } from '../../services/pedestrians/index.js'
+import {
+  findPedestrianByUserId,
+  findPedestrianByUserIdAndOrganizationId,
+} from '../../services/pedestrians/index.js'
 import type { AuthorizationError } from '../authorization.js'
 import { toPedestrianResponse } from './pedestrian-response.js'
 
@@ -23,6 +26,32 @@ export const getMyPedestrian = async (actor: RequestActor): Promise<GetMyPedestr
   }
 
   const pedestrian = await findPedestrianByUserId(actor.user_id)
+
+  if (!pedestrian) {
+    return {
+      ok: false,
+      error: { type: 'PEDESTRIAN_NOT_FOUND' },
+    }
+  }
+
+  return {
+    ok: true,
+    value: toPedestrianResponse(pedestrian),
+  }
+}
+
+export const getMyPedestrianForOrganization = async (
+  actor: RequestActor,
+  organizationId: string
+): Promise<GetMyPedestrianResult> => {
+  if (actor.type === 'service_client') {
+    return {
+      ok: false,
+      error: { type: 'AUTH_ORGANIZATION_FORBIDDEN' },
+    }
+  }
+
+  const pedestrian = await findPedestrianByUserIdAndOrganizationId(actor.user_id, organizationId)
 
   if (!pedestrian) {
     return {

@@ -4,7 +4,9 @@ import type { UploadTarget } from '../../schemas/common.js'
 import type { RecordingIdParams } from '../../schemas/recordings.js'
 import {
   findRecordingAuthorizationById,
+  findRecordingAuthorizationByIdForOrganization,
   findRecordingById,
+  findRecordingByIdForOrganization,
   markRecordingUploadReady,
 } from '../../services/recordings/index.js'
 import {
@@ -51,9 +53,12 @@ export type CompleteUploadResult =
 
 export const completeUpload = async (
   actor: RequestActor,
-  params: RecordingIdParams
+  params: RecordingIdParams,
+  organizationId?: string
 ): Promise<CompleteUploadResult> => {
-  const recording = await findRecordingById(params.recordingId)
+  const recording = organizationId
+    ? await findRecordingByIdForOrganization(params.recordingId, organizationId)
+    : await findRecordingById(params.recordingId)
 
   if (!recording) {
     return {
@@ -65,7 +70,9 @@ export const completeUpload = async (
     }
   }
 
-  const recordingAuthorization = await findRecordingAuthorizationById(recording.id)
+  const recordingAuthorization = organizationId
+    ? await findRecordingAuthorizationByIdForOrganization(recording.id, organizationId)
+    : await findRecordingAuthorizationById(recording.id)
 
   if (!recordingAuthorization) {
     return {

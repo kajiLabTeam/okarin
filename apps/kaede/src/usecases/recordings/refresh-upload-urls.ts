@@ -4,7 +4,9 @@ import { recordingUploadStatusSchema } from '../../schemas/common.js'
 import type { RefreshUploadUrlsRequest, RecordingIdParams } from '../../schemas/recordings.js'
 import {
   findRecordingAuthorizationById,
+  findRecordingAuthorizationByIdForOrganization,
   findRecordingById,
+  findRecordingByIdForOrganization,
 } from '../../services/recordings/index.js'
 import { issueRecordingUploadUrls } from '../../services/storage/index.js'
 import type { AuthorizationError } from '../authorization.js'
@@ -50,9 +52,12 @@ export type RefreshUploadUrlsResult =
 export const refreshUploadUrls = async (
   actor: RequestActor,
   params: RecordingIdParams,
-  payload: RefreshUploadUrlsRequest
+  payload: RefreshUploadUrlsRequest,
+  organizationId?: string
 ) => {
-  const recording = await findRecordingById(params.recordingId)
+  const recording = organizationId
+    ? await findRecordingByIdForOrganization(params.recordingId, organizationId)
+    : await findRecordingById(params.recordingId)
 
   if (!recording) {
     return {
@@ -64,7 +69,9 @@ export const refreshUploadUrls = async (
     } satisfies RefreshUploadUrlsResult
   }
 
-  const recordingAuthorization = await findRecordingAuthorizationById(recording.id)
+  const recordingAuthorization = organizationId
+    ? await findRecordingAuthorizationByIdForOrganization(recording.id, organizationId)
+    : await findRecordingAuthorizationById(recording.id)
 
   if (!recordingAuthorization) {
     return {

@@ -75,6 +75,11 @@ export const toInitRecordingErrorResponse = (error: InitRecordingError) => {
     case 'AUTH_DASHBOARD_FORBIDDEN':
     case 'AUTH_ORGANIZATION_FORBIDDEN':
       return toAuthorizationErrorResponse(error)
+    case 'RESOURCE_NOT_FOUND':
+      return {
+        body: { error_code: 'RESOURCE_NOT_FOUND', error_message: 'resource not found' },
+        status: 404 as const,
+      }
     case 'PEDESTRIAN_NOT_FOUND':
       return {
         body: {

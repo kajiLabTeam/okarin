@@ -26,7 +26,17 @@ export const organizationOidcStartParamsSchema = z.object({
 export const organizationOidcStartRequestSchema = z
   .object({
     intent: oidcIntentSchema,
-    return_to: safeReturnToSchema,
+    return_to: safeReturnToSchema.optional(),
+    mobile: z
+      .object({
+        redirect_uri: z.string().url(),
+        code_challenge: z
+          .string()
+          .length(43)
+          .regex(/^[A-Za-z0-9_-]+$/),
+        code_challenge_method: z.literal('S256'),
+      })
+      .optional(),
     invite_token: z.string().min(1).optional(),
   })
   .superRefine((value, context) => {
@@ -42,6 +52,28 @@ export const organizationOidcStartRequestSchema = z
         code: z.ZodIssueCode.custom,
         message: 'invite_token is only allowed for accept_invite',
         path: ['invite_token'],
+      })
+    }
+    const isMobileIntent = value.intent === 'login' || value.intent === 'reauthenticate'
+    if (isMobileIntent && !value.return_to && !value.mobile) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'return_to or mobile is required',
+        path: ['return_to'],
+      })
+    }
+    if (value.mobile && !isMobileIntent) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'mobile is only allowed for login or reauthenticate',
+        path: ['mobile'],
+      })
+    }
+    if (value.mobile && value.return_to) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'return_to cannot be combined with mobile',
+        path: ['return_to'],
       })
     }
   })
