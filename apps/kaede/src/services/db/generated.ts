@@ -149,6 +149,23 @@ export interface OidcLoginTransactions {
   return_to: string
   session_id: string | null
   state_hash: string
+  expected_user_id: string | null
+  mobile_redirect_uri: string | null
+  mobile_code_challenge: string | null
+  mobile_code_challenge_method: string | null
+}
+
+export interface MobileSessionExchangeCodes {
+  id: Generated<string>
+  code_hash: string
+  oidc_transaction_id: string
+  session_id: string
+  user_id: string
+  organization_id: string
+  intent: string
+  expires_at: Timestamp
+  consumed_at: Timestamp | null
+  created_at: Generated<Timestamp>
 }
 
 export interface OrganizationAuthSettings {
@@ -390,6 +407,7 @@ export interface DB {
   floors: Floors
   oidc_identities: OidcIdentities
   oidc_login_transactions: OidcLoginTransactions
+  mobile_session_exchange_codes: MobileSessionExchangeCodes
   organization_auth_settings: OrganizationAuthSettings
   organization_creation_requests: OrganizationCreationRequests
   organization_invite_redemptions: OrganizationInviteRedemptions

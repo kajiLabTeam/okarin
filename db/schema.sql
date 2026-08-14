@@ -218,6 +218,10 @@ CREATE TABLE public.oidc_login_transactions (
     nonce text NOT NULL,
     pkce_code_verifier_ciphertext text NOT NULL,
     return_to text NOT NULL,
+    expected_user_id uuid,
+    mobile_redirect_uri text,
+    mobile_code_challenge text,
+    mobile_code_challenge_method text,
     expires_at timestamp with time zone NOT NULL,
     consumed_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -225,9 +229,28 @@ CREATE TABLE public.oidc_login_transactions (
     CONSTRAINT oidc_login_transactions_intent_state_chk CHECK ((((intent = 'login'::text) AND (session_id IS NULL) AND (invite_id IS NULL)) OR ((intent = 'reauthenticate'::text) AND (session_id IS NOT NULL) AND (invite_id IS NULL)) OR ((intent = 'accept_invite'::text) AND (invite_id IS NOT NULL)) OR ((intent = 'link_identity'::text) AND (session_id IS NOT NULL) AND (invite_id IS NULL)))),
     CONSTRAINT oidc_login_transactions_nonce_nonempty_chk CHECK ((length(btrim(nonce)) > 0)),
     CONSTRAINT oidc_login_transactions_pkce_nonempty_chk CHECK ((length(btrim(pkce_code_verifier_ciphertext)) > 0)),
+    CONSTRAINT oidc_login_transactions_mobile_fields_chk CHECK (((mobile_redirect_uri IS NULL AND mobile_code_challenge IS NULL AND mobile_code_challenge_method IS NULL) OR (mobile_redirect_uri IS NOT NULL AND mobile_code_challenge IS NOT NULL AND mobile_code_challenge_method = 'S256'::text))),
     CONSTRAINT oidc_login_transactions_return_to_chk CHECK ((("left"(return_to, 1) = '/'::text) AND ("left"(return_to, 2) <> '//'::text) AND (POSITION(('\'::text) IN (return_to)) = 0))),
     CONSTRAINT oidc_login_transactions_state_hash_nonempty_chk CHECK ((length(btrim(state_hash)) > 0))
 );
+
+CREATE TABLE public.mobile_session_exchange_codes (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    code_hash text NOT NULL,
+    oidc_transaction_id uuid NOT NULL,
+    session_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    intent text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    consumed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT mobile_session_exchange_codes_hash_nonempty_chk CHECK ((length(btrim(code_hash)) > 0)),
+    CONSTRAINT mobile_session_exchange_codes_intent_chk CHECK ((intent = ANY (ARRAY['login'::text, 'reauthenticate'::text])))
+);
+
+CREATE UNIQUE INDEX mobile_session_exchange_codes_code_hash_idx ON public.mobile_session_exchange_codes USING btree (code_hash);
+CREATE INDEX mobile_session_exchange_codes_expiry_idx ON public.mobile_session_exchange_codes USING btree (expires_at) WHERE (consumed_at IS NULL);
 
 
 --

@@ -44,6 +44,7 @@ const floorRowsQuery = () =>
       'floors.created_at',
       'floors.updated_at',
     ])
+    .whereRef('buildings.organization_id', '=', 'floors.organization_id')
 
 export const listFloors = async ({ buildingIds, organizationIds }: ListFloorsOptions = {}) => {
   if (buildingIds?.length === 0 || organizationIds?.length === 0) {

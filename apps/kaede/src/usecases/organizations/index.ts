@@ -315,6 +315,68 @@ const requireOrganizationManagerOrAdmin = async (
   }
 }
 
+const requireOrganizationMemberOrAdmin = async (
+  sessionToken: string | undefined,
+  organizationId: string,
+  executor?: DbExecutor
+): Promise<
+  OrganizationResult<{
+    userId: string
+    globalRole: 'none' | 'admin'
+    membershipRole: string | null
+  }>
+> => {
+  const actor = await requireActiveSessionUser(sessionToken, executor)
+
+  if (!actor.ok) {
+    return {
+      ok: false,
+      error: mapAuthError(actor.error),
+    }
+  }
+
+  const organization = await findOrganizationById(organizationId, executor)
+
+  if (!organization) {
+    return {
+      ok: false,
+      error: { type: 'ORGANIZATION_NOT_FOUND' },
+    }
+  }
+
+  if (actor.value.global_role === 'admin') {
+    return {
+      ok: true,
+      value: {
+        userId: actor.value.id,
+        globalRole: 'admin',
+        membershipRole: null,
+      },
+    }
+  }
+
+  const membership = await findOrganizationMembership(organizationId, actor.value.id, executor)
+
+  if (
+    membership?.status !== 'active' ||
+    (membership.role !== 'member' && membership.role !== 'manager' && membership.role !== 'owner')
+  ) {
+    return {
+      ok: false,
+      error: { type: 'AUTH_FORBIDDEN' },
+    }
+  }
+
+  return {
+    ok: true,
+    value: {
+      userId: actor.value.id,
+      globalRole: 'none',
+      membershipRole: membership.role,
+    },
+  }
+}
+
 export const listOrganizationsForSession = async (
   sessionToken: string | undefined,
   executor?: DbExecutor
@@ -516,7 +578,7 @@ export const listOrganizationFloorsForSession = async (
   organizationId: string,
   executor?: DbExecutor
 ): Promise<OrganizationResult<{ floors: FloorResponse[] }>> => {
-  const actor = await requireOrganizationManagerOrAdmin(sessionToken, organizationId, executor)
+  const actor = await requireOrganizationMemberOrAdmin(sessionToken, organizationId, executor)
 
   if (!actor.ok) {
     return actor

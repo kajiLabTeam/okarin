@@ -17,9 +17,11 @@ export {
   createSession,
   findSessionByToken,
   findValidSessionByToken,
+  findValidSessionById,
   revokeAllSessionsByUserId,
   revokeSessionByToken,
   updateSessionLastSeen,
+  rotateSessionToken,
 } from './session-repository.js'
 export type { CreateSessionParams, CreateSessionResult, Session } from './session-repository.js'
 export { generateSessionToken, hashSessionToken } from './session-token.js'

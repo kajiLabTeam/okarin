@@ -60,3 +60,24 @@ export const findPedestrianByUserId = async (
     .where('user_id', '=', userId)
     .executeTakeFirst()
 }
+
+export const findPedestrianByUserIdAndOrganizationId = async (
+  userId: string,
+  organizationId: string,
+  executor: DbExecutor = db
+): Promise<Pedestrian | undefined> => {
+  return executor
+    .selectFrom('pedestrians as pedestrian')
+    .innerJoin('organization_memberships as membership', (join) =>
+      join
+        .onRef('membership.id', '=', 'pedestrian.membership_id')
+        .onRef('membership.organization_id', '=', 'pedestrian.organization_id')
+    )
+    .selectAll('pedestrian')
+    .where('pedestrian.user_id', '=', userId)
+    .where('pedestrian.organization_id', '=', organizationId)
+    .where('membership.user_id', '=', userId)
+    .where('membership.organization_id', '=', organizationId)
+    .where('membership.status', '=', 'active')
+    .executeTakeFirst()
+}

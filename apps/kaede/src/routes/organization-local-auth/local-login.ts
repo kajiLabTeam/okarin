@@ -37,6 +37,16 @@ const localAuthError = (type: string) => {
         status: 403 as const,
         body: { error_code: type, error_message: 'user is disabled' },
       }
+    case 'AUTH_UNAUTHENTICATED':
+      return {
+        status: 401 as const,
+        body: { error_code: type, error_message: 'login required' },
+      }
+    case 'AUTH_SESSION_ALREADY_EXISTS':
+      return {
+        status: 409 as const,
+        body: { error_code: type, error_message: 'a valid session already exists' },
+      }
     case 'AUTH_CREDENTIAL_LOCKED':
       return {
         status: 429 as const,
@@ -84,6 +94,10 @@ export const registerLocalOrganizationLoginRoute = (app: OpenAPIHono) => {
         description: 'invalid credentials or session',
         content: { 'application/json': { schema: errorResponseSchema } },
       },
+      409: {
+        description: 'a valid session already exists',
+        content: { 'application/json': { schema: errorResponseSchema } },
+      },
       403: {
         description: 'local authentication is not allowed',
         content: { 'application/json': { schema: errorResponseSchema } },
@@ -113,7 +127,7 @@ export const registerLocalOrganizationLoginRoute = (app: OpenAPIHono) => {
     }
 
     if (result.value.sessionToken) {
-      setSessionCookie(c, result.value.sessionToken)
+      setSessionCookie(c, result.value.sessionToken, result.value.session.expires_at)
     }
 
     return c.json(

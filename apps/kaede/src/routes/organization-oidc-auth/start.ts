@@ -13,7 +13,13 @@ import { getSessionTokenFromCookie } from '../auth/cookie.js'
 
 const errorStatus = (type: string) => {
   if (type === 'INVITE_INVALID' || type === 'OIDC_PROVIDER_NOT_FOUND') return 404 as const
-  if (type === 'AUTH_SESSION_REQUIRED' || type.includes('SESSION_')) return 401 as const
+  if (type === 'AUTH_SESSION_ALREADY_EXISTS') return 409 as const
+  if (
+    type === 'AUTH_SESSION_REQUIRED' ||
+    type === 'AUTH_UNAUTHENTICATED' ||
+    type.includes('SESSION_')
+  )
+    return 401 as const
   return 403 as const
 }
 
@@ -39,6 +45,10 @@ export const registerOrganizationOidcStartRoute = (app: OpenAPIHono) => {
         description: 'OIDC not allowed',
         content: { 'application/json': { schema: errorResponseSchema } },
       },
+      409: {
+        description: 'a valid session already exists',
+        content: { 'application/json': { schema: errorResponseSchema } },
+      },
       404: {
         description: 'provider or invite not found',
         content: { 'application/json': { schema: errorResponseSchema } },
@@ -54,6 +64,16 @@ export const registerOrganizationOidcStartRoute = (app: OpenAPIHono) => {
         403
       )
     }
+    const payload = c.req.valid('json')
+    if (payload.mobile && payload.mobile.redirect_uri !== config.mobileRedirectUri) {
+      return c.json(
+        {
+          error_code: 'AUTH_METHOD_NOT_ALLOWED',
+          error_message: 'mobile redirect URI is not allowed',
+        },
+        403
+      )
+    }
     const { organizationSlug, providerId } = c.req.valid('param')
     const client = new GoogleOidcClient({
       clientId: config.googleClientId,
@@ -64,7 +84,7 @@ export const registerOrganizationOidcStartRoute = (app: OpenAPIHono) => {
       organizationSlug,
       providerId,
       getSessionTokenFromCookie(c),
-      c.req.valid('json'),
+      payload,
       {
         client,
         configuredClientId: config.googleClientId,

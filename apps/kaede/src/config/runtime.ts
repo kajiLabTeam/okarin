@@ -44,6 +44,7 @@ export interface OidcRuntimeConfig {
   stateCookieSecret: string
   passwordLoginEnabled: boolean
   organizationCreationRequestsEnabled: boolean
+  mobileRedirectUri: string
 }
 
 export interface StorageRuntimeConfig {
@@ -210,6 +211,10 @@ export const getOidcRuntimeConfig = (): OidcRuntimeConfig => {
     stateCookieSecret: enabled ? getRequiredEnv('OIDC_STATE_COOKIE_SECRET') : '',
     passwordLoginEnabled,
     organizationCreationRequestsEnabled,
+    mobileRedirectUri: getOptionalEnv(
+      'MOBILE_OIDC_REDIRECT_URI',
+      'https://ayumi.okarin.app/auth/callback'
+    ),
   }
 
   return oidcRuntimeConfig

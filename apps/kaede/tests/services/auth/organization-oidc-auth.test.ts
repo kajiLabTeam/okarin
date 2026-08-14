@@ -110,13 +110,14 @@ const linkIdentity = async (
 
 const startLogin = async (
   fixture: Awaited<ReturnType<typeof createFixture>>,
-  sessionToken?: string
+  sessionToken?: string,
+  intent: 'login' | 'reauthenticate' = 'login'
 ) => {
   const result = await startOrganizationOidc(
     fixture.organization.slug,
     fixture.provider.id,
     sessionToken,
-    { intent: 'login', return_to: '/orgs/oidc-organization' },
+    { intent, return_to: '/orgs/oidc-organization' },
     {
       client: {
         createAuthorizationUrl: ({ state }) =>
@@ -309,8 +310,12 @@ describe('organization OIDC authentication', () => {
     const fixture = await createFixture()
     await linkIdentity(fixture)
     const otherUser = await createUser('other-user@example.test')
+    await db
+      .insertInto('organization_memberships')
+      .values({ organization_id: fixture.organization.id, user_id: otherUser.id, role: 'member' })
+      .execute()
     const session = await createSession({ userId: otherUser.id, now }, db)
-    const state = await startLogin(fixture, session.token)
+    const state = await startLogin(fixture, session.token, 'reauthenticate')
 
     const result = await completeOrganizationOidc('authorization-code', state, {
       client: callbackClient(),

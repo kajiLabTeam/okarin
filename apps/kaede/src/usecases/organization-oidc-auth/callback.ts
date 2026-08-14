@@ -2,6 +2,7 @@ import type { GoogleIdTokenClaims } from '../../services/auth/index.js'
 import { createSession, findValidSessionByToken } from '../../services/auth/index.js'
 import { db } from '../../services/db/index.js'
 import type { DbExecutor } from '../../services/executor.js'
+import { issueMobileSessionExchangeCode } from '../../services/mobile-session-exchange/index.js'
 import {
   canonicalizeOidcIssuer,
   claimOidcLoginTransaction,
@@ -81,6 +82,8 @@ export type CompleteOrganizationOidcResult =
       value: {
         return_to: string
         sessionToken?: string
+        mobileSessionExchangeCode?: string
+        mobileRedirectUri?: string
       }
     }
   | {
@@ -319,16 +322,15 @@ export const completeOrganizationOidc = async (
     let session
     let createdSessionToken: string | undefined
     if (transaction.intent === 'reauthenticate') {
-      if (!transaction.session_id || !options.sessionToken) {
+      if (!transaction.session_id) {
         return {
           ok: false,
           error: { type: 'AUTH_SESSION_REQUIRED' },
           return_to: transaction.return_to,
         } as const
       }
-      const cookieSession = await findValidSessionByToken(options.sessionToken, now, trx)
       const transactionSession = await findValidSessionById(transaction.session_id, now, trx)
-      if (!cookieSession.ok || cookieSession.session.id !== transactionSession?.id) {
+      if (transaction.expected_user_id !== transactionSession?.user_id) {
         return {
           ok: false,
           error: { type: 'AUTH_SESSION_REQUIRED' },
@@ -395,11 +397,27 @@ export const completeOrganizationOidc = async (
       trx
     )
 
+    const mobileSessionExchangeCode = transaction.mobile_redirect_uri
+      ? await issueMobileSessionExchangeCode(
+          {
+            oidcTransactionId: transaction.id,
+            sessionId: session.id,
+            userId: identity.user_id,
+            organizationId: provider.organization_id,
+            intent: transaction.intent as 'login' | 'reauthenticate',
+            now,
+          },
+          trx
+        )
+      : undefined
+
     return {
       ok: true,
       value: {
         return_to: transaction.return_to,
-        sessionToken: createdSessionToken,
+        sessionToken: transaction.mobile_redirect_uri ? undefined : createdSessionToken,
+        mobileSessionExchangeCode,
+        mobileRedirectUri: transaction.mobile_redirect_uri ?? undefined,
       },
     } as const
   })

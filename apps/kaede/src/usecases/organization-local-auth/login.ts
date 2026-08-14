@@ -24,6 +24,8 @@ export type LocalOrganizationLoginError =
   | { type: 'AUTH_IDENTITY_USER_MISMATCH' }
   | { type: 'AUTH_MEMBERSHIP_NOT_ACTIVE' }
   | { type: 'AUTH_USER_DISABLED' }
+  | { type: 'AUTH_UNAUTHENTICATED' }
+  | { type: 'AUTH_SESSION_ALREADY_EXISTS' }
   | { type: 'AUTH_SESSION_EXPIRED' }
   | { type: 'AUTH_SESSION_REVOKED' }
 
@@ -76,7 +78,7 @@ const sessionError = (
     case 'SESSION_REVOKED':
       return { type: 'AUTH_SESSION_REVOKED' }
     case 'SESSION_NOT_FOUND':
-      return { type: 'AUTH_INVALID_CREDENTIALS' }
+      return { type: 'AUTH_UNAUTHENTICATED' }
   }
 }
 
@@ -89,10 +91,24 @@ export const loginToOrganizationWithLocalCredential = async (
   executor?: DbExecutor
 ): Promise<LocalOrganizationLoginResult> => {
   return runInTransaction(executor, async (trx) => {
+    const intent = payload.intent ?? (sessionToken ? 'reauthenticate' : 'login')
     const policy = await findOrganizationLocalAuthPolicyBySlug(organizationSlug, trx)
 
     if (!policy?.local_auth_enabled || policy.organization_status !== 'active') {
       return { ok: false, error: { type: 'AUTH_METHOD_NOT_ALLOWED' } } as const
+    }
+
+    let existingSession: Awaited<ReturnType<typeof findValidSessionByToken>> | undefined
+    if (sessionToken) {
+      existingSession = await findValidSessionByToken(sessionToken, now, trx)
+      if (intent === 'reauthenticate' && !existingSession.ok) {
+        return { ok: false, error: sessionError(existingSession.error) } as const
+      }
+      if (intent === 'login' && existingSession.ok) {
+        return { ok: false, error: { type: 'AUTH_SESSION_ALREADY_EXISTS' } } as const
+      }
+    } else if (intent === 'reauthenticate') {
+      return { ok: false, error: { type: 'AUTH_UNAUTHENTICATED' } } as const
     }
 
     const normalizedLoginEmail = normalizeLocalLoginEmail(payload.login_email)
@@ -119,7 +135,7 @@ export const loginToOrganizationWithLocalCredential = async (
       return { ok: false, error: { type: 'AUTH_INVALID_CREDENTIALS' } } as const
     }
 
-    const eventType = sessionToken ? 'local_reauthenticate' : 'local_login'
+    const eventType = intent === 'reauthenticate' ? 'local_reauthenticate' : 'local_login'
     const eventContext = {
       event_type: eventType,
       user_id: credential.user_id,
@@ -181,16 +197,15 @@ export const loginToOrganizationWithLocalCredential = async (
     let activeSession
     let createdSessionToken: string | undefined
 
-    if (sessionToken) {
-      const sessionResult = await findValidSessionByToken(sessionToken, now, trx)
-      if (!sessionResult.ok) {
-        return { ok: false, error: sessionError(sessionResult.error) } as const
+    if (intent === 'reauthenticate') {
+      if (!existingSession?.ok) {
+        return { ok: false, error: { type: 'AUTH_UNAUTHENTICATED' } } as const
       }
-      if (sessionResult.session.user_id !== credential.user_id) {
+      if (existingSession.session.user_id !== credential.user_id) {
         await insertAuthenticationEvent(
           {
             ...eventContext,
-            session_id: sessionResult.session.id,
+            session_id: existingSession.session.id,
             outcome: 'failure',
             failure_code: 'AUTH_IDENTITY_USER_MISMATCH',
           },
@@ -198,7 +213,7 @@ export const loginToOrganizationWithLocalCredential = async (
         )
         return { ok: false, error: { type: 'AUTH_IDENTITY_USER_MISMATCH' } } as const
       }
-      activeSession = sessionResult.session
+      activeSession = existingSession.session
     } else {
       const created = await createSession(
         { authMethod: 'password', userId: credential.user_id, now },
@@ -261,7 +276,7 @@ export const loginToOrganizationWithLocalCredential = async (
           authenticated_at: grant.authenticated_at.toISOString(),
           expires_at: grant.expires_at.toISOString(),
         },
-        return_to: payload.return_to,
+        return_to: payload.return_to ?? '/',
       },
     }
   })

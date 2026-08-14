@@ -1,6 +1,8 @@
 export {
   findRecordingAuthorizationById,
+  findRecordingAuthorizationByIdForOrganization,
   findRecordingById,
+  findRecordingByIdForOrganization,
   insertRecording,
   listRecordingsByOrganizationIdPaginated,
   listRecordingsByPedestrianIdPaginated,
