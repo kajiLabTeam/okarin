@@ -1,3 +1,5 @@
+-- migrate:up
+
 ALTER TABLE oidc_login_transactions
   ADD COLUMN expected_user_id uuid,
   ADD COLUMN mobile_redirect_uri text,
@@ -34,3 +36,16 @@ CREATE UNIQUE INDEX mobile_session_exchange_codes_code_hash_idx
 CREATE INDEX mobile_session_exchange_codes_expiry_idx
   ON mobile_session_exchange_codes (expires_at)
   WHERE consumed_at IS NULL;
+
+-- migrate:down
+
+DROP INDEX IF EXISTS mobile_session_exchange_codes_expiry_idx;
+DROP INDEX IF EXISTS mobile_session_exchange_codes_code_hash_idx;
+DROP TABLE IF EXISTS mobile_session_exchange_codes;
+
+ALTER TABLE oidc_login_transactions
+  DROP CONSTRAINT IF EXISTS oidc_login_transactions_mobile_fields_chk,
+  DROP COLUMN IF EXISTS mobile_code_challenge_method,
+  DROP COLUMN IF EXISTS mobile_code_challenge,
+  DROP COLUMN IF EXISTS mobile_redirect_uri,
+  DROP COLUMN IF EXISTS expected_user_id;
