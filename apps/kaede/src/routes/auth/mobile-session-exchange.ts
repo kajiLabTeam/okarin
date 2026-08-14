@@ -2,7 +2,6 @@ import { createRoute, z } from '@hono/zod-openapi'
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { errorResponseSchema } from '../../schemas/common.js'
 import { rotateSessionToken } from '../../services/auth/index.js'
-import { consumeMobileSessionExchangeCode } from '../../services/mobile-session-exchange/index.js'
 import { setSessionCookie } from './cookie.js'
 
 const requestSchema = z
@@ -31,6 +30,10 @@ export const registerMobileSessionExchangeRoute = (app: OpenAPIHono) => {
   })
 
   app.openapi(route, async (c) => {
+    // Keep the database-backed exchange service out of auth route module initialization.
+    // This lets DB-free auth route tests register the route without DATABASE_URL.
+    const { consumeMobileSessionExchangeCode } =
+      await import('../../services/mobile-session-exchange/index.js')
     const payload = c.req.valid('json')
     const result = await consumeMobileSessionExchangeCode(
       payload.mobile_session_exchange_code,

@@ -13,6 +13,7 @@ const originalStateCookieSecret = process.env.OIDC_STATE_COOKIE_SECRET
 const originalPasswordLoginEnabled = process.env.PASSWORD_LOGIN_ENABLED
 const originalOrganizationCreationRequestsEnabled =
   process.env.ORGANIZATION_CREATION_REQUESTS_ENABLED
+const originalMobileOidcRedirectUri = process.env.MOBILE_OIDC_REDIRECT_URI
 
 const restoreEnv = () => {
   if (originalAppEnv === undefined) {
@@ -47,6 +48,7 @@ const restoreEnv = () => {
     'ORGANIZATION_CREATION_REQUESTS_ENABLED',
     originalOrganizationCreationRequestsEnabled
   )
+  restoreOptionalEnv('MOBILE_OIDC_REDIRECT_URI', originalMobileOidcRedirectUri)
 
   resetRuntimeConfigForTests()
 }
@@ -165,6 +167,7 @@ describe('getOidcRuntimeConfig', () => {
       stateCookieSecret: 'state-cookie-secret',
       passwordLoginEnabled: false,
       organizationCreationRequestsEnabled: false,
+      mobileRedirectUri: 'https://ayumi.okarin.app/auth/callback',
     })
   })
 })
