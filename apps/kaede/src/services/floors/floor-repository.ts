@@ -9,6 +9,7 @@ type NewFloor = Insertable<Floors>
 export interface ListFloorsOptions {
   buildingIds?: string[]
   organizationIds?: string[]
+  executor?: DbExecutor
 }
 
 export interface FloorRow {
@@ -26,8 +27,8 @@ export interface FloorRow {
   updated_at: Date
 }
 
-const floorRowsQuery = () =>
-  db
+const floorRowsQuery = (executor: DbExecutor = db) =>
+  executor
     .selectFrom('floors')
     .innerJoin('buildings', 'buildings.id', 'floors.building_id')
     .select([
@@ -46,12 +47,16 @@ const floorRowsQuery = () =>
     ])
     .whereRef('buildings.organization_id', '=', 'floors.organization_id')
 
-export const listFloors = async ({ buildingIds, organizationIds }: ListFloorsOptions = {}) => {
+export const listFloors = async ({
+  buildingIds,
+  organizationIds,
+  executor = db,
+}: ListFloorsOptions = {}) => {
   if (buildingIds?.length === 0 || organizationIds?.length === 0) {
     return []
   }
 
-  let query = floorRowsQuery()
+  let query = floorRowsQuery(executor)
 
   if (buildingIds) {
     query = query.where('floors.building_id', 'in', buildingIds)
@@ -71,13 +76,13 @@ export const listFloors = async ({ buildingIds, organizationIds }: ListFloorsOpt
 
 export const findFloorDetailById = async (
   floorId: string,
-  { organizationIds }: ListFloorsOptions = {}
+  { organizationIds, executor = db }: ListFloorsOptions = {}
 ): Promise<FloorRow | undefined> => {
   if (organizationIds?.length === 0) {
     return undefined
   }
 
-  let query = floorRowsQuery().where('floors.id', '=', floorId)
+  let query = floorRowsQuery(executor).where('floors.id', '=', floorId)
 
   if (organizationIds) {
     query = query.where('floors.organization_id', 'in', organizationIds)

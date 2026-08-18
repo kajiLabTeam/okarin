@@ -1,6 +1,6 @@
 import { createRoute } from '@hono/zod-openapi'
 import type { OpenAPIHono } from '@hono/zod-openapi'
-import { buildingsListResponseSchema } from '../../schemas/buildings.js'
+import { organizationBuildingsListResponseSchema } from '../../schemas/buildings.js'
 import { errorResponseSchema } from '../../schemas/common.js'
 import { organizationIdParamsSchema } from '../../schemas/organizations.js'
 import { listOrganizationBuildingsForSession } from '../../usecases/organizations/index.js'
@@ -21,7 +21,7 @@ export const registerListOrganizationBuildingsRoute = (app: OpenAPIHono) => {
         description: 'organization buildings',
         content: {
           'application/json': {
-            schema: buildingsListResponseSchema,
+            schema: organizationBuildingsListResponseSchema,
           },
         },
       },
