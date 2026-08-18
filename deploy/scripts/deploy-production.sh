@@ -187,9 +187,6 @@ compose_cmd build kaede
 log "Running database migrations for env: production"
 compose_cmd --profile tools run --rm -e DBMATE_SCHEMA_FILE=/tmp/schema.sql dbmate up
 
-log "Running one-shot multi-organization auth cutover for env: production"
-compose_cmd run --rm --no-deps kaede node dist/cli/multi-org-auth-backfill.js cutover
-
 log "Initializing object storage for env: production"
 compose_cmd --profile tools run --rm storage-bootstrap
 
