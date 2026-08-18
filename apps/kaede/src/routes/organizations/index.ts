@@ -8,6 +8,7 @@ import { registerCreateOrganizationUserActivationLinkRoute } from './create-orga
 import { registerCreateOrganizationUserRoute } from './create-organization-user.js'
 import { registerCreateOrganizationRoute } from './create-organization.js'
 import { registerCreateStayHeatmapRoute } from './create-stay-heatmap.js'
+import { registerGetOrganizationBuildingDetailRoute } from './get-organization-building-detail.js'
 import { registerGetOrganizationUserRoute } from './get-organization-user.js'
 import { registerGetOrganizationRoute } from './get-organization.js'
 import { registerOrganizationInviteRoutes } from './invites.js'
@@ -31,6 +32,7 @@ registerListOrganizationsRoute(organizationsRoutes)
 registerCreateOrganizationRoute(organizationsRoutes)
 registerGetOrganizationRoute(organizationsRoutes)
 registerListOrganizationBuildingsRoute(organizationsRoutes)
+registerGetOrganizationBuildingDetailRoute(organizationsRoutes)
 registerCreateOrganizationBuildingRoute(organizationsRoutes)
 registerCreateOrganizationBuildingFloorRoute(organizationsRoutes)
 registerListOrganizationBuildingFloorsRoute(organizationsRoutes)

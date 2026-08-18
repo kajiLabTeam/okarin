@@ -1,5 +1,5 @@
 import { getOidcRuntimeConfig } from '../../config/runtime.js'
-import type { BuildingResponse } from '../../schemas/buildings.js'
+import type { BuildingDetailResponse, BuildingResponse } from '../../schemas/buildings.js'
 import type { FloorResponse } from '../../schemas/floors.js'
 import type {
   ApproveOrganizationCreationRequestRequest,
@@ -24,6 +24,7 @@ import {
   revokeActivationTokensByUserId,
 } from '../../services/auth/index.js'
 import {
+  findBuildingDetailForOrganization,
   findBuildingDetailById,
   listBuildings as listBuildingRows,
 } from '../../services/buildings/index.js'
@@ -631,6 +632,69 @@ export const listOrganizationBuildingFloorsForSession = async (
     value: {
       floors: await Promise.all(floors.map(toFloorResponse)),
     },
+  }
+}
+
+const toBuildingDetailResponse = async (
+  detail: Awaited<ReturnType<typeof findBuildingDetailForOrganization>>
+): Promise<BuildingDetailResponse> => {
+  if (!detail) {
+    throw new Error('building detail is missing')
+  }
+
+  const floors = await Promise.all(
+    detail.floors.map(async (floor) => {
+      const response = await toFloorResponse(floor)
+      return {
+        floor_id: response.floor_id,
+        building_id: response.building_id,
+        organization_id: response.organization_id,
+        name: response.name,
+        level: response.level,
+        recording_count: floor.recording_count,
+        map_image: response.map_image,
+        created_at: response.created_at,
+        updated_at: response.updated_at,
+      }
+    })
+  )
+
+  return {
+    building: toBuildingResponse(detail.building),
+    summary: {
+      floor_count: floors.length,
+      recording_count: floors.reduce((total, floor) => total + floor.recording_count, 0),
+    },
+    floors,
+  }
+}
+
+export const getOrganizationBuildingDetailForSession = async (
+  sessionToken: string | undefined,
+  organizationId: string,
+  buildingId: string,
+  executor?: DbExecutor
+): Promise<OrganizationResult<BuildingDetailResponse>> => {
+  const actor = await requireOrganizationManagerOrAdmin(sessionToken, organizationId, executor)
+
+  if (!actor.ok) {
+    return actor
+  }
+
+  const detail = await findBuildingDetailForOrganization(organizationId, buildingId, executor)
+
+  if (!detail) {
+    return {
+      ok: false,
+      error: {
+        type: 'BUILDING_NOT_FOUND',
+      },
+    }
+  }
+
+  return {
+    ok: true,
+    value: await toBuildingDetailResponse(detail),
   }
 }
 
