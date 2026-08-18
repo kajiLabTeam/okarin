@@ -1,5 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { findBuildingDetailForOrganization } from '../../../src/services/buildings/index.js'
+import {
+  findBuildingDetailForOrganization,
+  listBuildingSummariesForOrganization,
+} from '../../../src/services/buildings/index.js'
 import { createDb } from '../../../src/services/db/client.js'
 import { resetDatabase } from '../../db/helpers.js'
 
@@ -145,5 +148,72 @@ describe('findBuildingDetailForOrganization', () => {
     await expect(
       findBuildingDetailForOrganization(organization.id, building.id, db)
     ).resolves.toBeUndefined()
+  })
+
+  it('organization 内の全 building を一括集計し、削除済み recording を除外する', async () => {
+    const organization = await db
+      .insertInto('organizations')
+      .values({ name: 'Group A' })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    const buildingA = await db
+      .insertInto('buildings')
+      .values({ organization_id: organization.id, name: 'Building A' })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    const buildingB = await db
+      .insertInto('buildings')
+      .values({ organization_id: organization.id, name: 'Building B' })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    const floor = await db
+      .insertInto('floors')
+      .values({
+        organization_id: organization.id,
+        building_id: buildingA.id,
+        level: 1,
+        name: '1F',
+        image_object_path: `maps/${buildingA.id}/66666666-6666-4666-8666-666666666666.png`,
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    const pedestrian = await db
+      .insertInto('pedestrians')
+      .values({ organization_id: organization.id, display_name: 'Pedestrian', user_id: null })
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    await db
+      .insertInto('recordings')
+      .values([
+        {
+          organization_id: organization.id,
+          floor_id: floor.id,
+          pedestrian_id: pedestrian.id,
+          upload_targets: ['accel'],
+        },
+        {
+          organization_id: organization.id,
+          floor_id: floor.id,
+          pedestrian_id: pedestrian.id,
+          upload_targets: ['gyro'],
+          deleted_at: new Date('2026-06-11T00:00:00.000Z'),
+        },
+      ])
+      .execute()
+
+    const result = await listBuildingSummariesForOrganization(organization.id, db)
+
+    expect(result).toEqual([
+      {
+        building: expect.objectContaining({ id: buildingA.id, name: 'Building A' }),
+        floor_count: 1,
+        recording_count: 1,
+      },
+      {
+        building: expect.objectContaining({ id: buildingB.id, name: 'Building B' }),
+        floor_count: 0,
+        recording_count: 0,
+      },
+    ])
   })
 })

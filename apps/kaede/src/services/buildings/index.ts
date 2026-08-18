@@ -4,5 +4,8 @@ export {
   insertBuilding,
   listBuildings,
 } from './building-repository.js'
-export { findBuildingDetailForOrganization } from './building-detail-repository.js'
+export {
+  findBuildingDetailForOrganization,
+  listBuildingSummariesForOrganization,
+} from './building-detail-repository.js'
 export type { ListBuildingsOptions } from './building-repository.js'

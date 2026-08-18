@@ -1,5 +1,8 @@
 import { getOidcRuntimeConfig } from '../../config/runtime.js'
-import type { BuildingDetailResponse, BuildingResponse } from '../../schemas/buildings.js'
+import type {
+  BuildingDetailResponse,
+  OrganizationBuildingListItemResponse,
+} from '../../schemas/buildings.js'
 import type { FloorResponse } from '../../schemas/floors.js'
 import type {
   ApproveOrganizationCreationRequestRequest,
@@ -26,7 +29,7 @@ import {
 import {
   findBuildingDetailForOrganization,
   findBuildingDetailById,
-  listBuildings as listBuildingRows,
+  listBuildingSummariesForOrganization,
 } from '../../services/buildings/index.js'
 import { db } from '../../services/db/index.js'
 import type { DbExecutor } from '../../services/executor.js'
@@ -555,21 +558,23 @@ export const listOrganizationBuildingsForSession = async (
   sessionToken: string | undefined,
   organizationId: string,
   executor?: DbExecutor
-): Promise<OrganizationResult<{ buildings: BuildingResponse[] }>> => {
+): Promise<OrganizationResult<{ buildings: OrganizationBuildingListItemResponse[] }>> => {
   const actor = await requireOrganizationManagerOrAdmin(sessionToken, organizationId, executor)
 
   if (!actor.ok) {
     return actor
   }
 
-  const buildings = await listBuildingRows({
-    organizationIds: [organizationId],
-  })
+  const buildings = await listBuildingSummariesForOrganization(organizationId, executor)
 
   return {
     ok: true,
     value: {
-      buildings: buildings.map(toBuildingResponse),
+      buildings: buildings.map(({ building, floor_count, recording_count }) => ({
+        ...toBuildingResponse(building),
+        floor_count,
+        recording_count,
+      })),
     },
   }
 }

@@ -55,6 +55,25 @@ export const buildingsListResponseSchema = z
   })
   .openapi('BuildingsListResponse')
 
+export const organizationBuildingListItemSchema = buildingSchema
+  .extend({
+    floor_count: z.number().int().nonnegative().openapi({
+      description: 'building に登録されている floor の件数',
+    }),
+    recording_count: z.number().int().nonnegative().openapi({
+      description: 'building に登録されている有効な recording の件数',
+    }),
+  })
+  .openapi('OrganizationBuildingListItem')
+
+export const organizationBuildingsListResponseSchema = z
+  .object({
+    buildings: z.array(organizationBuildingListItemSchema).openapi({
+      description: 'organization 内 building 一覧',
+    }),
+  })
+  .openapi('OrganizationBuildingsListResponse')
+
 export const buildingDetailSummarySchema = z
   .object({
     floor_count: z.number().int().nonnegative().openapi({
@@ -127,5 +146,8 @@ export const createBuildingRequestSchema = z
 
 export type BuildingIdParams = z.infer<typeof buildingIdParamsSchema>
 export type BuildingResponse = z.infer<typeof buildingSchema>
+export type OrganizationBuildingListItemResponse = z.infer<
+  typeof organizationBuildingListItemSchema
+>
 export type BuildingDetailResponse = z.infer<typeof buildingDetailResponseSchema>
 export type CreateBuildingRequest = z.infer<typeof createBuildingRequestSchema>
