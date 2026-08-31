@@ -12,6 +12,8 @@ import {
 import {
   buildRecordingRawObjectKey,
   listRecordingRawObjectKeys,
+  validateBleCsvObject,
+  validateMetadataObject,
 } from '../../services/storage/index.js'
 import type { AuthorizationError } from '../authorization.js'
 import { requireRecordingAccess } from '../authorization.js'
@@ -36,6 +38,10 @@ export type CompleteUploadError =
       type: 'RECORDING_UPLOAD_TARGETS_INVALID'
       recordingId: string
       invalidTargets: string[]
+    }
+  | {
+      type: 'UPLOAD_FILE_INVALID'
+      recordingId: string
     }
 
 export type CompleteUploadResult =
@@ -90,7 +96,14 @@ export const completeUpload = async (
     return authorization
   }
 
-  if (recording.upload_status === 'ready' || recording.upload_status === 'failed') {
+  if (recording.upload_status === 'ready') {
+    return {
+      ok: true,
+      value: { recording_id: recording.id, upload_status: 'ready' },
+    }
+  }
+
+  if (recording.upload_status === 'failed') {
     return {
       ok: false,
       error: {
@@ -142,6 +155,17 @@ export const completeUpload = async (
         recordingId: recording.id,
         missingTargets,
       },
+    }
+  }
+
+  if (!(await validateMetadataObject(recordingAuthorization.organization_id, recording.id))) {
+    return { ok: false, error: { type: 'UPLOAD_FILE_INVALID', recordingId: recording.id } }
+  }
+
+  if (uploadTargets.includes('ble')) {
+    const valid = await validateBleCsvObject(recordingAuthorization.organization_id, recording.id)
+    if (!valid) {
+      return { ok: false, error: { type: 'UPLOAD_FILE_INVALID', recordingId: recording.id } }
     }
   }
 

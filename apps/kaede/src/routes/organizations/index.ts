@@ -25,6 +25,7 @@ import { registerOrganizationOidcLinkRoutes } from './oidc-links.js'
 import { registerOrganizationOidcProviderRoutes } from './oidc-providers.js'
 import { registerOrganizationScopedPedestrianRoute } from './scoped-pedestrian.js'
 import { registerOrganizationScopedRecordingRoutes } from './scoped-recordings.js'
+import { registerOrganizationBeaconRoutes } from './beacons.js'
 
 export const organizationsRoutes = new OpenAPIHono()
 
@@ -54,3 +55,4 @@ registerOrganizationOidcProviderRoutes(organizationsRoutes)
 registerOrganizationInviteRoutes(organizationsRoutes)
 registerOrganizationScopedPedestrianRoute(organizationsRoutes)
 registerOrganizationScopedRecordingRoutes(organizationsRoutes)
+registerOrganizationBeaconRoutes(organizationsRoutes)

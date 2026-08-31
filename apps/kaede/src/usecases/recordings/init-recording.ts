@@ -44,6 +44,7 @@ export type InitRecordingResult =
           metadata?: string
           pressure?: string
           wifi?: string
+          ble?: string
         }
         expires_at: string
       }

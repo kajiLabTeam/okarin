@@ -171,6 +171,15 @@ export const toCompleteUploadErrorResponse = (error: CompleteUploadError) => {
         },
         status: 500 as const,
       }
+    case 'UPLOAD_FILE_INVALID':
+      return {
+        body: {
+          error_code: error.type,
+          error_message: 'uploaded BLE CSV is invalid',
+          details: { recording_id: error.recordingId },
+        },
+        status: 422 as const,
+      }
   }
 }
 

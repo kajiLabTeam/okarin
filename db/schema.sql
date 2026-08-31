@@ -167,6 +167,30 @@ CREATE TABLE public.buildings (
 -- Name: floors; Type: TABLE; Schema: public; Owner: -
 --
 
+CREATE TABLE public.beacons (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    floor_id uuid NOT NULL,
+    format_type text DEFAULT 'ibeacon'::text NOT NULL,
+    format_config jsonb NOT NULL,
+    name text NOT NULL,
+    pixel_x double precision NOT NULL,
+    pixel_y double precision NOT NULL,
+    note text,
+    enabled boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    deleted_at timestamp with time zone,
+    CONSTRAINT beacons_format_type_chk CHECK ((format_type = 'ibeacon'::text)),
+    CONSTRAINT beacons_format_config_object_chk CHECK ((jsonb_typeof(format_config) = 'object'::text)),
+    CONSTRAINT beacons_name_nonempty_chk CHECK ((length(btrim(name)) > 0)),
+    CONSTRAINT beacons_pixel_x_nonnegative_chk CHECK ((pixel_x >= 0)),
+    CONSTRAINT beacons_pixel_y_nonnegative_chk CHECK ((pixel_y >= 0))
+);
+
+-- Name: floors; Type: TABLE; Schema: public; Owner: -
+--
+
 CREATE TABLE public.floors (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     building_id uuid NOT NULL,
@@ -183,6 +207,15 @@ CREATE TABLE public.floors (
     CONSTRAINT floors_map_dimensions_bounds_chk CHECK (((map_width_px IS NULL) OR ((map_width_px > 0) AND (map_height_px > 0) AND (map_width_px <= 20000) AND (map_height_px <= 20000) AND (((map_width_px)::bigint * (map_height_px)::bigint) <= 100000000)))),
     CONSTRAINT floors_map_dimensions_presence_chk CHECK ((((map_width_px IS NULL) AND (map_height_px IS NULL)) OR ((map_width_px IS NOT NULL) AND (map_height_px IS NOT NULL))))
 );
+
+ALTER TABLE ONLY public.beacons
+    ADD CONSTRAINT beacons_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+    ADD CONSTRAINT beacons_floor_id_fkey FOREIGN KEY (floor_id) REFERENCES public.floors(id);
+
+CREATE INDEX beacons_floor_id_idx ON public.beacons USING btree (floor_id);
+CREATE INDEX beacons_organization_id_idx ON public.beacons USING btree (organization_id);
+CREATE UNIQUE INDEX beacons_org_active_name_key ON public.beacons USING btree (organization_id, lower(btrim(name))) WHERE (deleted_at IS NULL);
+CREATE UNIQUE INDEX beacons_org_active_ibeacon_identity_key ON public.beacons USING btree (organization_id, (format_config ->> 'uuid'::text), (((format_config ->> 'major'::text))::integer), (((format_config ->> 'minor'::text))::integer)) WHERE ((deleted_at IS NULL) AND (format_type = 'ibeacon'::text));
 
 
 --
@@ -493,6 +526,7 @@ CREATE TABLE public.recordings (
     deleted_at timestamp with time zone,
     organization_id uuid NOT NULL,
     constraints jsonb DEFAULT '[]'::jsonb NOT NULL,
+    upload_failure jsonb,
     CONSTRAINT recordings_constraints_array_check CHECK ((jsonb_typeof(constraints) = 'array'::text)),
     CONSTRAINT recordings_upload_status_chk CHECK ((upload_status = ANY (ARRAY['accepted'::text, 'ready'::text, 'failed'::text]))),
     CONSTRAINT recordings_upload_targets_nonempty_chk CHECK ((cardinality(upload_targets) >= 1))
@@ -1523,6 +1557,8 @@ CREATE TRIGGER set_updated_at_auth_identities BEFORE UPDATE ON public.auth_ident
 
 CREATE TRIGGER set_updated_at_buildings BEFORE UPDATE ON public.buildings FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+CREATE TRIGGER set_updated_at_beacons BEFORE UPDATE ON public.beacons FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
 
 --
 -- Name: floors set_updated_at_floors; Type: TRIGGER; Schema: public; Owner: -
@@ -2094,4 +2130,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20260811010553'),
     ('20260812010000'),
     ('20260812020000'),
-    ('20260812020100');
+    ('20260812020100'),
+    ('20260830010000');
