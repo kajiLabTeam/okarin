@@ -46,13 +46,18 @@ export const readObjectText = async (client: S3Client, key: string) => {
   return readBody(body as AsyncIterable<Uint8Array>)
 }
 
-export const putObjectText = async (client: S3Client, key: string, body: string) => {
+export const putObjectText = async (
+  client: S3Client,
+  key: string,
+  body: string,
+  contentType = 'text/csv'
+) => {
   await client.send(
     new PutObjectCommand({
       Bucket: getRequiredEnv('S3_BUCKET'),
       Key: key,
       Body: body,
-      ContentType: 'text/csv',
+      ContentType: contentType,
     })
   )
 }

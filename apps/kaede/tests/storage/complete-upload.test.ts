@@ -53,7 +53,8 @@ describe('POST /api/recordings/:recordingId/complete-upload', () => {
     await putObjectText(
       s3,
       `organizations/${organizationId}/recordings/${recordingId}/raw/metadata.json`,
-      '{"schema_version":1}\n'
+      '{"schema_version":1}\n',
+      'application/json'
     )
 
     const response = await app.request(`/api/recordings/${recordingId}/complete-upload`, {

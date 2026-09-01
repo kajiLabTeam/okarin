@@ -34,7 +34,11 @@ const uploadUrlsSchema = z
       .url()
       .optional()
       .openapi({ description: 'Wi-Fi スキャン用のアップロード URL' }),
-    ble: z.string().url().optional().openapi({ description: 'BLEビーコンデータ用のアップロード URL' }),
+    ble: z
+      .string()
+      .url()
+      .optional()
+      .openapi({ description: 'BLEビーコンデータ用のアップロード URL' }),
   })
   .openapi('RecordingUploadUrls')
 
@@ -176,18 +180,35 @@ export const refreshUploadUrlsResponseSchema = z
   })
   .openapi('RefreshUploadUrlsResponse')
 
-export const failRecordingRequestSchema = z.object({
-  error_code: z.enum([
-    'BLE_CSV_MISSING', 'BLE_CSV_UNFINALIZED', 'SENSOR_CSV_MISSING', 'METADATA_MISSING',
-    'METADATA_INVALID', 'FILE_CORRUPTED', 'UPLOAD_RETRY_EXHAUSTED', 'USER_DISCARDED',
-  ]),
-  message: z.string().trim().min(1).max(2000),
-  missing_targets: z.array(uploadTargetSchema).max(10).optional(),
-}).strict().superRefine((value, context) => {
-  if (value.missing_targets && new Set(value.missing_targets).size !== value.missing_targets.length) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ['missing_targets'], message: 'missing_targets must not contain duplicates' })
-  }
-}).openapi('FailRecordingRequest')
+export const failRecordingRequestSchema = z
+  .object({
+    error_code: z.enum([
+      'BLE_CSV_MISSING',
+      'BLE_CSV_UNFINALIZED',
+      'SENSOR_CSV_MISSING',
+      'METADATA_MISSING',
+      'METADATA_INVALID',
+      'FILE_CORRUPTED',
+      'UPLOAD_RETRY_EXHAUSTED',
+      'USER_DISCARDED',
+    ]),
+    message: z.string().trim().min(1).max(2000),
+    missing_targets: z.array(uploadTargetSchema).max(10).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.missing_targets &&
+      new Set(value.missing_targets).size !== value.missing_targets.length
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['missing_targets'],
+        message: 'missing_targets must not contain duplicates',
+      })
+    }
+  })
+  .openapi('FailRecordingRequest')
 
 export const recordingDetailResponseSchema = z
   .object({

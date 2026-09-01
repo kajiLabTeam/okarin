@@ -164,7 +164,7 @@ CREATE TABLE public.buildings (
 
 
 --
--- Name: floors; Type: TABLE; Schema: public; Owner: -
+-- Name: beacons; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.beacons (
@@ -207,16 +207,6 @@ CREATE TABLE public.floors (
     CONSTRAINT floors_map_dimensions_bounds_chk CHECK (((map_width_px IS NULL) OR ((map_width_px > 0) AND (map_height_px > 0) AND (map_width_px <= 20000) AND (map_height_px <= 20000) AND (((map_width_px)::bigint * (map_height_px)::bigint) <= 100000000)))),
     CONSTRAINT floors_map_dimensions_presence_chk CHECK ((((map_width_px IS NULL) AND (map_height_px IS NULL)) OR ((map_width_px IS NOT NULL) AND (map_height_px IS NOT NULL))))
 );
-
-ALTER TABLE ONLY public.beacons
-    ADD CONSTRAINT beacons_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
-    ADD CONSTRAINT beacons_floor_id_fkey FOREIGN KEY (floor_id) REFERENCES public.floors(id);
-
-CREATE INDEX beacons_floor_id_idx ON public.beacons USING btree (floor_id);
-CREATE INDEX beacons_organization_id_idx ON public.beacons USING btree (organization_id);
-CREATE UNIQUE INDEX beacons_org_active_name_key ON public.beacons USING btree (organization_id, lower(btrim(name))) WHERE (deleted_at IS NULL);
-CREATE UNIQUE INDEX beacons_org_active_ibeacon_identity_key ON public.beacons USING btree (organization_id, (format_config ->> 'uuid'::text), (((format_config ->> 'major'::text))::integer), (((format_config ->> 'minor'::text))::integer)) WHERE ((deleted_at IS NULL) AND (format_type = 'ibeacon'::text));
-
 
 --
 -- Name: oidc_identities; Type: TABLE; Schema: public; Owner: -
@@ -733,6 +723,14 @@ ALTER TABLE ONLY public.buildings
 
 
 --
+-- Name: beacons beacons_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.beacons
+    ADD CONSTRAINT beacons_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: floors floors_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1202,6 +1200,34 @@ CREATE INDEX buildings_organization_id_idx ON public.buildings USING btree (orga
 
 
 --
+-- Name: beacons_floor_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX beacons_floor_id_idx ON public.beacons USING btree (floor_id);
+
+
+--
+-- Name: beacons_organization_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX beacons_organization_id_idx ON public.beacons USING btree (organization_id);
+
+
+--
+-- Name: beacons_org_active_ibeacon_identity_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX beacons_org_active_ibeacon_identity_key ON public.beacons USING btree (organization_id, (format_config ->> 'uuid'::text), (((format_config ->> 'major'::text))::integer), (((format_config ->> 'minor'::text))::integer)) WHERE ((deleted_at IS NULL) AND (format_type = 'ibeacon'::text));
+
+
+--
+-- Name: beacons_org_active_name_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX beacons_org_active_name_key ON public.beacons USING btree (organization_id, lower(btrim(name))) WHERE (deleted_at IS NULL);
+
+
+--
 -- Name: floors_building_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1557,6 +1583,11 @@ CREATE TRIGGER set_updated_at_auth_identities BEFORE UPDATE ON public.auth_ident
 
 CREATE TRIGGER set_updated_at_buildings BEFORE UPDATE ON public.buildings FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+
+--
+-- Name: beacons set_updated_at_beacons; Type: TRIGGER; Schema: public; Owner: -
+--
+
 CREATE TRIGGER set_updated_at_beacons BEFORE UPDATE ON public.beacons FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 
@@ -1725,6 +1756,22 @@ ALTER TABLE ONLY public.auth_identities
 
 ALTER TABLE ONLY public.buildings
     ADD CONSTRAINT buildings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: beacons beacons_floor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.beacons
+    ADD CONSTRAINT beacons_floor_id_fkey FOREIGN KEY (floor_id) REFERENCES public.floors(id);
+
+
+--
+-- Name: beacons beacons_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.beacons
+    ADD CONSTRAINT beacons_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
 
 --
