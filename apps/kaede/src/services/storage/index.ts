@@ -6,6 +6,8 @@ export {
   getAnalysisHeatmapObjectText,
   getFloorMapObjectBytes,
   listRecordingRawObjectKeys,
+  validateBleCsvObject,
+  validateMetadataObject,
   putFloorMapObject,
 } from './object-store.js'
 export {

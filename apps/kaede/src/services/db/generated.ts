@@ -110,6 +110,22 @@ export interface Buildings {
   updated_at: Generated<Timestamp>
 }
 
+export interface Beacons {
+  created_at: Generated<Timestamp>
+  deleted_at: Timestamp | null
+  enabled: Generated<boolean>
+  floor_id: string
+  format_config: Json
+  format_type: Generated<string>
+  id: Generated<string>
+  name: string
+  note: string | null
+  organization_id: string
+  pixel_x: number
+  pixel_y: number
+  updated_at: Generated<Timestamp>
+}
+
 export interface Floors {
   building_id: string
   created_at: Generated<Timestamp>
@@ -315,6 +331,7 @@ export interface Recordings {
   updated_at: Generated<Timestamp>
   upload_status: Generated<string>
   upload_targets: string[]
+  upload_failure: Json | null
 }
 
 export interface SessionMembershipAuthentications {
@@ -403,6 +420,7 @@ export interface DB {
   audit_events: AuditEvents
   auth_identities: AuthIdentities
   authentication_events: AuthenticationEvents
+  beacons: Beacons
   buildings: Buildings
   floors: Floors
   oidc_identities: OidcIdentities

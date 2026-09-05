@@ -6,11 +6,15 @@ const {
   findRecordingByIdMock,
   listRecordingRawObjectKeysMock,
   markRecordingUploadReadyMock,
+  validateMetadataObjectMock,
+  validateBleCsvObjectMock,
 } = vi.hoisted(() => ({
   findRecordingAuthorizationByIdMock: vi.fn(),
   findRecordingByIdMock: vi.fn(),
   listRecordingRawObjectKeysMock: vi.fn(),
   markRecordingUploadReadyMock: vi.fn(),
+  validateMetadataObjectMock: vi.fn(),
+  validateBleCsvObjectMock: vi.fn(),
 }))
 
 vi.mock('../../services/recordings/index.js', () => ({
@@ -28,6 +32,8 @@ vi.mock('../../services/storage/index.js', () => ({
     return `organizations/${organizationId}/recordings/${recordingId}/raw/${target}.csv`
   },
   listRecordingRawObjectKeys: listRecordingRawObjectKeysMock,
+  validateMetadataObject: validateMetadataObjectMock,
+  validateBleCsvObject: validateBleCsvObjectMock,
 }))
 
 import { completeUpload } from './complete-upload.js'
@@ -47,6 +53,8 @@ const mockRecordingAuthorization = (recordingId: string) => {
 describe('completeUpload', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    validateMetadataObjectMock.mockResolvedValue(true)
+    validateBleCsvObjectMock.mockResolvedValue(true)
   })
 
   it('recording が存在しない場合は RECORDING_NOT_FOUND を返す', async () => {

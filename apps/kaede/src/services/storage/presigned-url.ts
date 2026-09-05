@@ -10,6 +10,7 @@ export interface RecordingUploadUrls {
   metadata?: string
   pressure?: string
   wifi?: string
+  ble?: string
 }
 
 export interface RecordingRawDownloadUrls {
@@ -119,6 +120,11 @@ export const issueRecordingUploadUrls = async (
         new PutObjectCommand({
           Bucket: config.bucket,
           Key: buildRecordingRawObjectKey(organizationId, recordingId, target),
+          ...(target === 'metadata'
+            ? { ContentType: 'application/json' }
+            : target === 'ble'
+              ? { ContentType: 'text/csv' }
+              : {}),
         }),
         { expiresIn: config.recordingUploadUrlTtlSeconds }
       )

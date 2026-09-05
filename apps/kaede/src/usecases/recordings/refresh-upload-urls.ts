@@ -40,6 +40,7 @@ export type RefreshUploadUrlsResult =
           gyro?: string
           pressure?: string
           wifi?: string
+          ble?: string
         }
         expires_at: string
       }

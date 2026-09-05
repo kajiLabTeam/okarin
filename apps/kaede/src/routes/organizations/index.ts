@@ -1,6 +1,7 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
 import { registerAnalysisRunRoutes } from './analysis-runs.js'
 import { registerOrganizationAuthSettingsRoutes } from './auth-settings.js'
+import { registerOrganizationBeaconRoutes } from './beacons.js'
 import { registerCreateOrganizationBuildingFloorRoute } from './create-organization-building-floor.js'
 import { registerCreateOrganizationBuildingRoute } from './create-organization-building.js'
 import { registerCreateOrganizationMembershipRoute } from './create-organization-membership.js'
@@ -54,3 +55,4 @@ registerOrganizationOidcProviderRoutes(organizationsRoutes)
 registerOrganizationInviteRoutes(organizationsRoutes)
 registerOrganizationScopedPedestrianRoute(organizationsRoutes)
 registerOrganizationScopedRecordingRoutes(organizationsRoutes)
+registerOrganizationBeaconRoutes(organizationsRoutes)

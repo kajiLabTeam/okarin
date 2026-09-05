@@ -57,6 +57,14 @@ export const registerCompleteUploadRoute = (app: OpenAPIHono<RequestActorHonoEnv
           },
         },
       },
+      422: {
+        description: 'uploaded file is invalid',
+        content: {
+          'application/json': {
+            schema: errorResponseSchema,
+          },
+        },
+      },
     },
   })
 
