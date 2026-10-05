@@ -1,0 +1,10 @@
+{
+  "data_type": "gyro",
+  "schema_version": "1",
+  "format": "csv",
+  "content_types": ["text/csv"],
+  "required_columns": ["timestamp_ns", "wall_time_ms", "x", "y", "z"],
+  "timestamp_column": "timestamp_ns",
+  "wall_time_column": "wall_time_ms",
+  "column_types": {"timestamp_ns": "integer", "wall_time_ms": "integer", "x": "number", "y": "number", "z": "number"}
+}

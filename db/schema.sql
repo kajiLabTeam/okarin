@@ -522,6 +522,51 @@ CREATE TABLE public.recordings (
     CONSTRAINT recordings_upload_targets_nonempty_chk CHECK ((cardinality(upload_targets) >= 1))
 );
 
+-- Name: data_assets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.data_assets (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    data_type text NOT NULL,
+    schema_version text NOT NULL,
+    sample_count integer,
+    started_at timestamp with time zone,
+    ended_at timestamp with time zone,
+    validation_status text DEFAULT 'pending'::text NOT NULL,
+    validation_error jsonb,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+-- Name: data_asset_objects; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.data_asset_objects (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    data_asset_id uuid NOT NULL,
+    object_role text DEFAULT 'primary'::text NOT NULL,
+    format text NOT NULL,
+    object_key text NOT NULL,
+    content_type text NOT NULL,
+    byte_size bigint,
+    checksum_sha256 text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+-- Name: recording_data_assets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.recording_data_assets (
+    recording_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    data_asset_id uuid NOT NULL,
+    data_type text NOT NULL,
+    client_asset_key text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
 
 --
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
@@ -1033,6 +1078,39 @@ ALTER TABLE ONLY public.pedestrians
 ALTER TABLE ONLY public.recordings
     ADD CONSTRAINT recordings_pkey PRIMARY KEY (id);
 
+ALTER TABLE ONLY public.recordings
+    ADD CONSTRAINT recordings_id_organization_key UNIQUE (id, organization_id);
+
+ALTER TABLE ONLY public.data_assets
+    ADD CONSTRAINT data_assets_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.data_assets
+    ADD CONSTRAINT data_assets_id_organization_type_key UNIQUE (id, organization_id, data_type);
+
+ALTER TABLE public.data_assets
+    ADD CONSTRAINT data_assets_data_type_nonempty_chk CHECK (length(btrim(data_type)) > 0),
+    ADD CONSTRAINT data_assets_schema_version_nonempty_chk CHECK (length(btrim(schema_version)) > 0),
+    ADD CONSTRAINT data_assets_sample_count_chk CHECK ((sample_count IS NULL) OR (sample_count >= 0)),
+    ADD CONSTRAINT data_assets_time_range_chk CHECK ((ended_at IS NULL) OR (started_at IS NULL) OR (ended_at >= started_at)),
+    ADD CONSTRAINT data_assets_validation_status_chk CHECK (validation_status = ANY (ARRAY['pending'::text, 'valid'::text, 'invalid'::text])),
+    ADD CONSTRAINT data_assets_metadata_object_chk CHECK (jsonb_typeof(metadata) = 'object');
+
+ALTER TABLE ONLY public.data_asset_objects
+    ADD CONSTRAINT data_asset_objects_pkey PRIMARY KEY (id);
+
+ALTER TABLE public.data_asset_objects
+    ADD CONSTRAINT data_asset_objects_role_nonempty_chk CHECK (length(btrim(object_role)) > 0),
+    ADD CONSTRAINT data_asset_objects_format_nonempty_chk CHECK (length(btrim(format)) > 0),
+    ADD CONSTRAINT data_asset_objects_content_type_nonempty_chk CHECK (length(btrim(content_type)) > 0),
+    ADD CONSTRAINT data_asset_objects_byte_size_chk CHECK ((byte_size IS NULL) OR (byte_size > 0)),
+    ADD CONSTRAINT data_asset_objects_checksum_sha256_chk CHECK ((checksum_sha256 IS NULL) OR (length(btrim(checksum_sha256)) > 0));
+
+ALTER TABLE ONLY public.recording_data_assets
+    ADD CONSTRAINT recording_data_assets_pkey PRIMARY KEY (recording_id, data_asset_id);
+
+ALTER TABLE public.recording_data_assets
+    ADD CONSTRAINT recording_data_assets_data_type_nonempty_chk CHECK (length(btrim(data_type)) > 0);
+
 
 --
 -- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1365,6 +1443,14 @@ CREATE UNIQUE INDEX organization_memberships_id_organization_key ON public.organ
 --
 
 CREATE UNIQUE INDEX organization_memberships_id_user_key ON public.organization_memberships USING btree (id, user_id);
+
+CREATE UNIQUE INDEX data_asset_objects_asset_role_idx ON public.data_asset_objects USING btree (data_asset_id, object_role);
+
+CREATE UNIQUE INDEX recording_data_assets_recording_data_type_idx ON public.recording_data_assets USING btree (recording_id, data_type);
+
+CREATE INDEX data_assets_organization_created_at_idx ON public.data_assets USING btree (organization_id, created_at DESC, id DESC);
+
+CREATE INDEX recording_data_assets_asset_id_idx ON public.recording_data_assets USING btree (data_asset_id);
 
 
 --
@@ -2028,6 +2114,24 @@ ALTER TABLE ONLY public.recordings
 
 ALTER TABLE ONLY public.recordings
     ADD CONSTRAINT recordings_pedestrian_id_fkey FOREIGN KEY (pedestrian_id) REFERENCES public.pedestrians(id) ON DELETE RESTRICT;
+
+ALTER TABLE ONLY public.data_assets
+    ADD CONSTRAINT data_assets_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+ALTER TABLE ONLY public.data_asset_objects
+    ADD CONSTRAINT data_asset_objects_data_asset_id_fkey FOREIGN KEY (data_asset_id) REFERENCES public.data_assets(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.recording_data_assets
+    ADD CONSTRAINT recording_data_assets_recording_org_fkey FOREIGN KEY (recording_id, organization_id) REFERENCES public.recordings(id, organization_id);
+
+ALTER TABLE ONLY public.recording_data_assets
+    ADD CONSTRAINT recording_data_assets_asset_org_type_fkey FOREIGN KEY (data_asset_id, organization_id, data_type) REFERENCES public.data_assets(id, organization_id, data_type);
+
+ALTER TABLE ONLY public.recording_data_assets
+    ADD CONSTRAINT recording_data_assets_recording_id_fkey FOREIGN KEY (recording_id) REFERENCES public.recordings(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.recording_data_assets
+    ADD CONSTRAINT recording_data_assets_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
 
 --

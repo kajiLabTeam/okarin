@@ -1,0 +1,59 @@
+import { z } from 'zod'
+import { readFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
+
+export interface DataTypeDefinition {
+  data_type: string
+  schema_version: string
+  format: string
+  content_types: string[]
+  required_columns: string[]
+  timestamp_column?: string
+  wall_time_column?: string
+  column_types: Record<string, 'integer' | 'number' | 'string'>
+}
+
+const dataTypeDefinitionSchema = z
+  .object({
+    data_type: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/),
+    schema_version: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/),
+    format: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/),
+    content_types: z.array(z.string().regex(/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/)).min(1),
+    required_columns: z.array(z.string().min(1)).min(1),
+    timestamp_column: z.string().min(1).optional(),
+    wall_time_column: z.string().min(1).optional(),
+    column_types: z.record(z.enum(['integer', 'number', 'string'])),
+  })
+  .strict()
+
+const catalogRoots = [
+  resolve(process.cwd(), 'contracts/data-types'),
+  resolve(process.cwd(), '../../contracts/data-types'),
+]
+const safePart = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/
+
+export const loadDataTypeDefinition = async (
+  dataType: string,
+  schemaVersion: string,
+  format: string
+): Promise<DataTypeDefinition | undefined> => {
+  if (![dataType, schemaVersion, format].every((value) => safePart.test(value))) return undefined
+  for (const root of catalogRoots) {
+    try {
+      const value = dataTypeDefinitionSchema.parse(
+        JSON.parse(await readFile(resolve(root, `${dataType}.v${schemaVersion}.json`), 'utf8'))
+      )
+      if (
+        value.data_type === dataType &&
+        value.schema_version === schemaVersion &&
+        value.format === format
+      ) {
+        return value
+      }
+      return undefined
+    } catch {
+      // Try the second monorepo-relative location.
+    }
+  }
+  return undefined
+}
