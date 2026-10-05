@@ -14,6 +14,7 @@ import {
   failRecordingRequestSchema,
   recordingDetailResponseSchema,
 } from '../../schemas/recordings.js'
+import { listRecordingDataAssets } from '../../services/data-assets/index.js'
 import {
   findRecordingAuthorizationByIdForOrganization,
   findRecordingByIdForOrganization,
@@ -86,7 +87,8 @@ export const registerOrganizationScopedRecordingRoutes = (app: OpenAPIHono) => {
       const error = toAuthorizationErrorResponse(authorization.error)
       return c.json(error.body, error.status)
     }
-    return c.json(toRecordingDetailResponse(recording), 200)
+    const assets = await listRecordingDataAssets(recording.id)
+    return c.json(toRecordingDetailResponse(recording, assets), 200)
   })
 
   const initRoute = createRoute({
@@ -117,6 +119,10 @@ export const registerOrganizationScopedRecordingRoutes = (app: OpenAPIHono) => {
       },
       409: {
         description: 'resource organization mismatch',
+        content: { 'application/json': { schema: errorResponseSchema } },
+      },
+      422: {
+        description: 'unsupported shared data type or schema',
         content: { 'application/json': { schema: errorResponseSchema } },
       },
     },

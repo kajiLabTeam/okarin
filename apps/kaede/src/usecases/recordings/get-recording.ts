@@ -1,5 +1,6 @@
 import type { RequestActor } from '../../middleware/request-actor-context.js'
 import type { RecordingDetailResponse, RecordingIdParams } from '../../schemas/recordings.js'
+import { listRecordingDataAssets } from '../../services/data-assets/index.js'
 import {
   findRecordingAuthorizationById,
   findRecordingById,
@@ -59,8 +60,10 @@ export const getRecording = async (
     return authorization
   }
 
+  const assets = await listRecordingDataAssets(recording.id)
+
   return {
     ok: true,
-    value: toRecordingDetailResponse(recording),
+    value: toRecordingDetailResponse(recording, assets),
   }
 }

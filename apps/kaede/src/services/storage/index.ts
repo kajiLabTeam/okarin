@@ -7,6 +7,7 @@ export {
   getFloorMapObjectBytes,
   listRecordingRawObjectKeys,
   validateBleCsvObject,
+  validateDataAssetObject,
   validateMetadataObject,
   putFloorMapObject,
 } from './object-store.js'
@@ -17,6 +18,7 @@ export {
   buildTrajectoryAnalyzedResultObjectKey,
   buildRecordingRawObjectPrefix,
   buildRecordingRawObjectKey,
+  buildDataAssetObjectKey,
   issueFloorMapDownloadUrl,
   getFloorMapContentType,
   getFloorMapExtensionFromObjectKey,
@@ -27,6 +29,7 @@ export {
   issueInternalTrajectoryResultUploadUrl,
   issueRecordingRawDownloadUrls,
   issueRecordingUploadUrls,
+  issueDataAssetUploadUrl,
   issueTrajectoryResultDownloadUrl,
   issueAnalysisTrajectoryCsvDownloadUrl,
 } from './presigned-url.js'

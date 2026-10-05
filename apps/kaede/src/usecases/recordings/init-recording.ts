@@ -3,10 +3,21 @@ import type { RequestActor } from '../../middleware/request-actor-context.js'
 import { recordingUploadStatusSchema } from '../../schemas/common.js'
 import type { UploadTarget } from '../../schemas/common.js'
 import type { InitRecordingRequest } from '../../schemas/recordings.js'
+import {
+  insertDataAsset,
+  insertDataAssetObject,
+  linkRecordingDataAsset,
+  loadDataTypeDefinition,
+} from '../../services/data-assets/index.js'
+import { db } from '../../services/db/index.js'
 import { findFloorById } from '../../services/floors/index.js'
 import { findPedestrianById } from '../../services/pedestrians/index.js'
 import { insertRecording } from '../../services/recordings/index.js'
-import { issueRecordingUploadUrls } from '../../services/storage/index.js'
+import {
+  buildDataAssetObjectKey,
+  issueDataAssetUploadUrl,
+  issueRecordingUploadUrls,
+} from '../../services/storage/index.js'
 import type { AuthorizationError } from '../authorization.js'
 import { requireRecordingAccess } from '../authorization.js'
 
@@ -31,6 +42,12 @@ export type InitRecordingError =
       floorId: string
       floorOrganizationId: string
     }
+  | {
+      type: 'DATA_TYPE_NOT_SUPPORTED'
+      dataType: string
+      schemaVersion: string
+      format: string
+    }
 export type InitRecordingResult =
   | {
       ok: true
@@ -46,6 +63,12 @@ export type InitRecordingResult =
           wifi?: string
           ble?: string
         }
+        available_assets?: {
+          data_asset_id: string
+          data_type: string
+          schema_version: string
+          object_upload_url: string
+        }[]
         expires_at: string
       }
     }
@@ -144,20 +167,142 @@ export const initRecording = async (
     return authorization satisfies InitRecordingResult
   }
 
-  const uploadTargets = withRequiredMetadataTarget(payload.upload_targets)
+  if (payload.assets) {
+    for (const asset of payload.assets) {
+      if (!(await loadDataTypeDefinition(asset.data_type, asset.schema_version, asset.format))) {
+        return {
+          ok: false,
+          error: {
+            type: 'DATA_TYPE_NOT_SUPPORTED',
+            dataType: asset.data_type,
+            schemaVersion: asset.schema_version,
+            format: asset.format,
+          },
+        } satisfies InitRecordingResult
+      }
+    }
+  }
 
-  const recording = await insertRecording({
-    pedestrian_id: payload.pedestrian_id,
-    floor_id: payload.floor_id,
-    organization_id: pedestrian.organization_id,
-    upload_targets: uploadTargets,
-    constraints: payload.constraints ?? [],
-  })
+  const uploadTargets: UploadTarget[] = payload.upload_targets
+    ? withRequiredMetadataTarget(payload.upload_targets)
+    : ['metadata']
+
+  let recording: Awaited<ReturnType<typeof insertRecording>>
+  let availableAssets:
+    | {
+        data_asset_id: string
+        data_type: string
+        schema_version: string
+        object_upload_url: string
+        format: string
+      }[]
+    | undefined
+
+  if (payload.assets) {
+    const assets = payload.assets
+    const result = await db.transaction().execute(async (trx) => {
+      const recording = await insertRecording(
+        {
+          pedestrian_id: payload.pedestrian_id,
+          floor_id: payload.floor_id,
+          organization_id: pedestrian.organization_id,
+          upload_targets: uploadTargets,
+          constraints: payload.constraints ?? [],
+        },
+        trx
+      )
+      const availableAssets = await Promise.all(
+        assets.map(async (asset) => {
+          const definition = await loadDataTypeDefinition(
+            asset.data_type,
+            asset.schema_version,
+            asset.format
+          )
+          if (!definition || definition.content_types.length === 0) {
+            throw new Error('catalog definition disappeared during transaction')
+          }
+          const contentType = definition.content_types[0]
+          const dataAsset = await insertDataAsset(
+            {
+              organization_id: recording.organization_id,
+              data_type: asset.data_type,
+              schema_version: asset.schema_version,
+              metadata: JSON.stringify({ format: asset.format }),
+            },
+            trx
+          )
+          await insertDataAssetObject(
+            {
+              data_asset_id: dataAsset.id,
+              object_role: 'primary',
+              format: asset.format,
+              object_key: buildDataAssetObjectKey(
+                recording.organization_id,
+                recording.id,
+                dataAsset.id,
+                asset.format
+              ),
+              content_type: contentType,
+              byte_size: null,
+              checksum_sha256: null,
+            },
+            trx
+          )
+          await linkRecordingDataAsset(
+            {
+              recording_id: recording.id,
+              organization_id: recording.organization_id,
+              data_asset_id: dataAsset.id,
+              data_type: asset.data_type,
+              client_asset_key: asset.client_asset_key ?? null,
+            },
+            trx
+          )
+          return {
+            data_asset_id: dataAsset.id,
+            data_type: asset.data_type,
+            schema_version: asset.schema_version,
+            object_upload_url: '',
+            format: asset.format,
+          }
+        })
+      )
+      return { recording, availableAssets }
+    })
+    recording = result.recording
+    availableAssets = result.availableAssets
+  } else {
+    recording = await insertRecording({
+      pedestrian_id: payload.pedestrian_id,
+      floor_id: payload.floor_id,
+      organization_id: pedestrian.organization_id,
+      upload_targets: uploadTargets,
+      constraints: payload.constraints ?? [],
+    })
+  }
   const { expiresAt, uploadUrls } = await issueRecordingUploadUrls(
     recording.organization_id,
     recording.id,
     uploadTargets
   )
+
+  const availableAssetsWithUrls = availableAssets
+    ? await Promise.all(
+        availableAssets.map(async (asset) => ({
+          data_asset_id: asset.data_asset_id,
+          data_type: asset.data_type,
+          schema_version: asset.schema_version,
+          object_upload_url: await issueDataAssetUploadUrl(
+            recording.organization_id,
+            recording.id,
+            asset.data_asset_id,
+            asset.format,
+            (await loadDataTypeDefinition(asset.data_type, asset.schema_version, asset.format))
+              ?.content_types[0]
+          ),
+        }))
+      )
+    : undefined
 
   return {
     ok: true,
@@ -166,6 +311,7 @@ export const initRecording = async (
       organization_id: recording.organization_id,
       upload_status: recordingUploadStatusSchema.parse(recording.upload_status),
       upload_urls: uploadUrls,
+      ...(availableAssetsWithUrls ? { available_assets: availableAssetsWithUrls } : {}),
       expires_at: expiresAt,
     },
   } satisfies InitRecordingResult

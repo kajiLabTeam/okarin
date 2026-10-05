@@ -5,6 +5,7 @@ import {
   ListObjectsV2Command,
   PutObjectCommand,
 } from '@aws-sdk/client-s3'
+import { createHash } from 'node:crypto'
 import {
   buildAnalysisHeatmapObjectKey,
   buildAnalysisTrajectoryCsvObjectKey,
@@ -191,6 +192,160 @@ export const validateMetadataObject = async (organizationId: string, recordingId
     return typeof value === 'object' && value !== null && !Array.isArray(value)
   } catch {
     return false
+  }
+}
+
+export interface DataAssetValidationResult {
+  valid: boolean
+  byteSize: number
+  checksumSha256: string | null
+  sampleCount?: number | null
+  startedAt?: Date | null
+  endedAt?: Date | null
+}
+
+export const validateDataAssetObject = async (
+  objectKey: string,
+  expectedContentType: string,
+  definition?: {
+    format: string
+    required_columns: string[]
+    timestamp_column?: string
+    wall_time_column?: string
+    column_types: Record<string, 'integer' | 'number' | 'string'>
+  },
+  maxBytes = 100 * 1024 * 1024
+): Promise<DataAssetValidationResult> => {
+  const { config, internalClient } = getS3Context()
+  try {
+    const head = await internalClient.send(
+      new HeadObjectCommand({ Bucket: config.bucket, Key: objectKey })
+    )
+    const valid =
+      (head.ContentType?.split(';', 1)[0]?.trim().toLowerCase() ?? '') === expectedContentType &&
+      (head.ContentLength ?? 0) > 0 &&
+      (head.ContentLength ?? 0) <= maxBytes
+    if (!valid) return { valid: false, byteSize: head.ContentLength ?? 0, checksumSha256: null }
+    const response = await internalClient.send(
+      new GetObjectCommand({ Bucket: config.bucket, Key: objectKey })
+    )
+    if (!response.Body)
+      return { valid: false, byteSize: head.ContentLength ?? 0, checksumSha256: null }
+    if (definition?.format !== 'csv') {
+      return { valid: false, byteSize: 0, checksumSha256: null }
+    }
+    const hash = createHash('sha256')
+    const decoder = new TextDecoder('utf-8', { fatal: true })
+    let totalBytes = 0
+    const deadline = Date.now() + 30_000
+    let field = ''
+    let record: string[] = []
+    let quoted = 0
+    let pendingQuote = 0
+    let headers: string[] | undefined
+    let indexes = new Map<string, number>()
+    let previousTimestamp: number | undefined
+    let startedAt: Date | null = null
+    let endedAt: Date | null = null
+    let sampleCount = 0
+    let invalid = false
+    const consumeRecord = (values: string[]) => {
+      if (!headers) {
+        headers = values.map((header, index) =>
+          index === 0 ? header.replace(/^\uFEFF/, '') : header
+        )
+        indexes = new Map(headers.map((header, index) => [header, index]))
+        invalid = definition.required_columns.some((column) => !indexes.has(column))
+        return
+      }
+      if (values.length !== headers.length) {
+        invalid = true
+        return
+      }
+      sampleCount++
+      for (const [column, type] of Object.entries(definition.column_types)) {
+        const value = values[indexes.get(column) ?? -1] ?? ''
+        if (value.length === 0) invalid = true
+        if (type === 'integer' && !/^-?\d+$/.test(value)) invalid = true
+        if (type === 'number' && !Number.isFinite(Number(value))) invalid = true
+      }
+      if (definition.timestamp_column) {
+        const timestamp = Number(values[indexes.get(definition.timestamp_column) ?? -1])
+        if (
+          !Number.isSafeInteger(timestamp) ||
+          (previousTimestamp !== undefined && timestamp <= previousTimestamp)
+        )
+          invalid = true
+        previousTimestamp = timestamp
+        const wallTime = Number(values[indexes.get(definition.wall_time_column ?? '') ?? -1])
+        if (!Number.isSafeInteger(wallTime) || wallTime <= 0) invalid = true
+        const date = new Date(wallTime)
+        if (Number.isNaN(date.getTime())) invalid = true
+        startedAt ??= date
+        endedAt = date
+      }
+    }
+    const consumeText = (text: string) => {
+      for (const character of text) {
+        if (pendingQuote === 1) {
+          if (character === '"') {
+            field += '"'
+            pendingQuote = 0
+            continue
+          }
+          quoted = 0
+          pendingQuote = 0
+        }
+        if (character === '"' && quoted === 1) {
+          pendingQuote = 1
+          continue
+        }
+        if (character === '"') {
+          quoted = quoted === 1 ? 0 : 1
+          continue
+        }
+        if (character === ',' && quoted === 0) {
+          record.push(field)
+          field = ''
+          continue
+        }
+        if ((character === '\n' || character === '\r') && quoted === 0) {
+          if (character === '\r') continue
+          record.push(field)
+          field = ''
+          consumeRecord(record)
+          record = []
+          continue
+        }
+        field += character
+      }
+    }
+    for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
+      if (Date.now() > deadline) return { valid: false, byteSize: totalBytes, checksumSha256: null }
+      totalBytes += chunk.byteLength
+      if (totalBytes > maxBytes) return { valid: false, byteSize: totalBytes, checksumSha256: null }
+      hash.update(chunk)
+      consumeText(decoder.decode(chunk, { stream: true }))
+    }
+    consumeText(decoder.decode())
+    if (pendingQuote === 1) {
+      // A quote immediately before EOF closes the field. Any still-open quoted
+      // field without that closing quote is malformed.
+      pendingQuote = 0
+      quoted = 0
+    } else if (quoted === 1) {
+      invalid = true
+    }
+    if (field.length > 0 || record.length > 0) {
+      record.push(field)
+      consumeRecord(record)
+    }
+    const checksumSha256 = hash.digest('hex')
+    if (invalid) return { valid: false, byteSize: totalBytes, checksumSha256 }
+    if (sampleCount === 0) return { valid: false, byteSize: totalBytes, checksumSha256 }
+    return { valid: true, byteSize: totalBytes, checksumSha256, sampleCount, startedAt, endedAt }
+  } catch {
+    return { valid: false, byteSize: 0, checksumSha256: null }
   }
 }
 

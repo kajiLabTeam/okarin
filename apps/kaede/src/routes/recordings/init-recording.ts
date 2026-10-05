@@ -58,6 +58,10 @@ export const registerInitRecordingRoute = (app: OpenAPIHono<RequestActorHonoEnv>
           },
         },
       },
+      422: {
+        description: 'unsupported shared data type or schema',
+        content: { 'application/json': { schema: errorResponseSchema } },
+      },
     },
   })
 

@@ -44,6 +44,17 @@ export const findRecordingById = async (
     .executeTakeFirst()
 }
 
+export const findRecordingByIdForUpdate = async (
+  recordingId: string,
+  executor: DbExecutor = db
+): Promise<Recording | undefined> => {
+  return activeRecordingsQuery(executor)
+    .selectAll()
+    .where('id', '=', recordingId)
+    .forUpdate()
+    .executeTakeFirst()
+}
+
 export const findRecordingByIdForOrganization = async (
   recordingId: string,
   organizationId: string,
@@ -213,7 +224,7 @@ export const markRecordingUploadReady = async (
 ): Promise<Recording | undefined> => {
   return executor
     .updateTable('recordings')
-    .set({ upload_status: 'ready' })
+    .set({ upload_status: 'ready', upload_failure: null })
     .where('id', '=', recordingId)
     .where('deleted_at', 'is', null)
     .where('upload_status', '=', 'accepted')
