@@ -91,6 +91,7 @@ export const receivePositioningAnalysisCallback = async (
       const recording = await findRecordingById(item.recording_id, transaction)
       const trajectory = await insertTrajectory(
         {
+          id: item.id,
           organization_id: recording?.organization_id ?? '',
           recording_id: item.recording_id,
           floor_id: recording?.floor_id ?? '',

@@ -9,8 +9,8 @@ import type {
   NozomiExecutionSlotBinding,
 } from '../nozomi/nozomi-execution-client.js'
 import {
-  issueInternalAnalysisItemResultUploadUrl,
   issueInternalDataAssetDownloadUrl,
+  issueInternalTrajectoryResultUploadUrl,
 } from '../storage/presigned-url.js'
 import { claimPendingOutboxJobs, completeOutboxJob, failOutboxJob } from './outbox-repository.js'
 import type { OutboxJob } from './outbox-repository.js'
@@ -144,6 +144,7 @@ export const processOutboxJob = async (
         inputs.push({
           slot_id,
           contract: {
+            kind: 'asset',
             data_type: asset.data_type,
             schema_version: asset.schema_version,
             format: asset.format,
@@ -155,11 +156,7 @@ export const processOutboxJob = async (
       }
     }
 
-    const { uploadUrl } = await issueInternalAnalysisItemResultUploadUrl(
-      run.organization_id,
-      run.id,
-      item.id
-    )
+    const { uploadUrl } = await issueInternalTrajectoryResultUploadUrl(run.organization_id, item.id)
 
     const callbackConfig = getCallbackRuntimeConfig()
     const appConfig = getAppRuntimeConfig()

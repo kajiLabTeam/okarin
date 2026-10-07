@@ -56,7 +56,6 @@ const userActor: RequestActor = {
 
 const itemId = '22222222-2222-4222-8222-222222222222'
 const recordingId = '44444444-4444-4444-8444-444444444444'
-const trajectoryId = '55555555-5555-4555-8555-555555555555'
 
 describe('receivePositioningAnalysisCallback', () => {
   beforeEach(() => {
@@ -73,7 +72,9 @@ describe('receivePositioningAnalysisCallback', () => {
       organization_id: 'org-1',
       floor_id: 'floor-1',
     })
-    mocks.insertTrajectory.mockResolvedValue({ id: trajectoryId })
+    mocks.insertTrajectory.mockImplementation((input: { id?: string }) =>
+      Promise.resolve({ id: input.id ?? itemId })
+    )
     mocks.insertCallback.mockResolvedValue({ id: 'cb-1' })
     mocks.updateItem.mockResolvedValue({})
     mocks.aggregateRunStatus.mockResolvedValue(undefined)
@@ -116,6 +117,7 @@ describe('receivePositioningAnalysisCallback', () => {
     expect(mocks.insertCallback).toHaveBeenCalledOnce()
     expect(mocks.insertTrajectory).toHaveBeenCalledWith(
       expect.objectContaining({
+        id: itemId,
         organization_id: 'org-1',
         recording_id: recordingId,
         floor_id: 'floor-1',
@@ -127,7 +129,7 @@ describe('receivePositioningAnalysisCallback', () => {
       itemId,
       expect.objectContaining({
         status: 'completed',
-        result_trajectory_id: trajectoryId,
+        result_trajectory_id: itemId,
         error: null,
       }),
       expect.anything()

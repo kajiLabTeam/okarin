@@ -59,7 +59,7 @@ vi.mock('../nozomi/nozomi-execution-client.js', () => ({
 
 vi.mock('../storage/presigned-url.js', () => ({
   issueInternalDataAssetDownloadUrl: mocks.issueAssetDownloadUrl,
-  issueInternalAnalysisItemResultUploadUrl: mocks.issueItemResultUploadUrl,
+  issueInternalTrajectoryResultUploadUrl: mocks.issueItemResultUploadUrl,
 }))
 
 import { FatalDispatchError, RetriableDispatchError } from '../nozomi/nozomi-execution-client.js'
@@ -75,7 +75,9 @@ describe('outbox-worker', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.issueAssetDownloadUrl.mockResolvedValue({ downloadUrl: 'http://s3/asset.csv' })
-    mocks.issueItemResultUploadUrl.mockResolvedValue({ uploadUrl: 'http://s3/upload.json' })
+    mocks.issueItemResultUploadUrl.mockResolvedValue({
+      uploadUrl: 'http://s3/trajectories/item-1/analyzed/result.csv',
+    })
   })
 
   describe('aggregatePositioningRunStatus', () => {
@@ -217,7 +219,16 @@ describe('outbox-worker', () => {
           analysis_run_item_id: 'item-1',
           pipeline_id: 'pdr',
           snapshot_digest: 'digest-1',
-          output_uri: 'http://s3/upload.json',
+          inputs: [
+            expect.objectContaining({
+              slot_id: 'imu',
+              contract: expect.objectContaining({
+                kind: 'asset',
+                data_type: 'sensor_raw',
+              }),
+            }),
+          ],
+          output_uri: 'http://s3/trajectories/item-1/analyzed/result.csv',
           callback: {
             url: 'http://kaede:8080/api/internal/pipeline-executions/callbacks',
             secret: 'shared-token-123',
