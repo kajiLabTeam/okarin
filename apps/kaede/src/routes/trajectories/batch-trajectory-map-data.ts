@@ -1,12 +1,13 @@
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
+import { requireRequestActor } from '../../middleware/request-actor-context.js'
+import type { RequestActorContext } from '../../middleware/request-actor-context.js'
 import { errorResponseSchema } from '../../schemas/common.js'
+import type { TrajectoryMapDataResponse } from '../../schemas/trajectories.js'
 import {
   batchTrajectoryMapDataRequestSchema,
   batchTrajectoryMapDataResponseSchema,
 } from '../../schemas/trajectories.js'
-import { requireRequestActor } from '../../middleware/request-actor-context.js'
-import type { RequestActorContext } from '../../middleware/request-actor-context.js'
 import { getTrajectoryMapData } from '../../usecases/trajectories/get-trajectory-map-data.js'
 import { toGetTrajectoryMapDataErrorResponse } from './error.js'
 
@@ -65,12 +66,14 @@ export const registerBatchTrajectoryMapDataRoute = (app: OpenAPIHono) => {
         getTrajectoryMapData(actor, { trajectoryId }, { data_type: request.data_type })
       )
     )
-    const failed = results.find((result) => !result.ok)
-    if (failed && !failed.ok) {
-      const error = toGetTrajectoryMapDataErrorResponse(failed.error)
-      return c.json(error.body, error.status)
+    const values: TrajectoryMapDataResponse[] = []
+    for (const result of results) {
+      if (!result.ok) {
+        const error = toGetTrajectoryMapDataErrorResponse(result.error)
+        return c.json(error.body, error.status)
+      }
+      values.push(result.value)
     }
-    const values = results.flatMap((result) => (result.ok ? [result.value] : []))
     const floorIds = new Set(values.map((value) => value.floor_id))
     if (floorIds.size !== 1) {
       return c.json(
