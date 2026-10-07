@@ -1,5 +1,5 @@
 import { Client } from 'pg'
-import { readFile } from 'node:fs/promises'
+import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -25,6 +25,26 @@ export const applySchema = async (connectionString: string) => {
   await client.connect()
   try {
     await client.query(schemaSql)
+
+    await client.query('SET search_path TO public;')
+
+    // db/migrations から未適用のマイグレーションを検出して適用する
+    const migrationsDir = path.resolve(__dirname, '../../../../db/migrations')
+    const files = await readdir(migrationsDir)
+    const sqlFiles = files.filter((f) => f.endsWith('.sql')).sort()
+
+    const appliedResult = await client.query('SELECT version FROM public.schema_migrations')
+    const appliedVersions = new Set(appliedResult.rows.map((r: { version: string }) => r.version))
+
+    for (const file of sqlFiles) {
+      const version = file.split('_')[0]
+      if (version && version >= '20261006020000' && !appliedVersions.has(version)) {
+        const migrationSql = await readFile(path.join(migrationsDir, file), 'utf8')
+        const upSql = migrationSql.split('-- migrate:down')[0]?.replace('-- migrate:up', '') ?? ''
+        await client.query(upSql)
+        await client.query('INSERT INTO public.schema_migrations (version) VALUES ($1)', [version])
+      }
+    }
   } finally {
     await client.end()
   }
