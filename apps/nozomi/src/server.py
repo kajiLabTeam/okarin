@@ -9,7 +9,13 @@ from sentry_sdk.integrations.starlette import StarletteIntegration
 
 from src.routes.analysis import analysis_router
 from src.routes.debug import debug_router
+from src.routes.executions import (
+    executions_router,
+    start_callback_retry_worker,
+    stop_callback_retry_worker,
+)
 from src.routes.health import health_router
+from src.routes.pipelines import pipelines_router
 
 
 def _scalar_fallback_html(openapi_url: str) -> HTMLResponse:
@@ -141,3 +147,8 @@ async def scalar_reference() -> HTMLResponse:
 app.include_router(health_router)
 app.include_router(analysis_router)
 app.include_router(debug_router)
+app.include_router(pipelines_router)
+app.include_router(executions_router)
+
+app.add_event_handler("startup", start_callback_retry_worker)
+app.add_event_handler("shutdown", stop_callback_retry_worker)

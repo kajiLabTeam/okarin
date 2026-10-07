@@ -42,7 +42,7 @@ class RikkaStayHeatmapAnalyzer:
         trajectory: StayHeatmapTrajectory,
     ) -> tuple[pd.DataFrame, list[dict[str, int]]]:
         try:
-            module = importlib.import_module("rikka.stay_analysis")
+            module = importlib.import_module("rikka.stay_analysis.pipeline")
         except ImportError as error:
             raise RuntimeError("rikka stay analysis API is not installed") from error
 

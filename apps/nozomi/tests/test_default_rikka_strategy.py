@@ -1,7 +1,7 @@
 import json
+from types import SimpleNamespace
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
 from src.analysis.default_rikka_strategy import DefaultRikkaStrategy
@@ -79,26 +79,21 @@ def test_default_rikka_strategy_runs_pdr_uploads_result_and_marks_completed(
             return StubResponse(gyro_csv)
         return StubResponse()
 
-    process_sensor_data_calls: list[tuple[pd.DataFrame, pd.DataFrame]] = []
+    pdr_calls: list[tuple[pd.DataFrame, pd.DataFrame]] = []
 
-    def fake_process_sensor_data(
-        df_acc: pd.DataFrame, df_gyro: pd.DataFrame
-    ) -> tuple[pd.DataFrame, pd.DataFrame]:
-        process_sensor_data_calls.append((df_acc, df_gyro))
-        return df_acc, df_gyro
+    def fake_run_pdr(
+        _settings: object,
+        *,
+        df_acc: pd.DataFrame,
+        df_gyro: pd.DataFrame,
+    ) -> SimpleNamespace:
+        pdr_calls.append((df_acc, df_gyro))
+        return SimpleNamespace(trajectory=[[0.0, 0.0], [1.5, 2.5]], t_at_steps=[10.0])
 
     monkeypatch.setattr("src.analysis.default_rikka_strategy.urlopen", fake_urlopen)
     monkeypatch.setattr(
-        "src.analysis.default_rikka_strategy.pdr.process_sensor_data",
-        fake_process_sensor_data,
-    )
-    monkeypatch.setattr(
-        "src.analysis.default_rikka_strategy.pdr.detect_steps",
-        lambda _df_acc: np.array([0]),
-    )
-    monkeypatch.setattr(
-        "src.analysis.default_rikka_strategy.pdr.estimate_trajectory",
-        lambda *_args, **_kwargs: ([[0.0, 0.0], [1.5, 2.5]], [], [10.0]),
+        "src.analysis.default_rikka_strategy.run_pdr",
+        fake_run_pdr,
     )
 
     DefaultRikkaStrategy().run(valid_analyze_request())
@@ -134,8 +129,8 @@ def test_default_rikka_strategy_runs_pdr_uploads_result_and_marks_completed(
             "dddddddd-dddd-dddd-dddd-dddddddddddd/analyzed/result.csv"
         ),
     }
-    assert list(process_sensor_data_calls[0][0].columns) == ["t", "x", "y", "z"]
-    assert list(process_sensor_data_calls[0][1].columns) == ["t", "x", "y", "z"]
+    assert list(pdr_calls[0][0].columns) == ["t", "x", "y", "z"]
+    assert list(pdr_calls[0][1].columns) == ["t", "x", "y", "z"]
 
 
 def test_default_rikka_strategy_falls_back_to_rikka_floor_scale(
@@ -144,16 +139,10 @@ def test_default_rikka_strategy_falls_back_to_rikka_floor_scale(
     request = valid_analyze_request()
     request.floor_scale = None
     monkeypatch.setattr(
-        "src.analysis.default_rikka_strategy.pdr.process_sensor_data",
-        lambda df_acc, df_gyro: (df_acc, df_gyro),
-    )
-    monkeypatch.setattr(
-        "src.analysis.default_rikka_strategy.pdr.detect_steps",
-        lambda _df_acc: np.array([0]),
-    )
-    monkeypatch.setattr(
-        "src.analysis.default_rikka_strategy.pdr.estimate_trajectory",
-        lambda *_args, **_kwargs: ([[0.0, 0.0], [1.0, 1.0]], [], [10.0]),
+        "src.analysis.default_rikka_strategy.run_pdr",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            trajectory=[[0.0, 0.0], [1.0, 1.0]], t_at_steps=[10.0]
+        ),
     )
 
     result_csv = DefaultRikkaStrategy()._analyze_to_csv(
