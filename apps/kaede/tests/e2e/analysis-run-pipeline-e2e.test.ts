@@ -590,5 +590,30 @@ describe('Analysis Run Pipeline E2E Integration', () => {
       expect(traj.points[1]).toEqual({ timestamp: 1, x: 11.5, y: 21.5 })
       expect(traj.points[2]).toEqual({ timestamp: 2, x: 13.0, y: 23.0 })
     }
+
+    // 7. Trajectory API からの実行メタデータ取得の検証 (Issue #257)
+    const singleTrajRes = await app.request(`/api/trajectories/${successfulTrajectoryIds[0]}`, {
+      headers: authHeaders,
+    })
+    expect(singleTrajRes.status).toBe(200)
+    const singleTrajJson = (await singleTrajRes.json()) as {
+      trajectory_id: string
+      status: string
+      execution: {
+        analysis_run_id: string
+        analysis_run_item_id: string
+        pipeline_id: string
+        parameters: Record<string, unknown>
+        inputs: Record<string, unknown> | null
+        executed_at: string
+      }
+    }
+    expect(singleTrajJson.trajectory_id).toBe(successfulTrajectoryIds[0])
+    expect(singleTrajJson.status).toBe('completed')
+    expect(singleTrajJson.execution).toBeDefined()
+    expect(singleTrajJson.execution.analysis_run_id).toBe(runId)
+    expect(singleTrajJson.execution.analysis_run_item_id).toBe(successfulTrajectoryIds[0])
+    expect(['pdr', 'pdr-ble']).toContain(singleTrajJson.execution.pipeline_id)
+    expect(singleTrajJson.execution.executed_at).toBeTruthy()
   }, 30000)
 })

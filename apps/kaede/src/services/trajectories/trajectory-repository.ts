@@ -1,7 +1,10 @@
 import { sql } from 'kysely'
 import type { Insertable, Kysely, Selectable, Transaction, Updateable } from 'kysely'
 import type { PaginationOptions } from '../../schemas/pagination.js'
-import type { TrajectoryConstraints } from '../../schemas/trajectories.js'
+import type {
+  TrajectoryConstraints,
+  TrajectoryExecutionMetadata,
+} from '../../schemas/trajectories.js'
 import type { Trajectories } from '../db/generated.js'
 import { db } from '../db/index.js'
 import type { DB } from '../db/index.js'
@@ -14,7 +17,11 @@ type NewTrajectoryInput = Omit<NewTrajectory, 'constraints'> & {
 }
 type TrajectoryUpdate = Updateable<Trajectories>
 
-export type TrajectoryPageRow = Trajectory & {
+export interface TrajectoryWithExecution extends Trajectory {
+  execution: TrajectoryExecutionMetadata | null
+}
+
+export type TrajectoryPageRow = TrajectoryWithExecution & {
   cursor_created_at: string
 }
 
@@ -26,14 +33,130 @@ export interface TrajectoryPageRows {
 const activeTrajectoriesQuery = (executor: DbExecutor) =>
   executor.selectFrom('trajectories').where('deleted_at', 'is', null)
 
+const activeTrajectoriesWithExecutionQuery = (executor: DbExecutor) =>
+  executor
+    .selectFrom('trajectories')
+    .leftJoin(
+      'positioning_analysis_run_items as item',
+      'item.result_trajectory_id',
+      'trajectories.id'
+    )
+    .where('trajectories.deleted_at', 'is', null)
+    .select([
+      'trajectories.id',
+      'trajectories.organization_id',
+      'trajectories.recording_id',
+      'trajectories.floor_id',
+      'trajectories.status',
+      'trajectories.constraints',
+      'trajectories.error_code',
+      'trajectories.error_message',
+      'trajectories.failed_at',
+      'trajectories.created_at',
+      'trajectories.updated_at',
+      'trajectories.deleted_at',
+      'item.analysis_run_id as item_analysis_run_id',
+      'item.id as item_id',
+      'item.pipeline_id as item_pipeline_id',
+      'item.pipeline_version as item_pipeline_version',
+      'item.pipeline_digest as item_pipeline_digest',
+      'item.parameters as item_parameters',
+      'item.input_manifest as item_input_manifest',
+      'item.created_at as item_created_at',
+    ])
+
+export const buildTrajectoryExecutionMetadata = (row: {
+  created_at: Date
+  item_analysis_run_id: string | null
+  item_id: string | null
+  item_pipeline_id: string | null
+  item_pipeline_version: string | null
+  item_pipeline_digest: string | null
+  item_parameters: unknown
+  item_input_manifest: unknown
+  item_created_at: Date | null
+}): TrajectoryExecutionMetadata => {
+  if (row.item_id && row.item_pipeline_id) {
+    const rawParameters =
+      typeof row.item_parameters === 'string'
+        ? (JSON.parse(row.item_parameters) as Record<string, unknown>)
+        : ((row.item_parameters ?? {}) as Record<string, unknown>)
+    const rawInputs =
+      typeof row.item_input_manifest === 'string'
+        ? (JSON.parse(row.item_input_manifest) as Record<string, unknown>)
+        : ((row.item_input_manifest ?? null) as Record<string, unknown> | null)
+
+    return {
+      analysis_run_id: row.item_analysis_run_id,
+      analysis_run_item_id: row.item_id,
+      pipeline_id: row.item_pipeline_id,
+      pipeline_version: row.item_pipeline_version,
+      pipeline_digest: row.item_pipeline_digest,
+      parameters: rawParameters,
+      inputs: rawInputs,
+      executed_at: (row.item_created_at ?? row.created_at).toISOString(),
+    }
+  }
+
+  return {
+    analysis_run_id: null,
+    analysis_run_item_id: null,
+    pipeline_id: 'legacy-pdr',
+    pipeline_version: null,
+    pipeline_digest: null,
+    parameters: {},
+    inputs: null,
+    executed_at: row.created_at.toISOString(),
+  }
+}
+
+const mapRowToTrajectoryWithExecution = (row: {
+  id: string
+  organization_id: string
+  recording_id: string
+  floor_id: string
+  status: string
+  constraints: unknown
+  error_code: string | null
+  error_message: string | null
+  failed_at: Date | null
+  created_at: Date
+  updated_at: Date
+  deleted_at: Date | null
+  item_analysis_run_id: string | null
+  item_id: string | null
+  item_pipeline_id: string | null
+  item_pipeline_version: string | null
+  item_pipeline_digest: string | null
+  item_parameters: unknown
+  item_input_manifest: unknown
+  item_created_at: Date | null
+}): TrajectoryWithExecution => ({
+  id: row.id,
+  organization_id: row.organization_id,
+  recording_id: row.recording_id,
+  floor_id: row.floor_id,
+  status: row.status,
+  constraints: row.constraints as Trajectory['constraints'],
+  error_code: row.error_code,
+  error_message: row.error_message,
+  failed_at: row.failed_at,
+  created_at: row.created_at,
+  updated_at: row.updated_at,
+  deleted_at: row.deleted_at,
+  execution: buildTrajectoryExecutionMetadata(row),
+})
+
 export const findTrajectoryById = async (
   trajectoryId: string,
   executor: DbExecutor = db
-): Promise<Trajectory | undefined> => {
-  return activeTrajectoriesQuery(executor)
-    .selectAll()
-    .where('id', '=', trajectoryId)
+): Promise<TrajectoryWithExecution | undefined> => {
+  const row = await activeTrajectoriesWithExecutionQuery(executor)
+    .where('trajectories.id', '=', trajectoryId)
     .executeTakeFirst()
+
+  if (!row) return undefined
+  return mapRowToTrajectoryWithExecution(row)
 }
 
 export const listTrajectoriesByRecordingIdPaginated = async (
@@ -41,16 +164,15 @@ export const listTrajectoriesByRecordingIdPaginated = async (
   options: PaginationOptions,
   executor: DbExecutor = db
 ): Promise<TrajectoryPageRows> => {
-  let rowsQuery = activeTrajectoriesQuery(executor)
-    .selectAll()
+  let rowsQuery = activeTrajectoriesWithExecutionQuery(executor)
     .select(
       sql<string>`to_char(trajectories.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`.as(
         'cursor_created_at'
       )
     )
-    .where('recording_id', '=', recordingId)
-    .orderBy('created_at', 'desc')
-    .orderBy('id', 'desc')
+    .where('trajectories.recording_id', '=', recordingId)
+    .orderBy('trajectories.created_at', 'desc')
+    .orderBy('trajectories.id', 'desc')
     .limit(options.limit + 1)
 
   if (options.cursor) {
@@ -59,7 +181,7 @@ export const listTrajectoriesByRecordingIdPaginated = async (
     )
   }
 
-  const [rows, countRow] = await Promise.all([
+  const [rawRows, countRow] = await Promise.all([
     rowsQuery.execute(),
     activeTrajectoriesQuery(executor)
       .select(({ fn }) => fn.countAll<string>().as('count'))
@@ -68,7 +190,10 @@ export const listTrajectoriesByRecordingIdPaginated = async (
   ])
 
   return {
-    rows,
+    rows: rawRows.map((row) => ({
+      ...mapRowToTrajectoryWithExecution(row),
+      cursor_created_at: row.cursor_created_at,
+    })),
     totalCount: Number(countRow.count),
   }
 }
@@ -78,16 +203,15 @@ export const listTrajectoriesByOrganizationIdPaginated = async (
   options: PaginationOptions,
   executor: DbExecutor = db
 ): Promise<TrajectoryPageRows> => {
-  let rowsQuery = activeTrajectoriesQuery(executor)
-    .selectAll()
+  let rowsQuery = activeTrajectoriesWithExecutionQuery(executor)
     .select(
       sql<string>`to_char(trajectories.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`.as(
         'cursor_created_at'
       )
     )
-    .where('organization_id', '=', organizationId)
-    .orderBy('created_at', 'desc')
-    .orderBy('id', 'desc')
+    .where('trajectories.organization_id', '=', organizationId)
+    .orderBy('trajectories.created_at', 'desc')
+    .orderBy('trajectories.id', 'desc')
     .limit(options.limit + 1)
 
   if (options.cursor) {
@@ -96,7 +220,7 @@ export const listTrajectoriesByOrganizationIdPaginated = async (
     )
   }
 
-  const [rows, countRow] = await Promise.all([
+  const [rawRows, countRow] = await Promise.all([
     rowsQuery.execute(),
     activeTrajectoriesQuery(executor)
       .select(({ fn }) => fn.countAll<string>().as('count'))
@@ -105,7 +229,10 @@ export const listTrajectoriesByOrganizationIdPaginated = async (
   ])
 
   return {
-    rows,
+    rows: rawRows.map((row) => ({
+      ...mapRowToTrajectoryWithExecution(row),
+      cursor_created_at: row.cursor_created_at,
+    })),
     totalCount: Number(countRow.count),
   }
 }
