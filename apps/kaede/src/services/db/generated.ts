@@ -79,6 +79,16 @@ export interface PositioningAnalysisRunItems {
   updated_at: Generated<Timestamp>
 }
 
+export interface PositioningAnalysisCallbacks {
+  id: Generated<string>
+  event_id: string
+  analysis_run_item_id: string
+  status: string
+  payload: Json
+  received_at: Generated<Timestamp>
+  processed_at: Timestamp | null
+}
+
 export interface ApplicationDataMigrations {
   completed_at: Generated<Timestamp>
   details: Generated<Json>
@@ -479,6 +489,7 @@ export interface Users {
 }
 
 export interface DB {
+  positioning_analysis_callbacks: PositioningAnalysisCallbacks
   positioning_analysis_run_items: PositioningAnalysisRunItems
   positioning_analysis_runs: PositioningAnalysisRuns
   analysis_run_trajectories: AnalysisRunTrajectories
