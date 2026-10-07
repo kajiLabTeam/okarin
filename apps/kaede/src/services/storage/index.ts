@@ -32,6 +32,9 @@ export {
   issueDataAssetUploadUrl,
   issueTrajectoryResultDownloadUrl,
   issueAnalysisTrajectoryCsvDownloadUrl,
+  buildAnalysisRunItemResultObjectKey,
+  issueInternalDataAssetDownloadUrl,
+  issueInternalAnalysisItemResultUploadUrl,
 } from './presigned-url.js'
 export { resetS3ClientForTests } from './s3-client.js'
 export type {
