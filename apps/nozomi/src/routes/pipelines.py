@@ -1,14 +1,14 @@
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from src.registry.adapter import RikkaAdapter
 from src.registry.catalog import initial_catalog
 from src.registry.registry import PipelineRegistry
+from src.registry.rikka_executor import RikkaComponentExecutor
 from src.schemas.execution import ErrorEnvelope
 from src.schemas.pipeline import PipelineCatalogEntry, PipelineSnapshot
 
 pipelines_router = APIRouter()
-registry = PipelineRegistry(initial_catalog(), RikkaAdapter())
+registry = PipelineRegistry(initial_catalog(), RikkaComponentExecutor())
 
 
 @pipelines_router.get(
