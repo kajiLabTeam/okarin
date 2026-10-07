@@ -71,6 +71,7 @@ export const listRecordingDataAssets = async (recordingId: string, executor: Exe
       'relation.client_asset_key',
       'asset_object.id as data_asset_object_id',
       'asset_object.object_key',
+      'asset_object.checksum_sha256',
       'asset_object.content_type',
       'asset_object.format',
     ])
