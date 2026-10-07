@@ -50,6 +50,35 @@ export interface AnalysisRunTrajectories {
   trajectory_id: string
 }
 
+export interface PositioningAnalysisRuns {
+  id: Generated<string>
+  organization_id: string
+  status: Generated<string>
+  idempotency_key: string
+  request_digest: string
+  retry_of_run_id: string | null
+  created_at: Generated<Timestamp>
+  updated_at: Generated<Timestamp>
+}
+
+export interface PositioningAnalysisRunItems {
+  id: Generated<string>
+  analysis_run_id: string
+  recording_id: string
+  pipeline_id: string
+  status: Generated<string>
+  slot_bindings: Json
+  pipeline_snapshot: Json
+  pipeline_digest: string
+  pipeline_version: string
+  parameters: Json
+  input_manifest: Json
+  result_trajectory_id: string | null
+  error: Json | null
+  created_at: Generated<Timestamp>
+  updated_at: Generated<Timestamp>
+}
+
 export interface ApplicationDataMigrations {
   completed_at: Generated<Timestamp>
   details: Generated<Json>
@@ -450,6 +479,8 @@ export interface Users {
 }
 
 export interface DB {
+  positioning_analysis_run_items: PositioningAnalysisRunItems
+  positioning_analysis_runs: PositioningAnalysisRuns
   analysis_run_trajectories: AnalysisRunTrajectories
   analysis_runs: AnalysisRuns
   application_data_migrations: ApplicationDataMigrations
