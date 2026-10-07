@@ -2,20 +2,15 @@ from __future__ import annotations
 
 from enum import StrEnum
 from typing import Any
-from urllib.parse import urlparse
 
 from pydantic import Field, field_validator
 
+from src.network_policy import (
+    UrlPurpose,
+    configured_callback_url,
+    validate_outbound_url,
+)
 from src.schemas.pipeline import Contract, SlotBinding, StrictModel
-
-
-def _validate_url(value: str, label: str) -> str:
-    parsed = urlparse(value)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        raise ValueError(f"{label} must use http or https and include a host")
-    if parsed.username or parsed.password:
-        raise ValueError(f"{label} must not contain credentials")
-    return value
 
 
 class InputManifest(StrictModel):
@@ -28,17 +23,23 @@ class InputManifest(StrictModel):
     @field_validator("uri")
     @classmethod
     def check_uri(cls, value: str) -> str:
-        return _validate_url(value, "uri")
+        return validate_outbound_url(value, UrlPurpose.STORAGE)
 
 
 class CallbackInfo(StrictModel):
     url: str
+    # Kaede currently sends this field for callback authentication. Nozomi accepts
+    # it for wire compatibility but never persists or reflects it; callbacks use
+    # the shared service token configured in Nozomi's environment instead.
     secret: str | None = None
 
     @field_validator("url")
     @classmethod
     def check_url(cls, value: str) -> str:
-        return _validate_url(value, "callback url")
+        validated = validate_outbound_url(value, UrlPurpose.CALLBACK)
+        if validated != configured_callback_url():
+            raise ValueError("callback url must match the configured Kaede endpoint")
+        return validated
 
 
 class ExecutionRequest(StrictModel):
@@ -54,7 +55,7 @@ class ExecutionRequest(StrictModel):
     @field_validator("output_uri")
     @classmethod
     def check_output_uri(cls, value: str) -> str:
-        return _validate_url(value, "output_uri")
+        return validate_outbound_url(value, UrlPurpose.STORAGE)
 
 
 class ExecutionStatus(StrEnum):
@@ -83,3 +84,12 @@ class ExecutionEvent(StrictModel):
 class ExecutionAccepted(StrictModel):
     analysis_run_item_id: str
     status: ExecutionStatus
+
+
+class CallbackDeliveryResponse(StrictModel):
+    event_id: str
+    analysis_run_item_id: str
+    status: str
+    attempts: int
+    last_error: str | None = None
+    next_attempt_at: float | None = None

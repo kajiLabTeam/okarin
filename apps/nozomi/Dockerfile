@@ -37,12 +37,15 @@ LABEL org.opencontainers.image.version=$APP_VERSION \
       org.opencontainers.image.revision=$VCS_REF
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
+    && apt-get install -y --no-install-recommends ca-certificates gosu \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd --create-home --shell /usr/sbin/nologin appuser
+    && useradd --create-home --shell /usr/sbin/nologin appuser \
+    && mkdir -p /var/lib/nozomi \
+    && chown appuser:appuser /var/lib/nozomi
 
 COPY --from=builder /app/.venv /app/.venv
+COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/nozomi-entrypoint
 
-USER appuser
+ENTRYPOINT ["nozomi-entrypoint"]
 
 CMD ["start"]

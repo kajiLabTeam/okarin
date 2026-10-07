@@ -25,6 +25,13 @@ $ uv run start
 $ HOST=0.0.0.0 PORT=8080 uv run start
 ```
 
+## Pipeline実行APIの運用条件
+
+- 入出力URLは`S3_INTERNAL_ENDPOINT`と`S3_PUBLIC_ENDPOINT`のoriginだけを許可します。追加originが必要な場合は`NOZOMI_ALLOWED_STORAGE_ORIGINS`へカンマ区切りで指定します。
+- callback先は`NOZOMI_PIPELINE_CALLBACK_URL`（既定はKaedeの`/api/internal/pipeline-executions/callbacks`）に固定し、`KAEDE_API_SHARED_TOKEN`をBearer認証に使用します。リクエストの`callback.secret`は後段PRとの互換性のため受理しますが利用・保存せず、URLや秘密値は実行DBへ保存しません。
+- 1入力の上限は既定で200 MiBです。`NOZOMI_MAX_INPUT_BYTES`で変更できます。
+- 実行予約とcallback配信待ちは`NOZOMI_EXECUTION_DB_PATH`のSQLiteへ保存します。Docker Composeでは永続volumeを割り当て、callbackが未達の場合は再起動後も指数バックオフで再送します。再起動で中断した実行は`execution_interrupted`へ収束し、失敗callbackを再送します。複数ホストへ水平分割する場合は共有DBへ移行してください。
+
 ### uvのセットアップ
 
 `uv venv`

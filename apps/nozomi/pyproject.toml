@@ -33,7 +33,7 @@ dev = [
 ]
 
 [tool.uv.sources]
-rikka = { git = "https://github.com/kajiLabTeam/rikka.git", rev = "ebbf7978f8c12829bb891c149cbf1985ab846529" }
+rikka = { git = "https://github.com/kajiLabTeam/rikka.git", rev = "6351b0c3fa20d3a32b8990e12dd4420e092ad880" }
 
 [tool.ruff]
 line-length = 88

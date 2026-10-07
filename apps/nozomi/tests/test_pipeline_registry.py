@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from src.registry.adapter import RikkaAdapter
 from src.registry.catalog import initial_catalog
 from src.registry.registry import PipelineRegistry
+from src.registry.rikka_executor import RikkaComponentExecutor
 from src.schemas.pipeline import (
     AssetContract,
     DataType,
@@ -28,7 +28,7 @@ def test_catalog_lists_four_initial_pipelines() -> None:
 
 
 def test_registry_computes_deterministic_digest() -> None:
-    registry = PipelineRegistry(initial_catalog(), RikkaAdapter())
+    registry = PipelineRegistry(initial_catalog(), RikkaComponentExecutor())
     snapshot1 = registry.resolve("pdr")
     snapshot2 = registry.resolve("pdr")
     assert snapshot1 is not None and snapshot2 is not None
@@ -36,13 +36,13 @@ def test_registry_computes_deterministic_digest() -> None:
     assert len(snapshot1.digest) == 64
 
 
-def test_unsupported_rikka_component_marks_availability_false() -> None:
-    registry = PipelineRegistry(initial_catalog(), RikkaAdapter())
-    snapshot = registry.resolve("pdr")
-    assert snapshot is not None
-    assert not snapshot.availability.available
-    assert snapshot.availability.reason is not None
-    assert snapshot.availability.reason.code == "unsupported_component"
+def test_latest_rikka_components_make_all_pipelines_available() -> None:
+    registry = PipelineRegistry(initial_catalog(), RikkaComponentExecutor())
+    assert all(
+        snapshot.availability.available
+        for definition in initial_catalog()
+        if (snapshot := registry.resolve(definition.pipeline_id)) is not None
+    )
 
 
 def test_get_pipelines_api_returns_catalog() -> None:
