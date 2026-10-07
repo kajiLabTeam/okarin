@@ -1,11 +1,15 @@
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { createRoute } from '@hono/zod-openapi'
-import { notImplementedResponseSchema } from '../../schemas/common.js'
+import { requireRequestActor } from '../../middleware/request-actor-context.js'
+import type { RequestActorContext } from '../../middleware/request-actor-context.js'
+import { errorResponseSchema } from '../../schemas/common.js'
+import type { TrajectoryMapDataResponse } from '../../schemas/trajectories.js'
 import {
   batchTrajectoryMapDataRequestSchema,
   batchTrajectoryMapDataResponseSchema,
 } from '../../schemas/trajectories.js'
-import { notImplemented } from '../../utils/not-implemented.js'
+import { getTrajectoryMapData } from '../../usecases/trajectories/get-trajectory-map-data.js'
+import { toGetTrajectoryMapDataErrorResponse } from './error.js'
 
 export const registerBatchTrajectoryMapDataRoute = (app: OpenAPIHono) => {
   const route = createRoute({
@@ -31,24 +35,65 @@ export const registerBatchTrajectoryMapDataRoute = (app: OpenAPIHono) => {
           },
         },
       },
-      501: {
-        description: 'not implemented',
-        content: {
-          'application/json': {
-            schema: notImplementedResponseSchema,
-          },
-        },
+      400: {
+        description: 'request is invalid',
+        content: { 'application/json': { schema: errorResponseSchema } },
+      },
+      403: {
+        description: 'permission denied',
+        content: { 'application/json': { schema: errorResponseSchema } },
+      },
+      404: {
+        description: 'trajectory が存在しない',
+        content: { 'application/json': { schema: errorResponseSchema } },
+      },
+      409: {
+        description: 'trajectory の現在状態では map data を取得できない',
+        content: { 'application/json': { schema: errorResponseSchema } },
+      },
+      422: {
+        description: '解析結果CSVが不正',
+        content: { 'application/json': { schema: errorResponseSchema } },
       },
     },
   })
 
-  app.openapi(route, (c) => {
-    c.req.valid('json')
-
-    return notImplemented(
-      c,
-      'POST /api/trajectories/map-data:batch',
-      '複数 trajectory の map data を取得する'
+  app.openapi(route, async (c) => {
+    const request = c.req.valid('json')
+    const actor = requireRequestActor(c as unknown as RequestActorContext)
+    const results = await Promise.all(
+      request.trajectory_ids.map((trajectoryId) =>
+        getTrajectoryMapData(actor, { trajectoryId }, { data_type: request.data_type })
+      )
+    )
+    const values: TrajectoryMapDataResponse[] = []
+    for (const result of results) {
+      if (!result.ok) {
+        const error = toGetTrajectoryMapDataErrorResponse(result.error)
+        return c.json(error.body, error.status)
+      }
+      values.push(result.value)
+    }
+    const floorIds = new Set(values.map((value) => value.floor_id))
+    if (floorIds.size !== 1) {
+      return c.json(
+        {
+          error_code: 'TRAJECTORY_FLOOR_MISMATCH',
+          error_message: 'trajectories must belong to the same floor',
+        },
+        400
+      )
+    }
+    return c.json(
+      {
+        floor_id: values[0]?.floor_id ?? '',
+        trajectories: values.map(({ trajectory_id, data_type, points }) => ({
+          trajectory_id,
+          data_type,
+          points,
+        })),
+      },
+      200
     )
   })
 }
