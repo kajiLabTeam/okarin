@@ -25,6 +25,7 @@ import { registerMembershipAdministrationRoutes } from './membership-administrat
 import { registerOrganizationOidcLinkRoutes } from './oidc-links.js'
 import { registerOrganizationOidcProviderRoutes } from './oidc-providers.js'
 import { registerPipelineAvailabilityRoute } from './pipeline-availability.js'
+import { registerPositioningAnalysisRunRoutes } from './positioning-analysis-runs.js'
 import { registerOrganizationScopedPedestrianRoute } from './scoped-pedestrian.js'
 import { registerOrganizationScopedRecordingRoutes } from './scoped-recordings.js'
 
@@ -58,3 +59,4 @@ registerOrganizationScopedPedestrianRoute(organizationsRoutes)
 registerOrganizationScopedRecordingRoutes(organizationsRoutes)
 registerOrganizationBeaconRoutes(organizationsRoutes)
 registerPipelineAvailabilityRoute(organizationsRoutes)
+registerPositioningAnalysisRunRoutes(organizationsRoutes)

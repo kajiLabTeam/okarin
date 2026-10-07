@@ -4,6 +4,7 @@ import { analysisRunsRoutes } from './analysis-runs/index.js'
 import { authRoutes } from './auth/index.js'
 import { buildingsRoutes } from './buildings/index.js'
 import { floorsRoutes } from './floors/index.js'
+import { internalRoutes } from './internal/index.js'
 import { nozomiRoutes } from './nozomi/index.js'
 import { organizationCreationRequestsRoutes } from './organization-creation-requests/index.js'
 import { organizationsRoutes } from './organizations/index.js'
@@ -21,6 +22,7 @@ export const registerApiRoutes = (app: OpenAPIHono) => {
   api.route('/auth', authRoutes)
   api.route('/buildings', buildingsRoutes)
   api.route('/floors', floorsRoutes)
+  api.route('/internal', internalRoutes)
   api.route('/nozomi', nozomiRoutes)
   api.route('/organization-creation-requests', organizationCreationRequestsRoutes)
   api.route('/organizations', organizationsRoutes)

@@ -9,6 +9,9 @@ interface Asset {
   schema_version: string
   format: string
   validation_status: string
+  data_asset_object_id?: string
+  object_key?: string
+  checksum_sha256?: string | null
 }
 interface Issue {
   slot_id: string
@@ -25,6 +28,12 @@ type ExecutionResolutionError =
 /** #192の正式なfloor/beacon resource解決に差し替えるための境界。 */
 export interface PipelineResourceProvider {
   listAssets(recordingId: string): Promise<Asset[]>
+}
+export interface ResolvedPipelineRecording {
+  recording_id: string
+  assets: Asset[]
+  bindings: Record<string, string>
+  issues: Issue[]
 }
 
 export const recordingAssetProvider: PipelineResourceProvider = {
@@ -143,10 +152,13 @@ export const resolvePipelineForExecution = async (
       assets: await resourceProvider.listAssets(recording_id),
     }))
   )
-  const resolvedRecordings = recordings.map(({ recording_id, assets }) => ({
-    recording_id,
-    ...bindingFor(pipeline, assets),
-  }))
+  const resolvedRecordings: ResolvedPipelineRecording[] = recordings.map(
+    ({ recording_id, assets }) => ({
+      recording_id,
+      assets,
+      ...bindingFor(pipeline, assets),
+    })
+  )
   const unavailableRecordings = resolvedRecordings
     .filter((recording) => recording.issues.length > 0)
     .map(({ recording_id, issues }) => ({ recording_id, issues }))
