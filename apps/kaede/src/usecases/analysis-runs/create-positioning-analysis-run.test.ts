@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   findInOrg: vi.fn(),
   insertRun: vi.fn(),
   insertItems: vi.fn(),
+  insertOutboxJobs: vi.fn(),
   findRecording: vi.fn(),
   findAuth: vi.fn(),
   resolvePipeline: vi.fn(),
@@ -20,6 +21,10 @@ vi.mock('../../services/analysis-runs/positioning-analysis-run-repository.js', (
   findPositioningRunInOrganization: mocks.findInOrg,
   insertPositioningRun: mocks.insertRun,
   insertPositioningItems: mocks.insertItems,
+}))
+
+vi.mock('../../services/analysis-runs/outbox-repository.js', () => ({
+  insertOutboxJobs: mocks.insertOutboxJobs,
 }))
 
 vi.mock('../../services/recordings/index.js', () => ({
@@ -114,10 +119,11 @@ describe('createPositioningAnalysisRun', () => {
       },
     })
     mocks.insertRun.mockResolvedValue({ id: runId })
-    mocks.insertItems.mockResolvedValue([])
+    mocks.insertItems.mockResolvedValue([{ id: 'item-1' }])
+    mocks.insertOutboxJobs.mockResolvedValue([])
   })
 
-  it('正常に親Runと子Itemを作成して202 Acceptedを返す', async () => {
+  it('正常に親Runと子Itemを作成して202 Acceptedを返し、Outboxジョブを同一トランザクションで登録する', async () => {
     const body: PositioningAnalysisRunRequest = {
       recording_ids: [recordingId],
       pipeline_ids: ['pdr'],
@@ -136,6 +142,18 @@ describe('createPositioningAnalysisRun', () => {
     })
     expect(mocks.insertRun).toHaveBeenCalledOnce()
     expect(mocks.insertItems).toHaveBeenCalledOnce()
+    expect(mocks.insertOutboxJobs).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          job_type: 'positioning_analysis_dispatch',
+          payload: { analysis_run_item_id: 'item-1' },
+          status: 'pending',
+          attempts: 0,
+          max_attempts: 3,
+        }),
+      ],
+      expect.anything()
+    )
   })
 
   it('同一Idempotency-Keyかつ同一リクエストなら既存のRunを返す', async () => {

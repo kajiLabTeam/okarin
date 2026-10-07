@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import type { RequestActor } from '../../middleware/request-actor-context.js'
 import type { Pipeline } from '../../schemas/pipelines.js'
 import type { PositioningAnalysisRunRequest } from '../../schemas/positioning-analysis-runs.js'
+import { insertOutboxJobs } from '../../services/analysis-runs/outbox-repository.js'
 import {
   findPositioningRunByKey,
   findPositioningRunInOrganization,
@@ -180,7 +181,18 @@ export const createPositioningAnalysisRun = async (
           error: null,
         }))
       )
-      await insertPositioningItems(items, transaction)
+      const insertedItems = await insertPositioningItems(items, transaction)
+      await insertOutboxJobs(
+        insertedItems.map((item) => ({
+          job_type: 'positioning_analysis_dispatch',
+          payload: { analysis_run_item_id: item.id },
+          status: 'pending',
+          attempts: 0,
+          max_attempts: 3,
+          run_at: new Date(),
+        })),
+        transaction
+      )
       return run
     })
     return {
