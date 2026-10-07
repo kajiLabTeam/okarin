@@ -41,31 +41,69 @@ const digest = (body: PositioningAnalysisRunRequest) =>
   createHash('sha256')
     .update(JSON.stringify(canonicalize(body)))
     .digest('hex')
-const parametersMatchSchema = (value: Record<string, unknown>, schema: Record<string, unknown>) => {
-  if (schema.type !== 'object') return true
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value)
+
+const jsonSchemaTypeMatches = (value: unknown, type: string) => {
+  if (type === 'null') return value === null
+  if (type === 'boolean') return typeof value === 'boolean'
+  if (type === 'string') return typeof value === 'string'
+  if (type === 'object') return typeof value === 'object' && value !== null && !Array.isArray(value)
+  if (type === 'array') return Array.isArray(value)
+  if (type === 'integer') return Number.isInteger(value)
+  if (type === 'number') return isFiniteNumber(value)
+  return true
+}
+
+/** Validate the JSON Schema subset emitted by Nozomi's pipeline catalog. */
+const parametersMatchSchema = (value: unknown, schema: Record<string, unknown>): boolean => {
+  const types = Array.isArray(schema.type)
+    ? schema.type.filter((type): type is string => typeof type === 'string')
+    : typeof schema.type === 'string'
+      ? [schema.type]
+      : []
+
+  if (types.length > 0 && !types.some((type) => jsonSchemaTypeMatches(value, type))) return false
+
+  if (isFiniteNumber(value)) {
+    if (typeof schema.minimum === 'number' && value < schema.minimum) return false
+    if (typeof schema.maximum === 'number' && value > schema.maximum) return false
+    if (typeof schema.exclusiveMinimum === 'number' && value <= schema.exclusiveMinimum)
+      return false
+    if (typeof schema.exclusiveMaximum === 'number' && value >= schema.exclusiveMaximum)
+      return false
+  }
+
+  if (Array.isArray(value)) {
+    return typeof schema.items === 'object' && schema.items !== null
+      ? value.every((entry) =>
+          parametersMatchSchema(entry, schema.items as Record<string, unknown>)
+        )
+      : true
+  }
+
+  if (typeof value !== 'object' || value === null) return true
+
   const required = Array.isArray(schema.required)
     ? schema.required.filter((key): key is string => typeof key === 'string')
     : []
   const properties =
     schema.properties && typeof schema.properties === 'object'
-      ? (schema.properties as Record<string, { type?: string }>)
+      ? (schema.properties as Record<string, unknown>)
       : {}
-  return (
-    required.every((key) => Object.prototype.hasOwnProperty.call(value, key)) &&
-    Object.entries(value).every(([key, entry]) => {
-      const property = Object.prototype.hasOwnProperty.call(properties, key)
-        ? properties[key]
-        : undefined
-      const type = property?.type
-      return (
-        !type ||
-        (type === 'number' && typeof entry === 'number') ||
-        (type === 'string' && typeof entry === 'string') ||
-        (type === 'boolean' && typeof entry === 'boolean') ||
-        (type === 'object' && typeof entry === 'object' && entry !== null)
-      )
-    })
-  )
+  if (!required.every((key) => Object.prototype.hasOwnProperty.call(value, key))) return false
+
+  if (schema.additionalProperties === false) {
+    if (Object.keys(value).some((key) => !Object.prototype.hasOwnProperty.call(properties, key)))
+      return false
+  }
+
+  return Object.entries(value).every(([key, entry]) => {
+    const property = properties[key]
+    return typeof property !== 'object' || property === null
+      ? true
+      : parametersMatchSchema(entry, property as Record<string, unknown>)
+  })
 }
 
 export const createPositioningAnalysisRun = async (
