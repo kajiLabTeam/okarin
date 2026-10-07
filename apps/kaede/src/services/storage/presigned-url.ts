@@ -425,3 +425,58 @@ export const issueAnalysisTrajectoryCsvDownloadUrl = async (
     objectKey,
   }
 }
+
+export const buildAnalysisRunItemResultObjectKey = (
+  organizationId: string,
+  analysisRunId: string,
+  itemId: string
+) => {
+  return `organizations/${validateObjectKeyUuid(organizationId, 'organizationId')}/analysis-runs/${validateObjectKeyUuid(analysisRunId, 'analysisRunId')}/items/${validateObjectKeyUuid(itemId, 'itemId')}/result.json`
+}
+
+export const issueInternalDataAssetDownloadUrl = async (
+  objectKey: string,
+  now: Date = new Date()
+) => {
+  const { config, internalClient } = getS3Context()
+  const downloadUrl = await getSignedUrl(
+    internalClient,
+    new GetObjectCommand({ Bucket: config.bucket, Key: objectKey }),
+    { expiresIn: config.trajectoryRawDownloadUrlTtlSeconds }
+  )
+
+  return {
+    downloadUrl,
+    expiresAt: new Date(
+      now.getTime() + config.trajectoryRawDownloadUrlTtlSeconds * 1000
+    ).toISOString(),
+    objectKey,
+  }
+}
+
+export const issueInternalAnalysisItemResultUploadUrl = async (
+  organizationId: string,
+  analysisRunId: string,
+  itemId: string,
+  now: Date = new Date()
+) => {
+  const { config, internalClient } = getS3Context()
+  const objectKey = buildAnalysisRunItemResultObjectKey(organizationId, analysisRunId, itemId)
+  const uploadUrl = await getSignedUrl(
+    internalClient,
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: objectKey,
+      ContentType: 'application/json',
+    }),
+    { expiresIn: config.trajectoryResultUploadUrlTtlSeconds }
+  )
+
+  return {
+    expiresAt: new Date(
+      now.getTime() + config.trajectoryResultUploadUrlTtlSeconds * 1000
+    ).toISOString(),
+    objectKey,
+    uploadUrl,
+  }
+}

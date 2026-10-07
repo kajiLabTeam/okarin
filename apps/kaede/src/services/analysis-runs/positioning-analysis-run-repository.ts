@@ -1,3 +1,4 @@
+import { sql } from 'kysely'
 import type { Insertable, Selectable } from 'kysely'
 import type { Json, PositioningAnalysisRunItems, PositioningAnalysisRuns } from '../db/generated.js'
 import { db } from '../db/index.js'
@@ -84,6 +85,40 @@ export const claimQueuedPositioningRunItem = (itemId: string, executor: DbExecut
     .where('status', '=', 'queued')
     .returningAll()
     .executeTakeFirst()
+
+export const findPositioningRunById = (id: string, executor: DbExecutor = db) =>
+  executor
+    .selectFrom('positioning_analysis_runs')
+    .selectAll()
+    .where('id', '=', id)
+    .executeTakeFirst()
+
+export const updatePositioningRunStatus = (
+  runId: string,
+  status: 'accepted' | 'processing' | 'completed' | 'partially_completed' | 'failed',
+  executor: DbExecutor = db
+) =>
+  executor
+    .updateTable('positioning_analysis_runs')
+    .set({ status, updated_at: new Date() })
+    .where('id', '=', runId)
+    .returningAll()
+    .executeTakeFirst()
+
+export const findTimedOutPositioningRunItems = (
+  timeoutMinutes: number,
+  executor: DbExecutor = db
+) =>
+  executor
+    .selectFrom('positioning_analysis_run_items')
+    .selectAll()
+    .where('status', '=', 'processing')
+    .where(
+      'updated_at',
+      '<',
+      sql<Date>`clock_timestamp() - (${timeoutMinutes} * interval '1 minute')`
+    )
+    .execute()
 
 /** #262 may implement this port with an outbox insert in the same transaction. */
 export interface PositioningAnalysisDispatchPort {

@@ -422,12 +422,12 @@ def event_id(item_id: str, status: str) -> str:
 
 def send_callback(event: ExecutionEvent) -> None:
     url = configured_callback_url()
-    validate_outbound_url(url, UrlPurpose.CALLBACK)
     headers = {"content-type": "application/json"}
     body = json.dumps(event.model_dump(mode="json")).encode()
     shared_token = os.getenv("KAEDE_API_SHARED_TOKEN")
     if shared_token:
         headers["authorization"] = f"Bearer {shared_token}"
+        headers["x-callback-secret"] = shared_token
     with build_opener(_NoRedirect).open(
         Request(url, data=body, headers=headers, method="POST"), timeout=10
     ) as response:

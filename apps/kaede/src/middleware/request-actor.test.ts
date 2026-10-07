@@ -105,6 +105,25 @@ describe('requestActorMiddleware', () => {
     expect(findValidSessionByTokenMock).not.toHaveBeenCalled()
   })
 
+  it('x-callback-secret ヘッダーでも service client actor を設定する', async () => {
+    const app = createTestApp()
+
+    const response = await app.request('/api/ping', {
+      headers: {
+        'x-callback-secret': 'shared-token',
+      },
+    })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      actor: {
+        type: 'service_client',
+        name: 'shared_token',
+      },
+    })
+    expect(findValidSessionByTokenMock).not.toHaveBeenCalled()
+  })
+
   it('Bearer scheme の大小文字と余分な空白を許容する', async () => {
     const app = createTestApp()
 

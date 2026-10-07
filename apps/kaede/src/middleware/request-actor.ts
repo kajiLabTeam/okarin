@@ -91,9 +91,10 @@ export const requestActorMiddleware = ({
     }
 
     const authorization = c.req.header('authorization')
+    const callbackSecret = c.req.header('x-callback-secret')
 
-    if (hasBearerAuthorization(authorization)) {
-      const actualToken = extractBearerToken(authorization)
+    if (hasBearerAuthorization(authorization) || callbackSecret) {
+      const actualToken = callbackSecret ?? extractBearerToken(authorization)
 
       if (!actualToken || !isEqualToken(actualToken, sharedToken)) {
         return sharedTokenAuthError(c)

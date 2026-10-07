@@ -89,6 +89,21 @@ export interface PositioningAnalysisCallbacks {
   processed_at: Timestamp | null
 }
 
+export interface OutboxJobs {
+  attempts: Generated<number>
+  created_at: Generated<Timestamp>
+  id: Generated<string>
+  job_type: string
+  last_error: string | null
+  lease_token: string | null
+  leased_until: Timestamp | null
+  max_attempts: Generated<number>
+  payload: Json
+  run_at: Generated<Timestamp>
+  status: Generated<string>
+  updated_at: Generated<Timestamp>
+}
+
 export interface ApplicationDataMigrations {
   completed_at: Generated<Timestamp>
   details: Generated<Json>
@@ -489,6 +504,7 @@ export interface Users {
 }
 
 export interface DB {
+  outbox_jobs: OutboxJobs
   positioning_analysis_callbacks: PositioningAnalysisCallbacks
   positioning_analysis_run_items: PositioningAnalysisRunItems
   positioning_analysis_runs: PositioningAnalysisRuns
