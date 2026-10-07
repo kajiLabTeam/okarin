@@ -9,7 +9,7 @@ import {
   uuidSchema,
 } from './common.js'
 import { paginationMetadataSchema } from './pagination.js'
-import { trajectoryConstraintsSchema } from './trajectories.js'
+import { trajectoryConstraintsSchema, trajectoryExecutionMetadataSchema } from './trajectories.js'
 
 const uploadUrlsSchema = z
   .object({
@@ -345,6 +345,9 @@ export const recordingTrajectoriesResponseSchema = z
           status: trajectoryStatusSchema,
           created_at: isoDatetimeSchema.openapi({
             description: 'trajectory の作成日時',
+          }),
+          execution: trajectoryExecutionMetadataSchema.nullable().optional().openapi({
+            description: '解析実行に関するメタデータ',
           }),
         })
       )

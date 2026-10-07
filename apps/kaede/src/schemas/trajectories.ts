@@ -257,6 +257,35 @@ export const callbackResponseSchema = z
   })
   .openapi('CallbackResponse')
 
+export const trajectoryExecutionMetadataSchema = z
+  .object({
+    analysis_run_id: uuidSchema.nullable().openapi({
+      description: '紐づく positioning_analysis_run の ID。legacy の場合は null',
+    }),
+    analysis_run_item_id: uuidSchema.nullable().openapi({
+      description: '紐づく positioning_analysis_run_item の ID。legacy の場合は null',
+    }),
+    pipeline_id: z.string().openapi({
+      description: '実行された pipeline の ID（例: pdr, pdr-ble, legacy-pdr）',
+    }),
+    pipeline_version: z.string().nullable().openapi({
+      description: '実行された pipeline の定義バージョン',
+    }),
+    pipeline_digest: z.string().nullable().openapi({
+      description: 'pipeline 定義のスナップショットダイジェスト',
+    }),
+    parameters: z.record(z.unknown()).openapi({
+      description: '実行時に渡されたパラメータ',
+    }),
+    inputs: z.record(z.unknown()).nullable().openapi({
+      description: '入力として渡された data asset のマニフェスト',
+    }),
+    executed_at: isoDatetimeSchema.openapi({
+      description: '解析実行日時',
+    }),
+  })
+  .openapi('TrajectoryExecutionMetadata')
+
 export const trajectoryStatusResponseSchema = z
   .object({
     trajectory_id: uuidSchema.openapi({
@@ -277,6 +306,9 @@ export const trajectoryStatusResponseSchema = z
     }),
     failed_at: isoDatetimeSchema.nullable().openapi({
       description: '失敗日時。未失敗なら null',
+    }),
+    execution: trajectoryExecutionMetadataSchema.nullable().optional().openapi({
+      description: '解析実行に関するメタデータ',
     }),
   })
   .openapi('TrajectoryStatusResponse')
@@ -304,6 +336,9 @@ export const organizationTrajectoriesResponseSchema = z
           }),
           updated_at: isoDatetimeSchema.openapi({
             description: 'trajectory の最終更新日時',
+          }),
+          execution: trajectoryExecutionMetadataSchema.nullable().optional().openapi({
+            description: '解析実行に関するメタデータ',
           }),
         })
       )
@@ -454,6 +489,7 @@ export const trajectoryCompletionResponseSchema = z
 export type CreateTrajectoryRequest = z.infer<typeof createTrajectoryRequestSchema>
 export type TrajectoryConstraints = z.infer<typeof trajectoryConstraintsSchema>
 export type CallbackRequest = z.infer<typeof callbackRequestSchema>
+export type TrajectoryExecutionMetadata = z.infer<typeof trajectoryExecutionMetadataSchema>
 export type TrajectoryStatusResponse = z.infer<typeof trajectoryStatusResponseSchema>
 export type OrganizationTrajectoriesResponse = z.infer<
   typeof organizationTrajectoriesResponseSchema

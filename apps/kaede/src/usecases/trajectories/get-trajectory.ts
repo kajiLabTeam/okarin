@@ -1,6 +1,6 @@
 import type { RequestActor } from '../../middleware/request-actor-context.js'
 import type { TrajectoryStatusResponse } from '../../schemas/trajectories.js'
-import type { Trajectory } from '../../services/trajectories/index.js'
+import type { TrajectoryWithExecution } from '../../services/trajectories/index.js'
 import { findTrajectoryById } from '../../services/trajectories/index.js'
 import type { AuthorizationError } from '../authorization.js'
 import { requireOrganizationManager } from '../authorization.js'
@@ -22,7 +22,9 @@ export type GetTrajectoryResult =
       error: GetTrajectoryError
     }
 
-const toTrajectoryStatusResponse = (trajectory: Trajectory): TrajectoryStatusResponse => ({
+const toTrajectoryStatusResponse = (
+  trajectory: TrajectoryWithExecution
+): TrajectoryStatusResponse => ({
   trajectory_id: trajectory.id,
   recording_id: trajectory.recording_id,
   organization_id: trajectory.organization_id,
@@ -30,6 +32,7 @@ const toTrajectoryStatusResponse = (trajectory: Trajectory): TrajectoryStatusRes
   error_code: trajectory.error_code,
   error_message: trajectory.error_message,
   failed_at: trajectory.failed_at?.toISOString() ?? null,
+  execution: trajectory.execution ?? null,
 })
 
 export const getTrajectory = async (

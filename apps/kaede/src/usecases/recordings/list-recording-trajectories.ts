@@ -6,7 +6,7 @@ import {
   findRecordingAuthorizationById,
   findRecordingById,
 } from '../../services/recordings/index.js'
-import type { Trajectory } from '../../services/trajectories/index.js'
+import type { TrajectoryWithExecution } from '../../services/trajectories/index.js'
 import { listTrajectoriesByRecordingIdPaginated } from '../../services/trajectories/index.js'
 import type { AuthorizationError } from '../authorization.js'
 import { requireOrganizationManager } from '../authorization.js'
@@ -32,12 +32,13 @@ export type ListRecordingTrajectoriesResult =
     }
 
 const toTrajectorySummary = (
-  trajectory: Trajectory
+  trajectory: TrajectoryWithExecution
 ): RecordingTrajectoriesResponse['trajectories'][number] => ({
   trajectory_id: trajectory.id,
   organization_id: trajectory.organization_id,
   status: trajectory.status as RecordingTrajectoriesResponse['trajectories'][number]['status'],
   created_at: trajectory.created_at.toISOString(),
+  execution: trajectory.execution ?? null,
 })
 
 export const listRecordingTrajectories = async (

@@ -1,4 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import {
+  insertPositioningItems,
+  insertPositioningRun,
+} from '../../../src/services/analysis-runs/positioning-analysis-run-repository.js'
 import { createDb } from '../../../src/services/db/client.js'
 import {
   findTrajectoryById,
@@ -316,5 +320,104 @@ describe('trajectory repository', () => {
     expect(first.rows[0].cursor_created_at).toBe('2026-07-28T00:00:00.123456Z')
     expect(second.totalCount).toBe(3)
     expect(second.rows.map((trajectory) => trajectory.id)).toEqual([ids[0]])
+  })
+
+  it('analysis_run_items と紐付いた trajectory は実行メタデータを返す', async () => {
+    const { floor, organization, recording } = await createRecordingFixture(db)
+
+    const run = await insertPositioningRun(
+      {
+        organization_id: organization.id,
+        idempotency_key: 'test-run-key-1',
+        request_digest: 'test-digest-1',
+        status: 'completed',
+      },
+      db
+    )
+
+    const trajectory = await insertTrajectory(
+      {
+        recording_id: recording.id,
+        floor_id: floor.id,
+        organization_id: organization.id,
+        status: 'completed',
+      },
+      db
+    )
+
+    const [item] = await insertPositioningItems(
+      [
+        {
+          analysis_run_id: run.id,
+          recording_id: recording.id,
+          pipeline_id: 'pdr-ble',
+          pipeline_version: '2.1.0',
+          pipeline_digest: 'sha256:fedcba',
+          slot_bindings: {},
+          pipeline_snapshot: { id: 'pdr-ble' },
+          parameters: { step_length: 0.65, filter: 'kalman' },
+          input_manifest: { recording: { asset_id: 'asset-123' } },
+          status: 'completed',
+          result_trajectory_id: trajectory.id,
+        },
+      ],
+      db
+    )
+
+    const found = await findTrajectoryById(trajectory.id, db)
+    expect(found).toBeDefined()
+    expect(found?.execution).toEqual({
+      analysis_run_id: run.id,
+      analysis_run_item_id: item.id,
+      pipeline_id: 'pdr-ble',
+      pipeline_version: '2.1.0',
+      pipeline_digest: 'sha256:fedcba',
+      parameters: { step_length: 0.65, filter: 'kalman' },
+      inputs: { recording: { asset_id: 'asset-123' } },
+      executed_at: item.created_at.toISOString(),
+    })
+
+    const list = await listTrajectoriesByRecordingIdPaginated(
+      recording.id,
+      { limit: 10, cursor: null },
+      db
+    )
+    expect(list.rows[0].execution).toEqual({
+      analysis_run_id: run.id,
+      analysis_run_item_id: item.id,
+      pipeline_id: 'pdr-ble',
+      pipeline_version: '2.1.0',
+      pipeline_digest: 'sha256:fedcba',
+      parameters: { step_length: 0.65, filter: 'kalman' },
+      inputs: { recording: { asset_id: 'asset-123' } },
+      executed_at: item.created_at.toISOString(),
+    })
+  })
+
+  it('legacy trajectory は互換メタデータを返す', async () => {
+    const { floor, organization, recording } = await createRecordingFixture(db)
+
+    const trajectory = await insertTrajectory(
+      {
+        recording_id: recording.id,
+        floor_id: floor.id,
+        organization_id: organization.id,
+        status: 'completed',
+      },
+      db
+    )
+
+    const found = await findTrajectoryById(trajectory.id, db)
+    expect(found).toBeDefined()
+    expect(found?.execution).toEqual({
+      analysis_run_id: null,
+      analysis_run_item_id: null,
+      pipeline_id: 'legacy-pdr',
+      pipeline_version: null,
+      pipeline_digest: null,
+      parameters: {},
+      inputs: null,
+      executed_at: trajectory.created_at.toISOString(),
+    })
   })
 })

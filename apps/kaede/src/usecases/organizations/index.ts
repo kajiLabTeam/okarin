@@ -54,7 +54,7 @@ import type {
 } from '../../services/organizations/index.js'
 import { insertPedestrian } from '../../services/pedestrians/index.js'
 import { listRecordingsByOrganizationIdPaginated } from '../../services/recordings/index.js'
-import type { Trajectory } from '../../services/trajectories/index.js'
+import type { TrajectoryWithExecution } from '../../services/trajectories/index.js'
 import { listTrajectoriesByOrganizationIdPaginated } from '../../services/trajectories/index.js'
 import {
   findOrganizationMembership,
@@ -494,7 +494,7 @@ export const listOrganizationRecordingsForSession = async (
 }
 
 const toOrganizationTrajectoryResponse = (
-  trajectory: Trajectory
+  trajectory: TrajectoryWithExecution
 ): OrganizationTrajectoriesResponse['trajectories'][number] => ({
   trajectory_id: trajectory.id,
   recording_id: trajectory.recording_id,
@@ -503,6 +503,7 @@ const toOrganizationTrajectoryResponse = (
   status: trajectory.status as OrganizationTrajectoriesResponse['trajectories'][number]['status'],
   created_at: trajectory.created_at.toISOString(),
   updated_at: trajectory.updated_at.toISOString(),
+  execution: trajectory.execution ?? null,
 })
 
 export const listOrganizationTrajectoriesForSession = async (

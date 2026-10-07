@@ -985,6 +985,16 @@ describe('organizations usecase', () => {
             status: 'processing',
             created_at: '2026-06-10T00:00:00.123Z',
             updated_at: '2026-06-10T00:02:00.000Z',
+            execution: {
+              analysis_run_id: null,
+              analysis_run_item_id: null,
+              pipeline_id: 'legacy-pdr',
+              pipeline_version: null,
+              pipeline_digest: null,
+              parameters: {},
+              inputs: null,
+              executed_at: '2026-06-10T00:00:00.123Z',
+            },
           },
         ],
         pagination: {
@@ -1017,6 +1027,16 @@ describe('organizations usecase', () => {
             status: 'completed',
             created_at: '2026-06-10T00:00:00.123Z',
             updated_at: '2026-06-10T00:01:00.000Z',
+            execution: {
+              analysis_run_id: null,
+              analysis_run_item_id: null,
+              pipeline_id: 'legacy-pdr',
+              pipeline_version: null,
+              pipeline_digest: null,
+              parameters: {},
+              inputs: null,
+              executed_at: '2026-06-10T00:00:00.123Z',
+            },
           },
         ],
         pagination: {
