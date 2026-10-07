@@ -5,8 +5,9 @@ from urllib.request import Request as UrlRequest
 from urllib.request import urlopen
 
 import pandas as pd
-from rikka.analyze import pdr
-from rikka.config import FLOORMAP_SCALE, INITIAL_DIRECTION
+from rikka.common.config import FLOORMAP_SCALE, INITIAL_DIRECTION
+from rikka.common.settings import BleLandmarkSettings, HeadingSettings, PdrSettings
+from rikka.pdr.pipeline import run_pdr
 
 from src.schemas.analysis import AnalyzeRequest
 
@@ -133,15 +134,19 @@ class DefaultRikkaStrategy:
         df_acc: pd.DataFrame,
         df_gyro: pd.DataFrame,
     ) -> bytes:
-        df_acc, df_gyro = pdr.process_sensor_data(df_acc, df_gyro)
-        peaks = pdr.detect_steps(df_acc)
-        trajectory, _, t_at_steps = pdr.estimate_trajectory(
-            peaks,
-            df_gyro,
-            df_acc,
-            initial_direction=self._initial_direction(request),
+        result = run_pdr(
+            PdrSettings(
+                heading=HeadingSettings(
+                    initial_direction=self._initial_direction(request)
+                ),
+                landmark=BleLandmarkSettings(enabled=False),
+            ),
+            df_acc=df_acc,
+            df_gyro=df_gyro,
         )
-        df_trajectory = self._build_result_dataframe(trajectory, t_at_steps)
+        df_trajectory = self._build_result_dataframe(
+            result.trajectory, result.t_at_steps
+        )
         start = self._start_constraint(request)
         if start is not None:
             floor_scale = self._floor_scale(request)
