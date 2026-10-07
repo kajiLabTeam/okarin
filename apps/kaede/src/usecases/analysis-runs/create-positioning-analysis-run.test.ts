@@ -156,6 +156,97 @@ describe('createPositioningAnalysisRun', () => {
     )
   })
 
+  it.each([
+    ['pdr', {}],
+    [
+      'pdr-particle-filter',
+      {
+        origin_x: 120,
+        origin_y: 240,
+        floor_scale: 0.05,
+        particle_count: 128,
+        particle_seed: null,
+      },
+    ],
+    ['pdr-ble', { origin_x: 120, origin_y: 240, floor_scale: 0.05, rssi_threshold_dbm: -70 }],
+    [
+      'pdr-particle-filter-ble',
+      {
+        origin_x: 120,
+        origin_y: 240,
+        floor_scale: 0.05,
+        particle_count: 128,
+        particle_seed: 7,
+        rssi_threshold_dbm: -70,
+      },
+    ],
+  ])('Nozomiの%s向けパラメータを受け付ける', async (pipelineId, parameters) => {
+    const schema = {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        origin_x: { type: 'integer', minimum: 0 },
+        origin_y: { type: 'integer', minimum: 0 },
+        floor_scale: { type: 'number', exclusiveMinimum: 0 },
+        particle_count: { type: 'integer', minimum: 1, maximum: 100_000 },
+        particle_seed: { type: ['integer', 'null'] },
+        rssi_threshold_dbm: { type: 'number', minimum: -150, maximum: 0 },
+      },
+      required: pipelineId === 'pdr' ? [] : ['origin_x', 'origin_y', 'floor_scale'],
+    }
+    mocks.resolvePipeline.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        pipeline: {
+          ...mockPipeline,
+          definition: {
+            ...mockPipeline.definition,
+            pipeline_id: pipelineId,
+            parameters_schema: schema,
+          },
+        },
+        recordings: [{ recording_id: recordingId, assets: [], bindings: {}, issues: [] }],
+      },
+    })
+
+    const result = await createPositioningAnalysisRun(managerActor, orgId, `schema-${pipelineId}`, {
+      recording_ids: [recordingId],
+      pipeline_ids: [pipelineId],
+      parameters_by_pipeline: { [pipelineId]: parameters },
+    })
+
+    expect(result).toMatchObject({ ok: true, value: { status: 'accepted', item_count: 1 } })
+  })
+
+  it('Nozomiが拒否する未知パラメータとinteger以外の値を受付時に拒否する', async () => {
+    mocks.resolvePipeline.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        pipeline: {
+          ...mockPipeline,
+          definition: {
+            ...mockPipeline.definition,
+            parameters_schema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: { origin_x: { type: 'integer', minimum: 0 } },
+              required: ['origin_x'],
+            },
+          },
+        },
+        recordings: [{ recording_id: recordingId, assets: [], bindings: {}, issues: [] }],
+      },
+    })
+
+    const result = await createPositioningAnalysisRun(managerActor, orgId, 'schema-invalid', {
+      recording_ids: [recordingId],
+      pipeline_ids: ['pdr'],
+      parameters_by_pipeline: { pdr: { origin_x: 1.5, unknown: true } },
+    })
+
+    expect(result).toEqual({ ok: false, error: { type: 'PARAMETERS_INVALID', status: 400 } })
+  })
+
   it('同一Idempotency-Keyかつ同一リクエストなら既存のRunを返す', async () => {
     const { createHash } = await import('node:crypto')
     const body: PositioningAnalysisRunRequest = {
