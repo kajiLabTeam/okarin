@@ -19,6 +19,7 @@ export class FatalDispatchError extends Error {
 export interface NozomiExecutionInputManifest {
   slot_id: string
   contract: {
+    kind: 'asset'
     data_type: string
     schema_version: string
     format: string

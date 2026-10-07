@@ -21,7 +21,12 @@ describe('dispatchExecutionToNozomi', () => {
     inputs: [
       {
         slot_id: 'imu',
-        contract: { data_type: 'sensor_raw', schema_version: '1.0.0', format: 'csv' },
+        contract: {
+          kind: 'asset',
+          data_type: 'sensor_raw',
+          schema_version: '1.0.0',
+          format: 'csv',
+        },
         uri: 'http://storage/download.csv',
         digest: 'b'.repeat(64),
         available: true,
