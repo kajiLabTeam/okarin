@@ -10,6 +10,7 @@ import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from io import StringIO
 from pathlib import Path
 from typing import Any, Protocol, cast
 from urllib.request import HTTPRedirectHandler, Request, build_opener
@@ -115,7 +116,38 @@ class HttpInputLoader:
 class HttpOutputWriter:
     def write(self, output_uri: str, outputs: dict[str, Any]) -> dict[str, Any]:
         validate_outbound_url(output_uri, UrlPurpose.STORAGE)
-        body = json.dumps(outputs, sort_keys=True, separators=(",", ":")).encode()
+        trajectory = outputs.get("trajectory")
+        if not isinstance(trajectory, dict) or not isinstance(
+            trajectory.get("points"), list
+        ):
+            raise PermanentComponentError("trajectory output does not contain points")
+
+        rows = trajectory["points"]
+        buffer = StringIO()
+        buffer.write("step_index,timestamp_s,x,y\n")
+        for index, point in enumerate(rows):
+            if not isinstance(point, dict):
+                raise PermanentComponentError("trajectory point is invalid")
+            x = point.get("x")
+            y = point.get("y")
+            timestamp = point.get("timestamp_s")
+            if not all(
+                isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and math.isfinite(value)
+                for value in (x, y)
+            ):
+                raise PermanentComponentError(
+                    "trajectory point coordinates are invalid"
+                )
+            if timestamp is not None and (
+                not isinstance(timestamp, (int, float))
+                or isinstance(timestamp, bool)
+                or not math.isfinite(timestamp)
+            ):
+                raise PermanentComponentError("trajectory point timestamp is invalid")
+            buffer.write(f"{index},{'' if timestamp is None else timestamp},{x},{y}\n")
+        body = buffer.getvalue().encode()
         digest = hashlib.sha256(body).hexdigest()
         try:
             with build_opener(_NoRedirect).open(
@@ -123,7 +155,7 @@ class HttpOutputWriter:
                     output_uri,
                     data=body,
                     method="PUT",
-                    headers={"content-type": "application/json"},
+                    headers={"content-type": "text/csv"},
                 ),
                 timeout=30,
             ) as response:

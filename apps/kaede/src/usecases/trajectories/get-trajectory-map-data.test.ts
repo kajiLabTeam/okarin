@@ -79,6 +79,39 @@ describe('getTrajectoryMapData', () => {
     })
   })
 
+  it('Nozomiのanalyzed result artifact契約をKaedeが読み込める', async () => {
+    const trajectoryId = '22222222-2222-4222-8222-222222222222'
+    const floorId = '33333333-3333-4333-8333-333333333333'
+    findTrajectoryByIdMock.mockResolvedValue({
+      id: trajectoryId,
+      floor_id: floorId,
+      organization_id: '11111111-1111-4111-8111-111111111111',
+      status: 'completed',
+    })
+    getTrajectoryAnalyzedResultObjectTextMock.mockResolvedValue(
+      'step_index,timestamp_s,x,y\n0,,10,20\n1,0.5,11,21.5\n'
+    )
+
+    const result = await getTrajectoryMapData(
+      managerActor,
+      { trajectoryId },
+      { data_type: 'analyzed' }
+    )
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        trajectory_id: trajectoryId,
+        floor_id: floorId,
+        data_type: 'analyzed',
+        points: [
+          { timestamp: 0, x: 10, y: 20 },
+          { timestamp: 1, x: 11, y: 21.5 },
+        ],
+      },
+    })
+  })
+
   it('completed 以外は TRAJECTORY_MAP_DATA_NOT_READY を返す', async () => {
     const trajectoryId = '22222222-2222-4222-8222-222222222222'
 

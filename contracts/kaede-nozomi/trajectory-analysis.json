@@ -31,5 +31,12 @@
     "status": "completed",
     "callback_token": "signed-callback-token",
     "result_object_key": "organizations/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/trajectories/dddddddd-dddd-4ddd-8ddd-dddddddddddd/analyzed/result.csv"
+  },
+  "analyzed_result_artifact": {
+    "format": "csv",
+    "content_type": "text/csv",
+    "object_key_suffix": "/analyzed/result.csv",
+    "columns": ["step_index", "timestamp_s", "x", "y"],
+    "required_columns": ["x", "y"]
   }
 }
