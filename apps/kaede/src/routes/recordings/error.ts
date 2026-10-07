@@ -80,6 +80,19 @@ export const toInitRecordingErrorResponse = (error: InitRecordingError) => {
         body: { error_code: 'RESOURCE_NOT_FOUND', error_message: 'resource not found' },
         status: 404 as const,
       }
+    case 'DATA_TYPE_NOT_SUPPORTED':
+      return {
+        body: {
+          error_code: error.type,
+          error_message: 'data_type, schema_version, or format is not in the shared catalog',
+          details: {
+            data_type: error.dataType,
+            schema_version: error.schemaVersion,
+            format: error.format,
+          },
+        },
+        status: 422 as const,
+      }
     case 'PEDESTRIAN_NOT_FOUND':
       return {
         body: {

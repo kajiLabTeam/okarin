@@ -6,9 +6,15 @@ const { findRecordingAuthorizationByIdMock, findRecordingByIdMock } = vi.hoisted
   findRecordingByIdMock: vi.fn(),
 }))
 
+const { listRecordingDataAssetsMock } = vi.hoisted(() => ({ listRecordingDataAssetsMock: vi.fn() }))
+
 vi.mock('../../services/recordings/index.js', () => ({
   findRecordingAuthorizationById: findRecordingAuthorizationByIdMock,
   findRecordingById: findRecordingByIdMock,
+}))
+
+vi.mock('../../services/data-assets/index.js', () => ({
+  listRecordingDataAssets: listRecordingDataAssetsMock,
 }))
 
 import { getRecording } from './get-recording.js'
@@ -42,6 +48,7 @@ const memberActor: UserRequestActor = {
 describe('getRecording', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    listRecordingDataAssetsMock.mockResolvedValue([])
   })
 
   it('manager は recording 詳細を取得できる', async () => {

@@ -61,7 +61,7 @@ export const listMyRecordings = async (
   return {
     ok: true,
     value: {
-      recordings: page.items.map(toRecordingDetailResponse),
+      recordings: page.items.map((recording) => toRecordingDetailResponse(recording)),
       pagination: {
         next_cursor: page.nextCursor,
         total_count: page.totalCount,

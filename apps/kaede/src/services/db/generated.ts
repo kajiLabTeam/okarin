@@ -334,6 +334,42 @@ export interface Recordings {
   upload_failure: Json | null
 }
 
+export interface DataAssets {
+  created_at: Generated<Timestamp>
+  data_type: string
+  ended_at: Timestamp | null
+  id: Generated<string>
+  metadata: Generated<Json>
+  organization_id: string
+  sample_count: number | null
+  schema_version: string
+  started_at: Timestamp | null
+  updated_at: Generated<Timestamp>
+  validation_error: Json | null
+  validation_status: Generated<string>
+}
+
+export interface DataAssetObjects {
+  byte_size: number | null
+  checksum_sha256: string | null
+  content_type: string
+  created_at: Generated<Timestamp>
+  data_asset_id: string
+  format: string
+  id: Generated<string>
+  object_key: string
+  object_role: Generated<string>
+}
+
+export interface RecordingDataAssets {
+  client_asset_key: string | null
+  created_at: Generated<Timestamp>
+  data_asset_id: string
+  data_type: string
+  organization_id: string
+  recording_id: string
+}
+
 export interface SessionMembershipAuthentications {
   auth_method: string
   authenticated_at: Timestamp
@@ -422,6 +458,8 @@ export interface DB {
   authentication_events: AuthenticationEvents
   beacons: Beacons
   buildings: Buildings
+  data_asset_objects: DataAssetObjects
+  data_assets: DataAssets
   floors: Floors
   oidc_identities: OidcIdentities
   oidc_login_transactions: OidcLoginTransactions
@@ -438,6 +476,7 @@ export interface DB {
   organizations: Organizations
   pedestrians: Pedestrians
   recordings: Recordings
+  recording_data_assets: RecordingDataAssets
   session_membership_authentications: SessionMembershipAuthentications
   sessions: Sessions
   trajectories: Trajectories

@@ -2,6 +2,7 @@ export {
   findRecordingAuthorizationById,
   findRecordingAuthorizationByIdForOrganization,
   findRecordingById,
+  findRecordingByIdForUpdate,
   findRecordingByIdForOrganization,
   insertRecording,
   listRecordingsByOrganizationIdPaginated,

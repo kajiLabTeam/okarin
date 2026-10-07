@@ -95,12 +95,60 @@ export const initRecordingRequestSchema = z
     floor_id: uuidSchema.openapi({
       description: '計測対象 floor の ID',
     }),
-    upload_targets: uploadTargetsSchema.openapi({
+    upload_targets: uploadTargetsSchema.optional().openapi({
       description: '初回アップロードで要求するセンサデータの一覧',
     }),
+    assets: z
+      .array(
+        z
+          .object({
+            data_type: z
+              .string()
+              .trim()
+              .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/),
+            schema_version: z
+              .string()
+              .trim()
+              .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/),
+            format: z
+              .string()
+              .trim()
+              .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/),
+            client_asset_key: z.string().trim().min(1).max(200).optional(),
+          })
+          .strict()
+      )
+      .min(1)
+      .max(20)
+      .optional()
+      .openapi({ description: '共有データ型カタログに基づく論理データ資産の一覧' }),
     constraints: trajectoryConstraintsSchema.optional().openapi({
       description: 'recording のデフォルト解析条件',
     }),
+  })
+  .superRefine((value, context) => {
+    if (!value.upload_targets && !value.assets) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'upload_targets or assets is required',
+      })
+    }
+    if (value.upload_targets && value.assets) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'upload_targets and assets are mutually exclusive',
+      })
+    }
+    if (
+      value.assets &&
+      new Set(value.assets.map((asset) => asset.data_type)).size !== value.assets.length
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['assets'],
+        message: 'the same data_type may only appear once per recording',
+      })
+    }
   })
   .openapi('InitRecordingRequest')
 
@@ -116,6 +164,16 @@ export const initRecordingResponseSchema = z
     upload_urls: uploadUrlsSchema.openapi({
       description: '各アップロード対象に対応する署名付き URL',
     }),
+    available_assets: z
+      .array(
+        z.object({
+          data_asset_id: uuidSchema,
+          data_type: z.string(),
+          schema_version: z.string(),
+          object_upload_url: z.string().url(),
+        })
+      )
+      .optional(),
     expires_at: isoDatetimeSchema.openapi({
       description: 'アップロード URL の有効期限',
     }),
@@ -226,6 +284,20 @@ export const recordingDetailResponseSchema = z
     }),
     upload_status: recordingUploadStatusSchema,
     upload_targets: uploadTargetsSchema,
+    available_assets: z
+      .array(
+        z.object({
+          data_asset_id: uuidSchema,
+          data_type: z.string(),
+          schema_version: z.string(),
+          validation_status: z.enum(['pending', 'valid', 'invalid']),
+          validation_error: z.unknown().optional(),
+          sample_count: z.number().int().nonnegative().nullable(),
+          started_at: isoDatetimeSchema.nullable(),
+          ended_at: isoDatetimeSchema.nullable(),
+        })
+      )
+      .optional(),
     created_at: isoDatetimeSchema.openapi({
       description: 'recording の作成日時',
     }),

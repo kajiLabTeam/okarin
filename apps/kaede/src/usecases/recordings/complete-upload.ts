@@ -3,17 +3,28 @@ import { uploadTargetSchema, recordingUploadStatusSchema } from '../../schemas/c
 import type { UploadTarget } from '../../schemas/common.js'
 import type { RecordingIdParams } from '../../schemas/recordings.js'
 import {
+  listRecordingDataAssets,
+  markDataAssetInvalid,
+  updateDataAssetObject,
+  updateDataAssetValidated,
+  loadDataTypeDefinition,
+} from '../../services/data-assets/index.js'
+import { db } from '../../services/db/index.js'
+import {
   findRecordingAuthorizationById,
   findRecordingAuthorizationByIdForOrganization,
   findRecordingById,
+  findRecordingByIdForUpdate,
   findRecordingByIdForOrganization,
   markRecordingUploadReady,
+  updateRecording,
 } from '../../services/recordings/index.js'
 import {
   buildRecordingRawObjectKey,
   listRecordingRawObjectKeys,
   validateBleCsvObject,
   validateMetadataObject,
+  validateDataAssetObject,
 } from '../../services/storage/index.js'
 import type { AuthorizationError } from '../authorization.js'
 import { requireRecordingAccess } from '../authorization.js'
@@ -166,6 +177,104 @@ export const completeUpload = async (
     const valid = await validateBleCsvObject(recordingAuthorization.organization_id, recording.id)
     if (!valid) {
       return { ok: false, error: { type: 'UPLOAD_FILE_INVALID', recordingId: recording.id } }
+    }
+  }
+
+  const dataAssets = await listRecordingDataAssets(recording.id)
+  if (dataAssets.length > 0) {
+    interface AssetValidation {
+      asset: (typeof dataAssets)[number]
+      validation:
+        | Awaited<ReturnType<typeof validateDataAssetObject>>
+        | { valid: false; code: string }
+    }
+    const assetValidations: AssetValidation[] = []
+    for (const asset of dataAssets) {
+      const definition = await loadDataTypeDefinition(
+        asset.data_type,
+        asset.schema_version,
+        asset.format
+      )
+      if (!definition) {
+        assetValidations.push({
+          asset,
+          validation: { valid: false, code: 'DATA_TYPE_NOT_SUPPORTED' } as const,
+        })
+        continue
+      }
+      const validation = await validateDataAssetObject(
+        asset.object_key,
+        asset.content_type,
+        definition
+      )
+      assetValidations.push({ asset, validation })
+    }
+    const hasInvalidAsset = assetValidations.some(({ validation }) => !validation.valid)
+    const finalized = await db.transaction().execute(async (trx) => {
+      const latest = await findRecordingByIdForUpdate(recording.id, trx)
+      if (latest?.upload_status !== 'accepted') return { recording: latest, updated: false }
+      for (const { asset, validation } of assetValidations) {
+        if (!validation.valid) {
+          await markDataAssetInvalid(
+            asset.data_asset_id,
+            { code: 'code' in validation ? validation.code : 'ASSET_STRUCTURE_INVALID' },
+            trx
+          )
+          continue
+        }
+        await updateDataAssetObject(
+          asset.data_asset_object_id,
+          {
+            byte_size: validation.byteSize,
+            checksum_sha256: validation.checksumSha256,
+          },
+          trx
+        )
+        await updateDataAssetValidated(
+          asset.data_asset_id,
+          {
+            sample_count: validation.sampleCount ?? null,
+            started_at: validation.startedAt ?? null,
+            ended_at: validation.endedAt ?? null,
+          },
+          trx
+        )
+      }
+      if (hasInvalidAsset) {
+        await updateRecording(
+          recording.id,
+          {
+            upload_failure: JSON.stringify({ code: 'ASSET_STRUCTURE_INVALID' }),
+          },
+          trx
+        )
+      } else {
+        await updateRecording(recording.id, { upload_status: 'ready', upload_failure: null }, trx)
+      }
+      return { recording: await findRecordingById(recording.id, trx), updated: true }
+    })
+    if (!finalized.recording) {
+      return {
+        ok: false,
+        error: { type: 'RECORDING_NOT_FOUND', recordingId: recording.id },
+      }
+    }
+    if (hasInvalidAsset) {
+      return { ok: false, error: { type: 'UPLOAD_FILE_INVALID', recordingId: recording.id } }
+    }
+    if (!finalized.updated) {
+      return {
+        ok: false,
+        error: {
+          type: 'RECORDING_UPLOAD_FINALIZED',
+          recordingId: finalized.recording.id,
+          uploadStatus: finalized.recording.upload_status as 'ready' | 'failed',
+        },
+      }
+    }
+    return {
+      ok: true,
+      value: { recording_id: finalized.recording.id, upload_status: 'ready' },
     }
   }
 

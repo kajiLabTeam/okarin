@@ -85,6 +85,21 @@ export const buildRecordingRawObjectPrefix = (organizationId: string, recordingI
   return `organizations/${organizationId}/recordings/${recordingId}/raw/`
 }
 
+export const buildDataAssetObjectKey = (
+  organizationId: string,
+  recordingId: string,
+  dataAssetId: string,
+  format: string
+) => {
+  validateObjectKeyUuid(organizationId, 'organizationId')
+  validateObjectKeyUuid(recordingId, 'recordingId')
+  validateObjectKeyUuid(dataAssetId, 'dataAssetId')
+  const extension = format === 'json' ? 'json' : format === 'csv' ? 'csv' : format
+  if (!/^[a-z0-9][a-z0-9._-]{0,19}$/i.test(extension))
+    throw new Error('format must be a safe extension')
+  return `organizations/${organizationId}/recordings/${recordingId}/assets/${dataAssetId}/primary.${extension}`
+}
+
 export const buildTrajectoryAnalyzedResultObjectKey = (
   organizationId: string,
   trajectoryId: string
@@ -135,6 +150,25 @@ export const issueRecordingUploadUrls = async (
     expiresAt: new Date(now.getTime() + config.recordingUploadUrlTtlSeconds * 1000).toISOString(),
     uploadUrls,
   }
+}
+
+export const issueDataAssetUploadUrl = async (
+  organizationId: string,
+  recordingId: string,
+  dataAssetId: string,
+  format: string,
+  contentType = 'application/octet-stream'
+) => {
+  const { config, presignClient } = getS3Context()
+  return getSignedUrl(
+    presignClient,
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: buildDataAssetObjectKey(organizationId, recordingId, dataAssetId, format),
+      ContentType: contentType,
+    }),
+    { expiresIn: config.recordingUploadUrlTtlSeconds }
+  )
 }
 
 export const issueFloorMapDownloadUrl = async (objectKey: string, now: Date = new Date()) => {
