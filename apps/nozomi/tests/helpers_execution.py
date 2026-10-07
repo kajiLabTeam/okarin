@@ -46,7 +46,7 @@ def make_request(
             InputManifest(
                 slot_id=slot.slot_id,
                 contract=contract,
-                uri="http://kaede:8080/input",
+                uri="http://seaweedfs:8333/input",
                 digest="0" * 64,
                 available=available,
             )
@@ -57,6 +57,9 @@ def make_request(
         snapshot_digest=snapshot.digest,
         inputs=tuple(inputs),
         bindings=snapshot.definition.bindings if bindings is None else bindings,
-        output_uri="http://storage:9000/output",
-        callback=CallbackInfo(url="http://kaede:8080/callback"),
+        output_uri="http://seaweedfs:8333/output",
+        callback=CallbackInfo(
+            url="http://kaede:8080/api/internal/pipeline-executions/callbacks",
+            secret="request-scoped-secret",
+        ),
     )

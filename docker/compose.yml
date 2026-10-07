@@ -24,7 +24,10 @@ services:
     restart: unless-stopped
     environment:
       HOST: 0.0.0.0
+      NOZOMI_EXECUTION_DB_PATH: /var/lib/nozomi/pipeline-executions.sqlite3
       PORT: 8000
+    volumes:
+      - nozomi_data:/var/lib/nozomi
     healthcheck:
       test:
         [
@@ -37,3 +40,6 @@ services:
       timeout: 3s
       retries: 20
       start_period: 5s
+
+volumes:
+  nozomi_data:
