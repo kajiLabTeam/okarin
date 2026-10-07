@@ -1,5 +1,6 @@
 import type { RequestActor } from '../../middleware/request-actor-context.js'
 import type { PositioningAnalysisCallbackRequest } from '../../schemas/positioning-analysis-callbacks.js'
+import { aggregatePositioningRunStatus } from '../../services/analysis-runs/outbox-worker.js'
 import {
   findPositioningCallbackByEventId,
   findPositioningRunItemById,
@@ -7,6 +8,8 @@ import {
   updatePositioningRunItemState,
 } from '../../services/analysis-runs/positioning-analysis-callback-repository.js'
 import { db } from '../../services/db/index.js'
+import { findRecordingById } from '../../services/recordings/index.js'
+import { insertTrajectory } from '../../services/trajectories/index.js'
 
 export type ReceivePositioningAnalysisCallbackResult =
   | {
@@ -83,15 +86,35 @@ export const receivePositioningAnalysisCallback = async (
       return { status: 'already_processed' as const }
     }
 
+    let trajectoryId: string | null = null
+    if (payload.status === 'completed') {
+      const recording = await findRecordingById(item.recording_id, transaction)
+      const trajectory = await insertTrajectory(
+        {
+          organization_id: recording?.organization_id ?? '',
+          recording_id: item.recording_id,
+          floor_id: recording?.floor_id ?? '',
+          status: 'completed',
+        },
+        transaction
+      )
+      trajectoryId = trajectory.id
+    }
+
     await updatePositioningRunItemState(
       payload.analysis_run_item_id,
       {
         status: payload.status,
-        result_trajectory_id: null, // Note: 後続の集約WorkerまたはPayload解析でTrajectory IDを更新
-        error: payload.error ?? null,
+        result_trajectory_id: trajectoryId,
+        error:
+          payload.status === 'failed'
+            ? (payload.error ?? { code: 'EXECUTION_FAILED', message: 'Pipeline execution failed' })
+            : null,
       },
       transaction
     )
+
+    await aggregatePositioningRunStatus(item.analysis_run_id, transaction)
 
     return { status: 'accepted' as const }
   })

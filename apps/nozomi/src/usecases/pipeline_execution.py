@@ -157,6 +157,7 @@ def send_callback(event: ExecutionEvent, url: str, secret: str | None) -> None:
     headers = {"content-type": "application/json"}
     if secret:
         headers["x-callback-secret"] = secret
+        headers["authorization"] = f"Bearer {secret}"
     body = json.dumps(event.model_dump(mode="json")).encode()
     with build_opener(_NoRedirect).open(
         Request(url, data=body, headers=headers, method="POST"), timeout=10
