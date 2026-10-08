@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import hashlib
-import logging
 import json
+import logging
 import math
 import os
 import sqlite3
@@ -472,7 +472,8 @@ def send_callback(event: ExecutionEvent) -> None:
             response_body = response.read().decode("utf-8", errors="replace")
             if response.status >= 300:
                 logger.error(
-                    "Nozomi callback rejected: url=%s status=%s body=%s event_id=%s item_id=%s",
+                    "Nozomi callback rejected: url=%s status=%s body=%s "
+                    "event_id=%s item_id=%s",
                     url,
                     response.status,
                     response_body[:2000],
@@ -491,7 +492,8 @@ def send_callback(event: ExecutionEvent) -> None:
     except HTTPError as error:
         response_body = error.read().decode("utf-8", errors="replace")
         logger.error(
-            "Nozomi callback HTTP error: url=%s status=%s body=%s event_id=%s item_id=%s",
+            "Nozomi callback HTTP error: url=%s status=%s body=%s "
+            "event_id=%s item_id=%s",
             url,
             error.code,
             response_body[:2000],
@@ -530,7 +532,8 @@ def send_callback_with_retry(
             return
         except Exception as exc:
             logger.warning(
-                "Nozomi callback attempt failed: attempt=%s event_id=%s item_id=%s error=%s",
+                "Nozomi callback attempt failed: attempt=%s event_id=%s "
+                "item_id=%s error=%s",
                 delivery.attempts,
                 event.event_id,
                 event.analysis_run_item_id,
