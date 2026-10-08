@@ -4,65 +4,23 @@ import { fetchPipelineCatalog } from './pipeline-client.js'
 
 const catalog = [
   {
-    definition: {
-      pipeline_id: 'pdr',
-      display_name: 'PDR',
-      definition_version: '1.0.0',
-      state: 'active',
-      components: [
-        {
-          component_id: 'pdr',
-          instance_id: 'pdr-1',
-          input_slots: [
-            {
-              slot_id: 'acce',
-              required: true,
-              max_assets: 1,
-              accepted_contracts: [
-                { kind: 'asset', data_type: 'acce', schema_version: '1', format: 'csv' },
-              ],
-            },
-          ],
-          output_slots: [
-            {
-              slot_id: 'pose',
-              required: true,
-              max_assets: 1,
-              accepted_contracts: [{ kind: 'internal_value', value_type: 'pose' }],
-            },
-          ],
-          parameters_schema: { type: 'object' },
-        },
-      ],
-      outputs: [
-        {
-          output_slot_id: 'pose',
-          source_component_instance: 'pdr-1',
-          source_slot_id: 'pose',
-        },
-      ],
-      bindings: [
-        {
-          target_component_instance: 'pdr-1',
-          target_slot_id: 'acce',
-          source_component_instance: null,
-          source_slot_id: 'acce',
-        },
-      ],
-      parameters_schema: { type: 'object' },
-      input_slots: [
-        {
-          slot_id: 'acce',
-          required: true,
-          max_assets: 1,
-          accepted_contracts: [
-            { kind: 'asset', data_type: 'acce', schema_version: '1', format: 'csv' },
-          ],
-        },
-      ],
-    },
-    availability: { available: true, reason: null },
+    pipeline_id: 'pdr',
+    display_name: 'PDR',
+    definition_version: '1.0.0',
     digest: 'd'.repeat(64),
+    input_slots: [
+      {
+        slot_id: 'acce',
+        required: true,
+        max_assets: 1,
+        accepted_contracts: [
+          { kind: 'asset', data_type: 'acce', schema_version: '1', format: 'csv' },
+        ],
+      },
+    ],
+    outputs: [],
+    parameters_schema: { type: 'object' },
+    availability: { available: true, reason: null },
   },
 ]
 
@@ -82,7 +40,7 @@ describe('Nozomi pipeline client/cache', () => {
       getCachedPipelineCatalog(),
       getCachedPipelineCatalog(),
     ])
-    expect(first[0].definition.pipeline_id).toBe('pdr')
+    expect(first[0].pipeline_id).toBe('pdr')
     expect(second).toBe(first)
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })

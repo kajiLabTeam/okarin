@@ -80,6 +80,20 @@ const pipeline = (available = true): Pipeline => ({
   digest: 'd'.repeat(64),
 })
 
+const catalogEntry = (available = true) => {
+  const snapshot = pipeline(available)
+  return {
+    pipeline_id: snapshot.definition.pipeline_id,
+    display_name: snapshot.definition.display_name,
+    definition_version: snapshot.definition.definition_version,
+    digest: snapshot.digest,
+    input_slots: snapshot.definition.input_slots,
+    outputs: snapshot.definition.outputs,
+    parameters_schema: snapshot.definition.parameters_schema,
+    availability: snapshot.availability,
+  }
+}
+
 const asset = (id: string, dataType: string, format = 'csv') => ({
   data_asset_id: id,
   data_type: dataType,
@@ -101,7 +115,7 @@ describe('pipeline availability', () => {
   })
 
   it('slot候補が1件ずつなら複数recordingを自動bindする', async () => {
-    getCatalogMock.mockResolvedValue([pipeline()])
+    getCatalogMock.mockResolvedValue([catalogEntry()])
     const inputProvider = provider({
       first: [asset('acce-1', 'acce'), asset('map-1', 'resource.floor_map', 'png')],
       second: [asset('acce-2', 'acce'), asset('map-2', 'resource.floor_map', 'png')],
@@ -120,7 +134,7 @@ describe('pipeline availability', () => {
   })
 
   it('不足・resource不足・複数候補を構造化して全体を利用不可にする', async () => {
-    getCatalogMock.mockResolvedValue([pipeline()])
+    getCatalogMock.mockResolvedValue([catalogEntry()])
     const inputProvider = provider({
       missing: [],
       ambiguous: [asset('acce-1', 'acce'), asset('acce-2', 'acce')],
@@ -152,7 +166,7 @@ describe('pipeline availability', () => {
   })
 
   it('Nozomiが利用不可としたpipelineを選択可能にしない', async () => {
-    getCatalogMock.mockResolvedValue([pipeline(false)])
+    getCatalogMock.mockResolvedValue([catalogEntry(false)])
     const inputProvider = provider({
       first: [asset('acce-1', 'acce'), asset('map-1', 'resource.floor_map', 'png')],
     })
@@ -167,8 +181,8 @@ describe('pipeline availability', () => {
   })
 
   it('optional slotの候補がなければ利用不可にしない', async () => {
-    const withOptional = pipeline()
-    withOptional.definition.input_slots.push({
+    const withOptional = catalogEntry()
+    withOptional.input_slots.push({
       slot_id: 'ble',
       required: false,
       max_assets: 1,
@@ -182,22 +196,6 @@ describe('pipeline availability', () => {
     const result = await listPipelineAvailability(['first'], inputProvider)
 
     expect(result.pipelines[0]).toMatchObject({ available: true, unavailable_reasons: [] })
-  })
-
-  it('retired pipelineを選択可能にしない', async () => {
-    const retired = pipeline()
-    retired.definition.state = 'retired'
-    getCatalogMock.mockResolvedValue([retired])
-    const inputProvider = provider({
-      first: [asset('acce-1', 'acce'), asset('map-1', 'resource.floor_map', 'png')],
-    })
-
-    const result = await listPipelineAvailability(['first'], inputProvider)
-
-    expect(result.pipelines[0]).toMatchObject({
-      available: false,
-      unavailable_reasons: [{ code: 'PIPELINE_RETIRED', target: 'pdr-particle-filter' }],
-    })
   })
 
   it('実行前はfresh snapshotを再解決し入力不足を受理しない', async () => {

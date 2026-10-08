@@ -1,11 +1,11 @@
-import type { Pipeline } from '../../schemas/pipelines.js'
+import type { PipelineCatalogEntry } from '../../schemas/pipelines.js'
 import { fetchPipelineCatalog } from './pipeline-client.js'
 
 const TTL_MS = 60_000
-let cached: { expiresAt: number; value: Pipeline[] } | undefined
-let inflight: Promise<Pipeline[]> | undefined
+let cached: { expiresAt: number; value: PipelineCatalogEntry[] } | undefined
+let inflight: Promise<PipelineCatalogEntry[]> | undefined
 
-export const getCachedPipelineCatalog = async (): Promise<Pipeline[]> => {
+export const getCachedPipelineCatalog = async (): Promise<PipelineCatalogEntry[]> => {
   const now = Date.now()
   if (cached && cached.expiresAt > now) return cached.value
   inflight ??= fetchPipelineCatalog()

@@ -63,10 +63,21 @@ const pipeline = {
   digest: 'd'.repeat(64),
 }
 
+const catalogEntry = {
+  pipeline_id: 'pdr',
+  display_name: 'PDR',
+  definition_version: '1.0.0',
+  digest: 'd'.repeat(64),
+  input_slots: pipeline.definition.input_slots,
+  outputs: pipeline.definition.outputs,
+  parameters_schema: pipeline.definition.parameters_schema,
+  availability: pipeline.availability,
+}
+
 describe('pipeline schemas', () => {
   it('Nozomiのpipeline契約を受理する', () => {
     expect(pipelineSchema.parse(pipeline).definition.pipeline_id).toBe('pdr')
-    expect(pipelineCatalogSchema.parse([pipeline])).toHaveLength(1)
+    expect(pipelineCatalogSchema.parse([catalogEntry])).toHaveLength(1)
   })
 
   it('必須のdigestとslot契約が欠けた応答を拒否する', () => {
