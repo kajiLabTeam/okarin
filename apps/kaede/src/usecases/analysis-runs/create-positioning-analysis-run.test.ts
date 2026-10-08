@@ -280,6 +280,27 @@ describe('createPositioningAnalysisRun', () => {
       organization_id: orgId,
       constraints: [{ seq: 0, point_type: 'start', x: 120, y: 240, direction: 90 }],
     })
+    mocks.resolvePipeline.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        pipeline: {
+          ...mockPipeline,
+          definition: {
+            ...mockPipeline.definition,
+            parameters_schema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                initial_direction: { type: 'number', minimum: 0, maximum: 360 },
+                user_height_m: { type: 'number', exclusiveMinimum: 0 },
+              },
+              required: [],
+            },
+          },
+        },
+        recordings: [{ recording_id: recordingId, assets: [], bindings: {}, issues: [] }],
+      },
+    })
 
     const result = await createPositioningAnalysisRun(managerActor, orgId, 'pdr-only', {
       recording_ids: [recordingId],
@@ -289,7 +310,7 @@ describe('createPositioningAnalysisRun', () => {
 
     expect(result).toMatchObject({ ok: true, value: { status: 'accepted', item_count: 1 } })
     expect(mocks.insertItems).toHaveBeenCalledWith(
-      [expect.objectContaining({ parameters: {} })],
+      [expect.objectContaining({ parameters: { initial_direction: 90 } })],
       expect.anything()
     )
   })
