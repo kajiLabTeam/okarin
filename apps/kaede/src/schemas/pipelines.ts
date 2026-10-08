@@ -105,8 +105,22 @@ export const activePipelineSchema = pipelineSchema.extend({
   definition: pipelineDefinitionSchema.extend({ state: z.literal('active') }),
 })
 
-export const pipelineCatalogSchema = z.array(pipelineSchema)
+export const pipelineCatalogEntrySchema = z
+  .object({
+    pipeline_id: z.string().regex(/^[a-z][a-z0-9-]*$/),
+    display_name: z.string().min(1),
+    definition_version: z.string().regex(/^v?[0-9]+\.[0-9]+\.[0-9]+$/),
+    digest: z.string().regex(/^[a-f0-9]{64}$/),
+    input_slots: z.array(pipelineSlotSchema),
+    outputs: z.array(pipelineOutputSchema),
+    parameters_schema: jsonObjectSchema,
+    availability: pipelineAvailabilitySchema,
+  })
+  .strict()
+
+export const pipelineCatalogSchema = z.array(pipelineCatalogEntrySchema)
 export type AssetContract = z.infer<typeof assetContractSchema>
+export type PipelineCatalogEntry = z.infer<typeof pipelineCatalogEntrySchema>
 export type Pipeline = z.infer<typeof pipelineSchema>
 
 export const pipelineAvailabilityQuerySchema = z.object({

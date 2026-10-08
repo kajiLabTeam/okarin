@@ -45,10 +45,13 @@ const matches = (asset: Asset, accepted: AssetContract) =>
   asset.schema_version === accepted.schema_version &&
   asset.format === accepted.format
 
-const bindingFor = (pipeline: Pipeline, assets: Asset[]) => {
+const bindingFor = (
+  pipeline: { input_slots: Pipeline['definition']['input_slots'] },
+  assets: Asset[]
+) => {
   const bindings: Record<string, string> = {}
   const issues: Issue[] = []
-  for (const slot of pipeline.definition.input_slots) {
+  for (const slot of pipeline.input_slots) {
     const candidates = assets.filter(
       (asset) =>
         asset.validation_status === 'valid' &&
@@ -94,9 +97,6 @@ export const listPipelineAvailability = async (
           }
         })
         const unavailableReasons = [
-          ...(pipeline.definition.state === 'retired'
-            ? [{ code: 'PIPELINE_RETIRED', target: pipeline.definition.pipeline_id }]
-            : []),
           ...(pipeline.availability.reason
             ? [
                 {
@@ -114,12 +114,11 @@ export const listPipelineAvailability = async (
           ),
         ]
         return {
-          pipeline_id: pipeline.definition.pipeline_id,
-          display_name: pipeline.definition.display_name,
+          pipeline_id: pipeline.pipeline_id,
+          display_name: pipeline.display_name,
           digest: pipeline.digest,
-          definition_version: pipeline.definition.definition_version,
+          definition_version: pipeline.definition_version,
           available:
-            pipeline.definition.state === 'active' &&
             pipeline.availability.available &&
             recordingResults.every((recording) => recording.available),
           engine_availability: pipeline.availability,
@@ -156,7 +155,7 @@ export const resolvePipelineForExecution = async (
     ({ recording_id, assets }) => ({
       recording_id,
       assets,
-      ...bindingFor(pipeline, assets),
+      ...bindingFor(pipeline.definition, assets),
     })
   )
   const unavailableRecordings = resolvedRecordings

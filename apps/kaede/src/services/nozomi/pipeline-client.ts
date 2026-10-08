@@ -1,6 +1,6 @@
 import { getNozomiRuntimeConfig } from '../../config/runtime.js'
 import { activePipelineSchema, pipelineCatalogSchema } from '../../schemas/pipelines.js'
-import type { Pipeline } from '../../schemas/pipelines.js'
+import type { Pipeline, PipelineCatalogEntry } from '../../schemas/pipelines.js'
 
 export class NozomiPipelineError extends Error {
   constructor(
@@ -32,7 +32,7 @@ const request = async (path: string, notFoundCode?: 'PIPELINE_NOT_FOUND'): Promi
   }
 }
 
-export const fetchPipelineCatalog = async (): Promise<Pipeline[]> => {
+export const fetchPipelineCatalog = async (): Promise<PipelineCatalogEntry[]> => {
   try {
     const parsed = pipelineCatalogSchema.safeParse(await request('/pipelines'))
     if (!parsed.success)
