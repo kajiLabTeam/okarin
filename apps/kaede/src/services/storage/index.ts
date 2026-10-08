@@ -10,6 +10,7 @@ export {
   validateDataAssetObject,
   validateMetadataObject,
   putFloorMapObject,
+  putBeaconLayoutObject,
 } from './object-store.js'
 export {
   buildFloorMapObjectKey,

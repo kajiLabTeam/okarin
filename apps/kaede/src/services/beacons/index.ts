@@ -6,5 +6,6 @@ export {
   softDeleteBeacon,
   updateBeacon,
 } from './beacon-repository.js'
-export { configurationVersion } from './configuration-version.js'
+export { beaconLayout, configurationVersion } from './configuration-version.js'
+export type { BeaconLayoutRow, ConfigurationBeacon } from './configuration-version.js'
 export type { Beacon, BeaconUpdate, NewBeacon } from './beacon-repository.js'
