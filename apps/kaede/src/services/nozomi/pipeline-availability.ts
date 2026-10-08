@@ -1,5 +1,10 @@
+import { createHash } from 'node:crypto'
 import type { AssetContract, Pipeline } from '../../schemas/pipelines.js'
+import { beaconLayout, listBeacons } from '../beacons/index.js'
 import { listRecordingDataAssets } from '../data-assets/index.js'
+import { findFloorDetailById } from '../floors/index.js'
+import { findRecordingById } from '../recordings/index.js'
+import { getFloorMapObjectBytes, putBeaconLayoutObject } from '../storage/index.js'
 import { getCachedPipelineCatalog } from './pipeline-catalog-cache.js'
 import { resolveActivePipeline } from './pipeline-client.js'
 
@@ -37,7 +42,50 @@ export interface ResolvedPipelineRecording {
 }
 
 export const recordingAssetProvider: PipelineResourceProvider = {
-  listAssets: async (recordingId) => (await listRecordingDataAssets(recordingId)) as Asset[],
+  listAssets: async (recordingId) => {
+    const assets = (await listRecordingDataAssets(recordingId)) as Asset[]
+    const recording = await findRecordingById(recordingId)
+    if (!recording) return assets
+
+    const floor = await findFloorDetailById(recording.floor_id, {
+      organizationIds: [recording.organization_id],
+    })
+    if (!floor) return assets
+    const [mapBytes, beacons] = await Promise.all([
+      floor.image_object_path.toLowerCase().endsWith('.png')
+        ? getFloorMapObjectBytes(floor.image_object_path)
+        : Promise.resolve(undefined),
+      listBeacons(floor.floor_id),
+    ])
+    const resources: Asset[] = []
+    if (mapBytes && mapBytes.byteLength > 0) {
+      resources.push({
+        data_asset_id: floor.floor_id,
+        data_type: 'resource.floor_map',
+        schema_version: '1',
+        format: 'png',
+        validation_status: 'valid',
+        object_key: floor.image_object_path,
+        checksum_sha256: createHash('sha256').update(mapBytes).digest('hex'),
+      })
+    }
+    if (beacons.length > 0) {
+      const layoutBytes = new TextEncoder().encode(beaconLayout(beacons))
+      const configurationDigest = createHash('sha256').update(layoutBytes).digest('hex')
+      const objectKey = `organizations/${floor.organization_id}/floors/${floor.floor_id}/beacon-layout/${configurationDigest}.json`
+      await putBeaconLayoutObject(objectKey, layoutBytes)
+      resources.push({
+        data_asset_id: `${floor.floor_id}:beacon-layout:${configurationDigest}`,
+        data_type: 'resource.beacon_layout',
+        schema_version: '1',
+        format: 'json',
+        validation_status: 'valid',
+        object_key: objectKey,
+        checksum_sha256: configurationDigest,
+      })
+    }
+    return [...assets, ...resources]
+  },
 }
 
 const matches = (asset: Asset, accepted: AssetContract) =>

@@ -12,6 +12,25 @@ export interface ConfigurationBeacon {
   deleted_at: Date | null
 }
 
+export interface BeaconLayoutRow {
+  beacon_id: string
+  pixel_x: number
+  pixel_y: number
+}
+
+export const beaconLayout = (beacons: ConfigurationBeacon[]) => {
+  const rows = beacons
+    .filter((beacon) => beacon.enabled && beacon.deleted_at === null)
+    .slice()
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map<BeaconLayoutRow>((beacon) => ({
+      beacon_id: beacon.id,
+      pixel_x: beacon.pixel_x,
+      pixel_y: beacon.pixel_y,
+    }))
+  return JSON.stringify({ beacons: rows })
+}
+
 export const configurationVersion = (beacons: ConfigurationBeacon[]) => {
   const canonical = beacons
     .filter((beacon) => beacon.enabled && beacon.deleted_at === null)

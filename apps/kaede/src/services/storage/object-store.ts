@@ -34,6 +34,19 @@ export const putFloorMapObject = async (
   )
 }
 
+export const putBeaconLayoutObject = async (objectKey: string, body: Uint8Array) => {
+  const { config, internalClient } = getS3Context()
+
+  await internalClient.send(
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: objectKey,
+      Body: body,
+      ContentType: 'application/json',
+    })
+  )
+}
+
 export const deleteFloorMapObject = async (objectKey: string) => {
   const { config, internalClient } = getS3Context()
 
