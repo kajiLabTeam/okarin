@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import math
 import os
 import sqlite3
@@ -13,6 +14,7 @@ from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
 from typing import Any, Protocol, cast
+from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from src.network_policy import (
@@ -28,6 +30,8 @@ from src.schemas.execution import (
     InputManifest,
 )
 from src.schemas.pipeline import ComponentContract, PipelineSnapshot
+
+logger = logging.getLogger(__name__)
 
 
 class ComponentExecutionError(Exception):
@@ -460,11 +464,53 @@ def send_callback(event: ExecutionEvent) -> None:
     if shared_token:
         headers["authorization"] = f"Bearer {shared_token}"
         headers["x-callback-secret"] = shared_token
-    with build_opener(_NoRedirect).open(
-        Request(url, data=body, headers=headers, method="POST"), timeout=10
-    ) as response:
-        if response.status >= 300:
-            raise RuntimeError(f"callback returned HTTP {response.status}")
+    try:
+        with build_opener(_NoRedirect).open(
+            Request(url, data=body, headers=headers, method="POST"), timeout=10
+        ) as response:
+            response_body = response.read().decode("utf-8", errors="replace")
+            if response.status >= 300:
+                logger.error(
+                    "Nozomi callback rejected: url=%s status=%s body=%s "
+                    "event_id=%s item_id=%s",
+                    url,
+                    response.status,
+                    response_body[:2000],
+                    event.event_id,
+                    event.analysis_run_item_id,
+                )
+                raise RuntimeError(
+                    f"callback returned HTTP {response.status}: {response_body[:500]}"
+                )
+            logger.info(
+                "Nozomi callback delivered: status=%s event_id=%s item_id=%s",
+                response.status,
+                event.event_id,
+                event.analysis_run_item_id,
+            )
+    except HTTPError as error:
+        response_body = error.read().decode("utf-8", errors="replace")
+        logger.error(
+            "Nozomi callback HTTP error: url=%s status=%s body=%s "
+            "event_id=%s item_id=%s",
+            url,
+            error.code,
+            response_body[:2000],
+            event.event_id,
+            event.analysis_run_item_id,
+        )
+        raise RuntimeError(
+            f"callback returned HTTP {error.code}: {response_body[:500]}"
+        ) from error
+    except URLError as error:
+        logger.error(
+            "Nozomi callback connection error: url=%s reason=%s event_id=%s item_id=%s",
+            url,
+            error.reason,
+            event.event_id,
+            event.analysis_run_item_id,
+        )
+        raise
 
 
 def send_callback_with_retry(
@@ -484,6 +530,14 @@ def send_callback_with_retry(
             repository.update_delivery(delivery)
             return
         except Exception as exc:
+            logger.warning(
+                "Nozomi callback attempt failed: attempt=%s event_id=%s "
+                "item_id=%s error=%s",
+                delivery.attempts,
+                event.event_id,
+                event.analysis_run_item_id,
+                exc,
+            )
             last_error = exc
             delivery.status = "failed"
             delivery.last_error = str(exc)

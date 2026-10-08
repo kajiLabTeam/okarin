@@ -1,10 +1,15 @@
 import { createHash } from 'node:crypto'
+import type { UploadTarget } from '../../schemas/common.js'
 import type { AssetContract, Pipeline } from '../../schemas/pipelines.js'
 import { beaconLayout, listBeacons } from '../beacons/index.js'
 import { listRecordingDataAssets } from '../data-assets/index.js'
 import { findFloorDetailById } from '../floors/index.js'
 import { findRecordingById } from '../recordings/index.js'
-import { getFloorMapObjectBytes, putBeaconLayoutObject } from '../storage/index.js'
+import {
+  buildRecordingRawObjectKey,
+  getFloorMapObjectBytes,
+  putBeaconLayoutObject,
+} from '../storage/index.js'
 import { getCachedPipelineCatalog } from './pipeline-catalog-cache.js'
 import { resolveActivePipeline } from './pipeline-client.js'
 
@@ -47,10 +52,25 @@ export const recordingAssetProvider: PipelineResourceProvider = {
     const recording = await findRecordingById(recordingId)
     if (!recording) return assets
 
+    // Legacy recordings store sensor files under raw/ and only expose them through
+    // upload_targets. Present them as virtual assets so the pipeline resolver can
+    // use the same binding and input-manifest path as typed data assets.
+    const legacyAssets = recording.upload_targets
+      .filter((target): target is Exclude<UploadTarget, 'metadata'> => target !== 'metadata')
+      .filter((target) => !assets.some((asset) => asset.data_type === target))
+      .map((target) => ({
+        data_asset_id: `legacy:${recording.id}:${target}`,
+        data_type: target,
+        schema_version: '1',
+        format: 'csv',
+        validation_status: 'valid',
+        object_key: buildRecordingRawObjectKey(recording.organization_id, recording.id, target),
+      }))
+
     const floor = await findFloorDetailById(recording.floor_id, {
       organizationIds: [recording.organization_id],
     })
-    if (!floor) return assets
+    if (!floor) return [...assets, ...legacyAssets]
     const [mapBytes, beacons] = await Promise.all([
       floor.image_object_path.toLowerCase().endsWith('.png')
         ? getFloorMapObjectBytes(floor.image_object_path)
@@ -84,7 +104,7 @@ export const recordingAssetProvider: PipelineResourceProvider = {
         checksum_sha256: configurationDigest,
       })
     }
-    return [...assets, ...resources]
+    return [...assets, ...legacyAssets, ...resources]
   },
 }
 

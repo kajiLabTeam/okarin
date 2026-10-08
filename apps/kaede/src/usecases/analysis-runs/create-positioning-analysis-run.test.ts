@@ -273,6 +273,48 @@ describe('createPositioningAnalysisRun', () => {
     )
   })
 
+  it('パイプラインのスキーマにない補完パラメータは追加しない', async () => {
+    mocks.findRecording.mockResolvedValue({
+      id: recordingId,
+      floor_id: floorId,
+      organization_id: orgId,
+      constraints: [{ seq: 0, point_type: 'start', x: 120, y: 240, direction: 90 }],
+    })
+    mocks.resolvePipeline.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        pipeline: {
+          ...mockPipeline,
+          definition: {
+            ...mockPipeline.definition,
+            parameters_schema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                initial_direction: { type: 'number', minimum: 0, maximum: 360 },
+                user_height_m: { type: 'number', exclusiveMinimum: 0 },
+              },
+              required: [],
+            },
+          },
+        },
+        recordings: [{ recording_id: recordingId, assets: [], bindings: {}, issues: [] }],
+      },
+    })
+
+    const result = await createPositioningAnalysisRun(managerActor, orgId, 'pdr-only', {
+      recording_ids: [recordingId],
+      pipeline_ids: ['pdr'],
+      parameters_by_pipeline: {},
+    })
+
+    expect(result).toMatchObject({ ok: true, value: { status: 'accepted', item_count: 1 } })
+    expect(mocks.insertItems).toHaveBeenCalledWith(
+      [expect.objectContaining({ parameters: { initial_direction: 90 } })],
+      expect.anything()
+    )
+  })
+
   it('Nozomiが拒否する未知パラメータとinteger以外の値を受付時に拒否する', async () => {
     mocks.resolvePipeline.mockResolvedValueOnce({
       ok: true,

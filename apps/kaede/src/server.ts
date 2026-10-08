@@ -56,6 +56,13 @@ export const createApp = () => {
   app.route('/api/invites', organizationInvitesRoutes)
 
   app.onError((err, c) => {
+    if ('issues' in err) {
+      console.error('Request validation failed', {
+        method: c.req.method,
+        path: c.req.path,
+        issues: err.issues,
+      })
+    }
     Sentry.captureException(err)
 
     if (err instanceof HTTPException) {

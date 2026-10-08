@@ -20,6 +20,18 @@ describe('positioningAnalysisCallbackRequestSchema', () => {
     expect(parsed.success).toBe(true)
   })
 
+  it('completed callback が error: null を含んでもパースできる', () => {
+    const input = {
+      event_id: 'event-1-null-error',
+      analysis_run_item_id: validItemId,
+      status: 'completed',
+      outputs: { digest: 'a'.repeat(64) },
+      error: null,
+    }
+    const parsed = positioningAnalysisCallbackRequestSchema.safeParse(input)
+    expect(parsed.success).toBe(true)
+  })
+
   it('failed イベントのスキーマを正常にパースする', () => {
     const input = {
       event_id: 'event-2',
