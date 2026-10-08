@@ -13,6 +13,7 @@ export const positioningAnalysisCallbackRequestSchema = z
         message: z.string().min(1),
       })
       .strict()
+      .nullable()
       .optional(),
   })
   .strict()
