@@ -27,6 +27,17 @@ def test_catalog_lists_four_initial_pipelines() -> None:
     ]
 
 
+def test_pdr_accepts_optional_floor_coordinate_parameters() -> None:
+    pdr = next(definition for definition in initial_catalog() if definition.pipeline_id == "pdr")
+    schema = pdr.parameters_schema
+
+    assert all(
+        key in schema["properties"]
+        for key in ("origin_x", "origin_y", "floor_scale")
+    )
+    assert schema["required"] == []
+
+
 def test_registry_computes_deterministic_digest() -> None:
     registry = PipelineRegistry(initial_catalog(), RikkaComponentExecutor())
     snapshot1 = registry.resolve("pdr")
