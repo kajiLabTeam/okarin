@@ -271,6 +271,18 @@ describe('pipeline availability', () => {
         upload_targets: ['acce', 'gyro', 'metadata'],
       },
       assets: [],
+      expectedAssets: [
+        {
+          data_asset_id: 'legacy:legacy-recording:acce',
+          data_type: 'acce',
+          object_key: 'organizations/org-1/recordings/legacy-recording/raw/acce.csv',
+        },
+        {
+          data_asset_id: 'legacy:legacy-recording:gyro',
+          data_type: 'gyro',
+          object_key: 'organizations/org-1/recordings/legacy-recording/raw/gyro.csv',
+        },
+      ],
     },
     {
       label: 'typed asset方式',
@@ -281,8 +293,12 @@ describe('pipeline availability', () => {
         upload_targets: ['metadata'],
       },
       assets: [asset('acce-1', 'acce'), asset('gyro-1', 'gyro')],
+      expectedAssets: [
+        { data_asset_id: 'acce-1', data_type: 'acce' },
+        { data_asset_id: 'gyro-1', data_type: 'gyro' },
+      ],
     },
-  ])('$labelでもPDRの実行入力を解決できる', async ({ recording, assets }) => {
+  ])('$labelでもPDRの実行入力を解決できる', async ({ recording, assets, expectedAssets }) => {
     resolvePipelineMock.mockResolvedValue(pdrPipeline())
     findRecordingMock.mockResolvedValue(recording)
     listRecordingAssetsMock.mockResolvedValue(assets)
@@ -295,6 +311,7 @@ describe('pipeline availability', () => {
             recording_id: recording.id,
             bindings: { acce: expect.any(String), gyro: expect.any(String) },
             issues: [],
+            assets: expectedAssets,
           },
         ],
       },
