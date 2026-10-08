@@ -56,6 +56,8 @@ vi.mock('../beacons/index.js', () => ({
   listBeacons: listBeaconsMock,
 }))
 vi.mock('../storage/index.js', () => ({
+  buildRecordingRawObjectKey: (organizationId: string, recordingId: string, target: string) =>
+    `organizations/${organizationId}/recordings/${recordingId}/raw/${target}.csv`,
   getFloorMapObjectBytes: getFloorMapBytesMock,
   putBeaconLayoutObject: putBeaconLayoutMock,
 }))
@@ -122,6 +124,29 @@ const pipeline = (available = true): Pipeline => ({
   digest: 'd'.repeat(64),
 })
 
+const pdrPipeline = (): Pipeline => ({
+  ...pipeline(),
+  definition: {
+    ...pipeline().definition,
+    pipeline_id: 'pdr',
+    display_name: 'PDR',
+    input_slots: [
+      {
+        slot_id: 'acce',
+        required: true,
+        max_assets: 1,
+        accepted_contracts: [assetContract('acce')],
+      },
+      {
+        slot_id: 'gyro',
+        required: true,
+        max_assets: 1,
+        accepted_contracts: [assetContract('gyro')],
+      },
+    ],
+  },
+})
+
 const catalogEntry = (available = true) => {
   const snapshot = pipeline(available)
   return {
@@ -160,6 +185,7 @@ describe('pipeline availability', () => {
 
   it('recordingのfloor_idからPNGのfloor map resourceを解決する', async () => {
     findRecordingMock.mockResolvedValue({
+      upload_targets: [],
       floor_id: 'floor-1',
       organization_id: 'org-1',
     })
@@ -185,6 +211,7 @@ describe('pipeline availability', () => {
 
   it('recordingのfloor_idから有効なbeacon layout resourceを解決する', async () => {
     findRecordingMock.mockResolvedValue({
+      upload_targets: [],
       floor_id: 'floor-1',
       organization_id: 'org-1',
     })
@@ -232,6 +259,46 @@ describe('pipeline availability', () => {
       new TextDecoder().decode(putBeaconLayoutMock.mock.calls[0][1] as Uint8Array)
     ) as { beacons: { beacon_id: string }[] }
     expect(layout.beacons.map((beacon) => beacon.beacon_id)).toEqual(['beacon-1', 'beacon-2'])
+  })
+
+  it.each([
+    {
+      label: '旧upload_targets方式',
+      recording: {
+        id: 'legacy-recording',
+        organization_id: 'org-1',
+        floor_id: 'floor-1',
+        upload_targets: ['acce', 'gyro', 'metadata'],
+      },
+      assets: [],
+    },
+    {
+      label: 'typed asset方式',
+      recording: {
+        id: 'asset-recording',
+        organization_id: 'org-1',
+        floor_id: 'floor-1',
+        upload_targets: ['metadata'],
+      },
+      assets: [asset('acce-1', 'acce'), asset('gyro-1', 'gyro')],
+    },
+  ])('$labelでもPDRの実行入力を解決できる', async ({ recording, assets }) => {
+    resolvePipelineMock.mockResolvedValue(pdrPipeline())
+    findRecordingMock.mockResolvedValue(recording)
+    listRecordingAssetsMock.mockResolvedValue(assets)
+
+    await expect(resolvePipelineForExecution('pdr', [recording.id])).resolves.toMatchObject({
+      ok: true,
+      value: {
+        recordings: [
+          {
+            recording_id: recording.id,
+            bindings: { acce: expect.any(String), gyro: expect.any(String) },
+            issues: [],
+          },
+        ],
+      },
+    })
   })
 
   it('slot候補が1件ずつなら複数recordingを自動bindする', async () => {
