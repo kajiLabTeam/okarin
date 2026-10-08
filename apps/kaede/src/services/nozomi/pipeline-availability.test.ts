@@ -1,10 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AssetContract, Pipeline } from '../../schemas/pipelines.js'
 import type { PipelineResourceProvider } from './pipeline-availability.js'
-import { listPipelineAvailability, resolvePipelineForExecution } from './pipeline-availability.js'
+import {
+  listPipelineAvailability,
+  recordingAssetProvider,
+  resolvePipelineForExecution,
+} from './pipeline-availability.js'
 
-const { getCatalogMock, resolvePipelineMock } = vi.hoisted(() => ({
+const {
+  findFloorMock,
+  findRecordingMock,
+  getCatalogMock,
+  getFloorMapBytesMock,
+  listRecordingAssetsMock,
+  resolvePipelineMock,
+} = vi.hoisted(() => ({
+  findFloorMock: vi.fn(),
+  findRecordingMock: vi.fn(),
+  getFloorMapBytesMock: vi.fn(),
   getCatalogMock: vi.fn(),
+  listRecordingAssetsMock: vi.fn(),
   resolvePipelineMock: vi.fn(),
 }))
 
@@ -15,8 +30,11 @@ vi.mock('./pipeline-client.js', () => ({
   resolveActivePipeline: resolvePipelineMock,
 }))
 vi.mock('../data-assets/index.js', () => ({
-  listRecordingDataAssets: vi.fn(),
+  listRecordingDataAssets: listRecordingAssetsMock,
 }))
+vi.mock('../floors/index.js', () => ({ findFloorDetailById: findFloorMock }))
+vi.mock('../recordings/index.js', () => ({ findRecordingById: findRecordingMock }))
+vi.mock('../storage/index.js', () => ({ getFloorMapObjectBytes: getFloorMapBytesMock }))
 
 const assetContract = (dataType: AssetContract['data_type'], format = 'csv') => ({
   kind: 'asset' as const,
@@ -112,6 +130,32 @@ const provider = (assetsByRecording: Record<string, ReturnType<typeof asset>[]>)
 describe('pipeline availability', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    listRecordingAssetsMock.mockResolvedValue([])
+  })
+
+  it('recordingのfloor_idからPNGのfloor map resourceを解決する', async () => {
+    findRecordingMock.mockResolvedValue({
+      floor_id: 'floor-1',
+      organization_id: 'org-1',
+    })
+    findFloorMock.mockResolvedValue({
+      floor_id: 'floor-1',
+      organization_id: 'org-1',
+      image_object_path: 'organizations/org-1/floors/floor-1/map.png',
+    })
+    getFloorMapBytesMock.mockResolvedValue(new Uint8Array([1, 2, 3]))
+
+    await expect(recordingAssetProvider.listAssets('recording-1')).resolves.toContainEqual(
+      expect.objectContaining({
+        data_asset_id: 'floor-1',
+        data_type: 'resource.floor_map',
+        schema_version: '1',
+        format: 'png',
+        validation_status: 'valid',
+        object_key: 'organizations/org-1/floors/floor-1/map.png',
+        checksum_sha256: '039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81',
+      })
+    )
   })
 
   it('slot候補が1件ずつなら複数recordingを自動bindする', async () => {

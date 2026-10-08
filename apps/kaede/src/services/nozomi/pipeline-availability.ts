@@ -1,5 +1,9 @@
+import { createHash } from 'node:crypto'
 import type { AssetContract, Pipeline } from '../../schemas/pipelines.js'
 import { listRecordingDataAssets } from '../data-assets/index.js'
+import { findFloorDetailById } from '../floors/index.js'
+import { findRecordingById } from '../recordings/index.js'
+import { getFloorMapObjectBytes } from '../storage/index.js'
 import { getCachedPipelineCatalog } from './pipeline-catalog-cache.js'
 import { resolveActivePipeline } from './pipeline-client.js'
 
@@ -37,7 +41,33 @@ export interface ResolvedPipelineRecording {
 }
 
 export const recordingAssetProvider: PipelineResourceProvider = {
-  listAssets: async (recordingId) => (await listRecordingDataAssets(recordingId)) as Asset[],
+  listAssets: async (recordingId) => {
+    const assets = (await listRecordingDataAssets(recordingId)) as Asset[]
+    const recording = await findRecordingById(recordingId)
+    if (!recording) return assets
+
+    const floor = await findFloorDetailById(recording.floor_id, {
+      organizationIds: [recording.organization_id],
+    })
+    if (!floor) return assets
+    if (!floor.image_object_path.toLowerCase().endsWith('.png')) return assets
+
+    const mapBytes = await getFloorMapObjectBytes(floor.image_object_path)
+    if (!mapBytes || mapBytes.byteLength === 0) return assets
+
+    return [
+      ...assets,
+      {
+        data_asset_id: floor.floor_id,
+        data_type: 'resource.floor_map',
+        schema_version: '1',
+        format: 'png',
+        validation_status: 'valid',
+        object_key: floor.image_object_path,
+        checksum_sha256: createHash('sha256').update(mapBytes).digest('hex'),
+      },
+    ]
+  },
 }
 
 const matches = (asset: Asset, accepted: AssetContract) =>
