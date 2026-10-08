@@ -26,6 +26,41 @@ const dataTypeDefinitionSchema = z
   })
   .strict()
 
+const builtInCatalogDefinitions: Record<string, DataTypeDefinition> = {
+  'acce:1:csv': {
+    data_type: 'acce',
+    schema_version: '1',
+    format: 'csv',
+    content_types: ['text/csv'],
+    required_columns: ['timestamp_ns', 'wall_time_ms', 'x', 'y', 'z'],
+    timestamp_column: 'timestamp_ns',
+    wall_time_column: 'wall_time_ms',
+    column_types: {
+      timestamp_ns: 'integer',
+      wall_time_ms: 'integer',
+      x: 'number',
+      y: 'number',
+      z: 'number',
+    },
+  },
+  'gyro:1:csv': {
+    data_type: 'gyro',
+    schema_version: '1',
+    format: 'csv',
+    content_types: ['text/csv'],
+    required_columns: ['timestamp_ns', 'wall_time_ms', 'x', 'y', 'z'],
+    timestamp_column: 'timestamp_ns',
+    wall_time_column: 'wall_time_ms',
+    column_types: {
+      timestamp_ns: 'integer',
+      wall_time_ms: 'integer',
+      x: 'number',
+      y: 'number',
+      z: 'number',
+    },
+  },
+}
+
 const catalogRoots = [
   resolve(process.cwd(), 'contracts/data-types'),
   resolve(process.cwd(), '../../contracts/data-types'),
@@ -38,22 +73,22 @@ export const loadDataTypeDefinition = async (
   format: string
 ): Promise<DataTypeDefinition | undefined> => {
   if (![dataType, schemaVersion, format].every((value) => safePart.test(value))) return undefined
+  const normalizedVersion = schemaVersion.replace(/^v/i, '')
   for (const root of catalogRoots) {
     try {
       const value = dataTypeDefinitionSchema.parse(
-        JSON.parse(await readFile(resolve(root, `${dataType}.v${schemaVersion}.json`), 'utf8'))
+        JSON.parse(await readFile(resolve(root, `${dataType}.v${normalizedVersion}.json`), 'utf8'))
       )
       if (
         value.data_type === dataType &&
-        value.schema_version === schemaVersion &&
+        (value.schema_version === schemaVersion || value.schema_version === normalizedVersion) &&
         value.format === format
       ) {
         return value
       }
-      return undefined
     } catch {
       // Try the second monorepo-relative location.
     }
   }
-  return undefined
+  return builtInCatalogDefinitions[`${dataType}:${normalizedVersion}:${format}`]
 }
