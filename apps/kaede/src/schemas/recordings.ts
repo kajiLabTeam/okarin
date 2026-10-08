@@ -87,6 +87,8 @@ export const recordingIdParamsSchema = z
   })
   .openapi('RecordingIdParams')
 
+const recordingResponseUploadTargetsSchema = z.array(uploadTargetSchema)
+
 export const initRecordingRequestSchema = z
   .object({
     pedestrian_id: uuidSchema.openapi({
@@ -283,7 +285,7 @@ export const recordingDetailResponseSchema = z
       description: 'recording が所属する organization の ID',
     }),
     upload_status: recordingUploadStatusSchema,
-    upload_targets: uploadTargetsSchema,
+    upload_targets: recordingResponseUploadTargetsSchema,
     available_assets: z
       .array(
         z.object({
