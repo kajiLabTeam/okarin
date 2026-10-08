@@ -38,7 +38,7 @@ export const createApp = () => {
       '/api/*',
       cors({
         origin: corsAllowedOrigins,
-        allowHeaders: ['authorization', 'content-type'],
+        allowHeaders: ['authorization', 'content-type', 'idempotency-key'],
         allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
         credentials: true,
       })
