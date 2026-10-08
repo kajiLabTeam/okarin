@@ -17,11 +17,14 @@ export const getPositioningAnalysisRun = async (
   const items = await listPositioningItems(run.id)
   const progress = { total: items.length, queued: 0, processing: 0, completed: 0, failed: 0 }
   for (const item of items) progress[item.status as keyof typeof progress]++
+  const hasInFlightItems = progress.queued > 0 || progress.processing > 0
   const status = (
     progress.failed === progress.total
       ? 'failed'
       : progress.completed === progress.total
         ? 'completed'
+        : hasInFlightItems
+          ? 'processing'
         : progress.completed > 0 || progress.failed > 0
           ? 'partially_completed'
           : run.status

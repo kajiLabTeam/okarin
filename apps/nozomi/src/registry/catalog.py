@@ -37,14 +37,14 @@ def _parameters_schema(
         "user_height_m": {"type": "number", "exclusiveMinimum": 0},
     }
     required: list[str] = []
+    properties.update(
+        {
+            "origin_x": {"type": "integer", "minimum": 0},
+            "origin_y": {"type": "integer", "minimum": 0},
+            "floor_scale": {"type": "number", "exclusiveMinimum": 0},
+        }
+    )
     if map_required:
-        properties.update(
-            {
-                "origin_x": {"type": "integer", "minimum": 0},
-                "origin_y": {"type": "integer", "minimum": 0},
-                "floor_scale": {"type": "number", "exclusiveMinimum": 0},
-            }
-        )
         required.extend(("origin_x", "origin_y", "floor_scale"))
     if particle:
         properties.update(
