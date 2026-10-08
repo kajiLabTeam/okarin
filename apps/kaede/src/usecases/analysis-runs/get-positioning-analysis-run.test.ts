@@ -132,6 +132,40 @@ describe('getPositioningAnalysisRun', () => {
     }
   })
 
+  it('一部完了・一部処理中の場合は processing を返す', async () => {
+    mocks.listItems.mockResolvedValue([
+      {
+        id: 'item-1',
+        recording_id: 'rec-1',
+        pipeline_id: 'pdr',
+        status: 'completed',
+        result_trajectory_id: 'traj-1',
+        pipeline_digest: 'a'.repeat(64),
+        pipeline_version: '1.0.0',
+        error: null,
+      },
+      {
+        id: 'item-2',
+        recording_id: 'rec-2',
+        pipeline_id: 'pdr-particle-filter',
+        status: 'processing',
+        result_trajectory_id: null,
+        pipeline_digest: 'b'.repeat(64),
+        pipeline_version: '1.0.0',
+        error: null,
+      },
+    ])
+
+    const result = await getPositioningAnalysisRun(managerActor, orgId, runId)
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value.status).toBe('processing')
+      expect(result.value.progress.completed).toBe(1)
+      expect(result.value.progress.processing).toBe(1)
+    }
+  })
+
   it('存在しないRunの場合は ANALYSIS_RUN_NOT_FOUND を返す', async () => {
     mocks.findRun.mockResolvedValue(null)
 
