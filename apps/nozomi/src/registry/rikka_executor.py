@@ -138,7 +138,27 @@ def _landmarks(content: bytes, map_dimensions: tuple[int, int]) -> tuple[Landmar
         raise PermanentComponentError("beacon_layout input is invalid") from exc
 
 
-def _trajectory_payload(result: TrajectoryResult, component_id: str) -> dict[str, Any]:
+def _trajectory_payload(
+    result: TrajectoryResult,
+    component_id: str,
+    parameters: dict[str, Any],
+) -> dict[str, Any]:
+    has_origin = all(
+        key in parameters for key in ("origin_x", "origin_y", "floor_scale")
+    )
+    if has_origin:
+        origin_x = float(parameters["origin_x"])
+        origin_y = float(parameters["origin_y"])
+        floor_scale = float(parameters["floor_scale"])
+        if not all(math.isfinite(value) for value in (origin_x, origin_y)):
+            raise PermanentComponentError("trajectory origin must be finite")
+        if not math.isfinite(floor_scale) or floor_scale <= 0:
+            raise PermanentComponentError("floor_scale must be finite and positive")
+    elif any(key in parameters for key in ("origin_x", "origin_y", "floor_scale")):
+        raise PermanentComponentError(
+            "origin_x, origin_y, and floor_scale must be provided together"
+        )
+
     timestamps: list[float | None] = [None, *map(float, result.t_at_steps)]
     if len(timestamps) != len(result.trajectory):
         timestamps = [None] * len(result.trajectory)
@@ -146,14 +166,22 @@ def _trajectory_payload(result: TrajectoryResult, component_id: str) -> dict[str
         {
             "step_index": index,
             "timestamp_s": timestamps[index],
-            "x": float(point[0]),
-            "y": float(point[1]),
+            "x": (
+                origin_x + float(point[0]) / floor_scale
+                if has_origin
+                else float(point[0])
+            ),
+            "y": (
+                origin_y + float(point[1]) / floor_scale
+                if has_origin
+                else float(point[1])
+            ),
         }
         for index, point in enumerate(result.trajectory)
     ]
     return {
         "schema_version": "1",
-        "coordinate_system": "local_meter",
+        "coordinate_system": "pixel" if has_origin else "local_meter",
         "component_id": component_id,
         "points": points,
         "step_count": max(0, len(points) - 1),
@@ -282,4 +310,8 @@ class RikkaComponentExecutor:
                     landmark_settings=(landmark_settings if uses_ble else None),
                 )
 
-        return {"trajectory": _trajectory_payload(result, component.component_id)}
+        return {
+            "trajectory": _trajectory_payload(
+                result, component.component_id, parameters
+            )
+        }

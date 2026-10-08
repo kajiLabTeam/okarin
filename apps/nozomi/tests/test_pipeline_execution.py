@@ -5,6 +5,7 @@ import json
 import math
 from pathlib import Path
 from typing import Any
+from types import SimpleNamespace
 
 import matplotlib.image as mpimg
 import numpy as np
@@ -14,7 +15,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from src.registry.catalog import initial_catalog
-from src.registry.rikka_executor import RikkaComponentExecutor
+from src.registry.rikka_executor import RikkaComponentExecutor, _trajectory_payload
 from src.routes import executions as execution_routes
 from src.routes.executions import start_execution
 from src.schemas.execution import (
@@ -43,6 +44,42 @@ def test_single_component_fake_executor_completes() -> None:
     event = execute_pipeline(snapshot, request, FakeExecutor())
     assert event.status == ExecutionStatus.COMPLETED
     assert "trajectory" in event.outputs
+
+
+def test_trajectory_payload_converts_local_meters_to_floor_pixels() -> None:
+    result = SimpleNamespace(
+        trajectory=((0.0, 0.0), (1.0, -2.0)),
+        t_at_steps=(1.0,),
+        landmark=None,
+    )
+
+    trajectory = _trajectory_payload(
+        result,
+        "rikka-pdr",
+        {"origin_x": 100, "origin_y": 200, "floor_scale": 0.5},
+    )
+
+    assert trajectory["coordinate_system"] == "pixel"
+    assert [(point["x"], point["y"]) for point in trajectory["points"]] == [
+        (100.0, 200.0),
+        (102.0, 196.0),
+    ]
+
+
+def test_trajectory_payload_keeps_local_meter_coordinates_without_origin() -> None:
+    result = SimpleNamespace(
+        trajectory=((0.0, 0.0), (1.0, -2.0)),
+        t_at_steps=(1.0,),
+        landmark=None,
+    )
+
+    trajectory = _trajectory_payload(result, "rikka-pdr", {})
+
+    assert trajectory["coordinate_system"] == "local_meter"
+    assert [(point["x"], point["y"]) for point in trajectory["points"]] == [
+        (0.0, 0.0),
+        (1.0, -2.0),
+    ]
 
 
 def test_multi_component_fake_executor_completes_in_linear_order() -> None:
