@@ -31,7 +31,6 @@ from src.schemas.execution import (
 )
 from src.schemas.pipeline import ComponentContract, PipelineSnapshot
 
-
 logger = logging.getLogger(__name__)
 
 
