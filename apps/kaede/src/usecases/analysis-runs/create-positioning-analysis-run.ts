@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import type { RequestActor } from '../../middleware/request-actor-context.js'
 import type { Pipeline } from '../../schemas/pipelines.js'
 import type { PositioningAnalysisRunRequest } from '../../schemas/positioning-analysis-runs.js'
+import { trajectoryConstraintsSchema } from '../../schemas/trajectories.js'
 import { insertOutboxJobs } from '../../services/analysis-runs/outbox-repository.js'
 import {
   findPositioningRunByKey,
@@ -10,6 +11,7 @@ import {
   insertPositioningRun,
 } from '../../services/analysis-runs/positioning-analysis-run-repository.js'
 import { db } from '../../services/db/index.js'
+import { findFloorById } from '../../services/floors/index.js'
 import { resolvePipelineForExecution } from '../../services/nozomi/pipeline-availability.js'
 import type { ResolvedPipelineRecording } from '../../services/nozomi/pipeline-availability.js'
 import { NozomiPipelineError } from '../../services/nozomi/pipeline-client.js'
@@ -138,7 +140,11 @@ export const createPositioningAnalysisRun = async (
     !(await findPositioningRunInOrganization(organizationId, body.retry_of_analysis_run_id))
   )
     return { ok: false, error: { type: 'RETRY_RUN_NOT_FOUND', status: 404 } }
-  const recordings = [] as { id: string; floor_id: string }[]
+  const recordings = [] as {
+    id: string
+    floor_id: string
+    constraints: unknown
+  }[]
   for (const recordingId of body.recording_ids) {
     const recording = await findRecordingByIdForOrganization(recordingId, organizationId)
     const access = await findRecordingAuthorizationByIdForOrganization(recordingId, organizationId)
@@ -146,11 +152,19 @@ export const createPositioningAnalysisRun = async (
       return { ok: false, error: { type: 'RECORDING_NOT_FOUND', status: 404 } }
     const recordingAccess = requireRecordingAccess(actor, access)
     if (!recordingAccess.ok) return { ok: false, error: { ...recordingAccess.error, status: 403 } }
-    recordings.push({ id: recording.id, floor_id: recording.floor_id })
+    recordings.push({
+      id: recording.id,
+      floor_id: recording.floor_id,
+      constraints: recording.constraints,
+    })
   }
   if (new Set(recordings.map((recording) => recording.floor_id)).size > 1)
     return { ok: false, error: { type: 'RECORDING_SCOPE_INVALID', status: 409 } }
-  const resolutions = [] as { pipeline: Pipeline; recordings: ResolvedPipelineRecording[] }[]
+  const floor = await findFloorById(recordings[0].floor_id)
+  const resolutions = [] as {
+    pipeline: Pipeline
+    recordings: (ResolvedPipelineRecording & { parameters: Record<string, unknown> })[]
+  }[]
   for (const pipelineId of body.pipeline_ids) {
     let resolved: Awaited<ReturnType<typeof resolvePipelineForExecution>>
     try {
@@ -167,10 +181,41 @@ export const createPositioningAnalysisRun = async (
       }
     }
     if (!resolved.ok) return { ok: false, error: { type: resolved.error.type, status: 409 } }
-    const parameters = body.parameters_by_pipeline[pipelineId] ?? {}
-    if (!parametersMatchSchema(parameters, resolved.value.pipeline.definition.parameters_schema))
+    const explicitParameters = body.parameters_by_pipeline[pipelineId] ?? {}
+    const recordingsWithParameters = resolved.value.recordings.map((resolvedRecording) => {
+      const recording = recordings.find(
+        (candidate) => candidate.id === resolvedRecording.recording_id
+      )
+      const constraints = trajectoryConstraintsSchema.safeParse(recording?.constraints)
+      const start = constraints.success
+        ? constraints.data.find((constraint) => constraint.point_type === 'start')
+        : undefined
+      const derivedParameters: Record<string, unknown> = {}
+      if (start) {
+        derivedParameters.origin_x = start.x
+        derivedParameters.origin_y = start.y
+        if (start.direction !== undefined) derivedParameters.initial_direction = start.direction
+      }
+      if (floor?.scale !== null && floor?.scale !== undefined) {
+        derivedParameters.floor_scale = floor.scale
+      }
+      return {
+        ...resolvedRecording,
+        parameters: { ...derivedParameters, ...explicitParameters },
+      }
+    })
+    if (
+      recordingsWithParameters.some(
+        ({ parameters }) =>
+          !parametersMatchSchema(parameters, resolved.value.pipeline.definition.parameters_schema)
+      )
+    ) {
       return { ok: false, error: { type: 'PARAMETERS_INVALID', status: 400 } }
-    resolutions.push(resolved.value)
+    }
+    resolutions.push({
+      pipeline: resolved.value.pipeline,
+      recordings: recordingsWithParameters,
+    })
   }
   try {
     const result = await db.transaction().execute(async (transaction) => {
@@ -185,7 +230,7 @@ export const createPositioningAnalysisRun = async (
         transaction
       )
       const items = resolutions.flatMap(({ pipeline, recordings }) =>
-        recordings.map(({ recording_id, bindings, assets }) => ({
+        recordings.map(({ recording_id, bindings, assets, parameters }) => ({
           analysis_run_id: run.id,
           recording_id,
           pipeline_id: pipeline.definition.pipeline_id,
@@ -194,12 +239,7 @@ export const createPositioningAnalysisRun = async (
           pipeline_snapshot: pipeline.definition,
           pipeline_digest: pipeline.digest,
           pipeline_version: pipeline.definition.definition_version,
-          parameters: Object.prototype.hasOwnProperty.call(
-            body.parameters_by_pipeline,
-            pipeline.definition.pipeline_id
-          )
-            ? body.parameters_by_pipeline[pipeline.definition.pipeline_id]
-            : {},
+          parameters,
           input_manifest: Object.fromEntries(
             Object.entries(bindings).map(([slot_id, assetId]) => [
               slot_id,

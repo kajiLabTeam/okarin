@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   insertOutboxJobs: vi.fn(),
   findRecording: vi.fn(),
   findAuth: vi.fn(),
+  findFloor: vi.fn(),
   resolvePipeline: vi.fn(),
   transaction: vi.fn(),
 }))
@@ -30,6 +31,10 @@ vi.mock('../../services/analysis-runs/outbox-repository.js', () => ({
 vi.mock('../../services/recordings/index.js', () => ({
   findRecordingByIdForOrganization: mocks.findRecording,
   findRecordingAuthorizationByIdForOrganization: mocks.findAuth,
+}))
+
+vi.mock('../../services/floors/index.js', () => ({
+  findFloorById: mocks.findFloor,
 }))
 
 vi.mock('../../services/nozomi/pipeline-availability.js', () => ({
@@ -104,6 +109,7 @@ describe('createPositioningAnalysisRun', () => {
       access_role: 'public',
       created_by_user_id: managerActor.user_id,
     })
+    mocks.findFloor.mockResolvedValue({ id: floorId, scale: 0.05 })
     mocks.resolvePipeline.mockResolvedValue({
       ok: true,
       value: {
@@ -216,6 +222,55 @@ describe('createPositioningAnalysisRun', () => {
     })
 
     expect(result).toMatchObject({ ok: true, value: { status: 'accepted', item_count: 1 } })
+  })
+
+  it('録画開始時のconstraintsとフロアスケールから必須パラメータを補完する', async () => {
+    mocks.findRecording.mockResolvedValue({
+      id: recordingId,
+      floor_id: floorId,
+      organization_id: orgId,
+      constraints: [{ seq: 0, point_type: 'start', x: 120, y: 240, direction: 90 }],
+    })
+    mocks.resolvePipeline.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        pipeline: {
+          ...mockPipeline,
+          definition: {
+            ...mockPipeline.definition,
+            pipeline_id: 'pdr-particle-filter',
+            parameters_schema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                origin_x: { type: 'integer' },
+                origin_y: { type: 'integer' },
+                initial_direction: { type: 'number' },
+                floor_scale: { type: 'number', exclusiveMinimum: 0 },
+              },
+              required: ['origin_x', 'origin_y', 'floor_scale'],
+            },
+          },
+        },
+        recordings: [{ recording_id: recordingId, assets: [], bindings: {}, issues: [] }],
+      },
+    })
+
+    const result = await createPositioningAnalysisRun(managerActor, orgId, 'derived-parameters', {
+      recording_ids: [recordingId],
+      pipeline_ids: ['pdr-particle-filter'],
+      parameters_by_pipeline: {},
+    })
+
+    expect(result).toMatchObject({ ok: true, value: { status: 'accepted', item_count: 1 } })
+    expect(mocks.insertItems).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          parameters: { origin_x: 120, origin_y: 240, initial_direction: 90, floor_scale: 0.05 },
+        }),
+      ],
+      expect.anything()
+    )
   })
 
   it('Nozomiが拒否する未知パラメータとinteger以外の値を受付時に拒否する', async () => {
