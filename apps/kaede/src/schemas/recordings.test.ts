@@ -29,6 +29,21 @@ describe('recording schemas', () => {
     expect(result.success).toBe(true)
   })
 
+  it('recordingDetailResponseSchema は旧形式の単一 upload_target を受け入れる', () => {
+    const result = recordingDetailResponseSchema.safeParse({
+      recording_id: '11111111-1111-4111-8111-111111111111',
+      pedestrian_id: '22222222-2222-4222-8222-222222222222',
+      floor_id: '33333333-3333-4333-8333-333333333333',
+      organization_id: '44444444-4444-4444-8444-444444444444',
+      upload_status: 'ready',
+      upload_targets: ['metadata'],
+      created_at: '2026-07-31T00:00:00.000Z',
+      updated_at: '2026-07-31T00:00:00.000Z',
+    })
+
+    expect(result.success).toBe(true)
+  })
+
   it('initRecordingRequestSchema は正しい recording 作成リクエストを受け入れる', () => {
     const result = initRecordingRequestSchema.safeParse({
       pedestrian_id: '11111111-1111-4111-8111-111111111111',
