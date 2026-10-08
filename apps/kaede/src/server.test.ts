@@ -185,12 +185,14 @@ describe('createApp auth wiring', { timeout: 60_000 }, () => {
       headers: {
         origin: 'https://mio.example.test',
         'access-control-request-method': 'GET',
+        'access-control-request-headers': 'idempotency-key',
       },
     })
 
     expect(response.status).toBe(204)
     expect(response.headers.get('access-control-allow-origin')).toBe('https://mio.example.test')
     expect(response.headers.get('access-control-allow-credentials')).toBe('true')
+    expect(response.headers.get('access-control-allow-headers')).toContain('idempotency-key')
   })
 
   it('health check は shared token なしで通す', async () => {
