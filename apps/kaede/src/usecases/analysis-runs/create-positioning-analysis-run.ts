@@ -182,6 +182,13 @@ export const createPositioningAnalysisRun = async (
     }
     if (!resolved.ok) return { ok: false, error: { type: resolved.error.type, status: 409 } }
     const explicitParameters = body.parameters_by_pipeline[pipelineId] ?? {}
+    const parameterProperties =
+      resolved.value.pipeline.definition.parameters_schema.properties &&
+      typeof resolved.value.pipeline.definition.parameters_schema.properties === 'object'
+        ? resolved.value.pipeline.definition.parameters_schema.properties
+        : {}
+    const acceptsParameter = (name: string) =>
+      Object.prototype.hasOwnProperty.call(parameterProperties, name)
     const recordingsWithParameters = resolved.value.recordings.map((resolvedRecording) => {
       const recording = recordings.find(
         (candidate) => candidate.id === resolvedRecording.recording_id
@@ -192,11 +199,12 @@ export const createPositioningAnalysisRun = async (
         : undefined
       const derivedParameters: Record<string, unknown> = {}
       if (start) {
-        derivedParameters.origin_x = start.x
-        derivedParameters.origin_y = start.y
-        if (start.direction !== undefined) derivedParameters.initial_direction = start.direction
+        if (acceptsParameter('origin_x')) derivedParameters.origin_x = start.x
+        if (acceptsParameter('origin_y')) derivedParameters.origin_y = start.y
+        if (start.direction !== undefined && acceptsParameter('initial_direction'))
+          derivedParameters.initial_direction = start.direction
       }
-      if (floor?.scale !== null && floor?.scale !== undefined) {
+      if (floor?.scale !== null && floor?.scale !== undefined && acceptsParameter('floor_scale')) {
         derivedParameters.floor_scale = floor.scale
       }
       return {
