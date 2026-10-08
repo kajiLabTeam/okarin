@@ -47,6 +47,17 @@ describe('data asset recording input', () => {
   it('loads the shared catalog and rejects unknown definitions', async () => {
     await expect(loadDataTypeDefinition('acce', '1', 'csv')).resolves.toMatchObject({
       data_type: 'acce',
+      schema_version: '1',
+      required_columns: ['timestamp_ns', 'wall_time_ms', 'x', 'y', 'z'],
+    })
+    await expect(loadDataTypeDefinition('acce', 'v1', 'csv')).resolves.toMatchObject({
+      data_type: 'acce',
+      schema_version: '1',
+      required_columns: ['timestamp_ns', 'wall_time_ms', 'x', 'y', 'z'],
+    })
+    await expect(loadDataTypeDefinition('gyro', '1', 'csv')).resolves.toMatchObject({
+      data_type: 'gyro',
+      schema_version: '1',
       required_columns: ['timestamp_ns', 'wall_time_ms', 'x', 'y', 'z'],
     })
     await expect(loadDataTypeDefinition('unknown', '1', 'csv')).resolves.toBeUndefined()
