@@ -31,6 +31,7 @@ import {
   findBuildingDetailById,
   listBuildingSummariesForOrganization,
 } from '../../services/buildings/index.js'
+import { listRecordingDataAssets } from '../../services/data-assets/index.js'
 import { db } from '../../services/db/index.js'
 import type { DbExecutor } from '../../services/executor.js'
 import { listFloors as listFloorRows } from '../../services/floors/index.js'
@@ -480,11 +481,16 @@ export const listOrganizationRecordingsForSession = async (
     executor
   )
   const page = buildPaginatedResult(pageRows.rows, query.limit, pageRows.totalCount)
+  const recordings = await Promise.all(
+    page.items.map(async (recording) =>
+      toRecordingDetailResponse(recording, await listRecordingDataAssets(recording.id, executor))
+    )
+  )
 
   return {
     ok: true,
     value: {
-      recordings: page.items.map((recording) => toRecordingDetailResponse(recording)),
+      recordings,
       pagination: {
         next_cursor: page.nextCursor,
         total_count: page.totalCount,
