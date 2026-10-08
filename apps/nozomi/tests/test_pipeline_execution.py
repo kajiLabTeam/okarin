@@ -4,8 +4,8 @@ import asyncio
 import json
 import math
 from pathlib import Path
-from typing import Any
 from types import SimpleNamespace
+from typing import Any
 
 import matplotlib.image as mpimg
 import numpy as np

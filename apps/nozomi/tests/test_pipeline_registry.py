@@ -28,7 +28,11 @@ def test_catalog_lists_four_initial_pipelines() -> None:
 
 
 def test_pdr_accepts_optional_floor_coordinate_parameters() -> None:
-    pdr = next(definition for definition in initial_catalog() if definition.pipeline_id == "pdr")
+    pdr = next(
+        definition
+        for definition in initial_catalog()
+        if definition.pipeline_id == "pdr"
+    )
     schema = pdr.parameters_schema
 
     assert all(
