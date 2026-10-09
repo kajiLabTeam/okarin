@@ -14,6 +14,24 @@ pnpm install
 pnpm run dev
 ```
 
+## Legacy recordings の data-assets 移行
+
+旧 `recordings.raw/<organization_id>/<recording_id>/` オブジェクトを、既存の raw オブジェクトを変更せずに `data_assets` と関連テーブルへ登録する one-shot 移行です。`acce` と `gyro` の CSV のみが対象で、欠損・不正なオブジェクトと catalog 非対応 target は JSON の `missing_items` / `items` に一覧化されます。
+
+まず dry-run で確認します（既定値も dry-run です）。dry-run は DB/S3 の読み取りだけを行い、移行行・完了マーカーを書き込みません。
+
+```txt
+pnpm migrate:legacy-recordings --dry-run
+```
+
+内容を確認して実行する場合だけ `--execute` を明示します。
+
+```txt
+pnpm migrate:legacy-recordings --execute
+```
+
+実行は recording/data type ごとのトランザクションで行われます。既に `recording_data_assets` の関連がある項目は `already_migrated` となり、再実行しても追加 asset は作成されません。全項目が成功または既移行になった場合だけ `application_data_migrations` に完了マーカーが記録されます。失敗・欠損がある場合は exit code 1 なので、JSON の `missing_items` を確認して問題解消後に再実行してください。
+
 Sentry を使う場合は `SENTRY_DSN` を設定してください。必要に応じて `SENTRY_TRACES_SAMPLE_RATE` と `SENTRY_SEND_DEFAULT_PII` も使えます。
 
 ## Database
