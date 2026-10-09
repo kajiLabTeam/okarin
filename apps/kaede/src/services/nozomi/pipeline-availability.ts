@@ -1,27 +1,20 @@
-import { createHash } from 'node:crypto'
 import type { UploadTarget } from '../../schemas/common.js'
 import type { AssetContract, Pipeline } from '../../schemas/pipelines.js'
-import { beaconLayout, listBeacons } from '../beacons/index.js'
 import { listRecordingDataAssets } from '../data-assets/index.js'
-import { findFloorDetailById } from '../floors/index.js'
 import { findRecordingById } from '../recordings/index.js'
-import {
-  buildRecordingRawObjectKey,
-  getFloorMapObjectBytes,
-  putBeaconLayoutObject,
-} from '../storage/index.js'
+import { buildRecordingRawObjectKey } from '../storage/index.js'
 import { getCachedPipelineCatalog } from './pipeline-catalog-cache.js'
 import { resolveActivePipeline } from './pipeline-client.js'
+import { resolveFloorResources } from './pipeline-resource-resolver.js'
+import type { PipelineResourceAsset } from './pipeline-resource-resolver.js'
 
-interface Asset {
+interface Asset extends PipelineResourceAsset {
   data_asset_id: string
   data_type: string
   schema_version: string
   format: string
   validation_status: string
   data_asset_object_id?: string
-  object_key?: string
-  checksum_sha256?: string | null
 }
 interface Issue {
   slot_id: string
@@ -35,7 +28,7 @@ type ExecutionResolutionError =
       recordings: { recording_id: string; issues: Issue[] }[]
     }
 
-/** #192の正式なfloor/beacon resource解決に差し替えるための境界。 */
+/** Combine typed assets, legacy sensor fallbacks, and floor-scoped resources. */
 export interface PipelineResourceProvider {
   listAssets(recordingId: string): Promise<Asset[]>
 }
@@ -67,43 +60,7 @@ export const recordingAssetProvider: PipelineResourceProvider = {
         object_key: buildRecordingRawObjectKey(recording.organization_id, recording.id, target),
       }))
 
-    const floor = await findFloorDetailById(recording.floor_id, {
-      organizationIds: [recording.organization_id],
-    })
-    if (!floor) return [...assets, ...legacyAssets]
-    const [mapBytes, beacons] = await Promise.all([
-      floor.image_object_path.toLowerCase().endsWith('.png')
-        ? getFloorMapObjectBytes(floor.image_object_path)
-        : Promise.resolve(undefined),
-      listBeacons(floor.floor_id),
-    ])
-    const resources: Asset[] = []
-    if (mapBytes && mapBytes.byteLength > 0) {
-      resources.push({
-        data_asset_id: floor.floor_id,
-        data_type: 'resource.floor_map',
-        schema_version: '1',
-        format: 'png',
-        validation_status: 'valid',
-        object_key: floor.image_object_path,
-        checksum_sha256: createHash('sha256').update(mapBytes).digest('hex'),
-      })
-    }
-    if (beacons.length > 0) {
-      const layoutBytes = new TextEncoder().encode(beaconLayout(beacons))
-      const configurationDigest = createHash('sha256').update(layoutBytes).digest('hex')
-      const objectKey = `organizations/${floor.organization_id}/floors/${floor.floor_id}/beacon-layout/${configurationDigest}.json`
-      await putBeaconLayoutObject(objectKey, layoutBytes)
-      resources.push({
-        data_asset_id: `${floor.floor_id}:beacon-layout:${configurationDigest}`,
-        data_type: 'resource.beacon_layout',
-        schema_version: '1',
-        format: 'json',
-        validation_status: 'valid',
-        object_key: objectKey,
-        checksum_sha256: configurationDigest,
-      })
-    }
+    const resources = await resolveFloorResources(recording)
     return [...assets, ...legacyAssets, ...resources]
   },
 }

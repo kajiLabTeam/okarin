@@ -162,6 +162,136 @@ describe('createPositioningAnalysisRun', () => {
     )
   })
 
+  it('resolverが解決したfloor/beacon resourceを実行manifestへ固定する', async () => {
+    const floorMap = {
+      data_asset_id: 'resource:floor-1:floor-map',
+      data_type: 'resource.floor_map',
+      schema_version: '1',
+      format: 'png',
+      validation_status: 'valid',
+      object_key: 'organizations/org-1/floors/floor-1/map.png',
+      checksum_sha256: 'map-digest',
+    }
+    const beaconLayout = {
+      data_asset_id: 'resource:floor-1:beacon-layout:layout-digest',
+      data_type: 'resource.beacon_layout',
+      schema_version: '1',
+      format: 'json',
+      validation_status: 'valid',
+      object_key: 'organizations/org-1/floors/floor-1/beacon-layout/layout-digest.json',
+      checksum_sha256: 'layout-digest',
+    }
+    mocks.resolvePipeline.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        pipeline: {
+          ...mockPipeline,
+          definition: {
+            ...mockPipeline.definition,
+            pipeline_id: 'pdr-particle-filter',
+            input_slots: [
+              {
+                slot_id: 'acce',
+                required: true,
+                max_assets: 1,
+                accepted_contracts: [
+                  { kind: 'asset', data_type: 'acce', schema_version: '1', format: 'csv' },
+                ],
+              },
+              {
+                slot_id: 'floor_map',
+                required: true,
+                max_assets: 1,
+                accepted_contracts: [
+                  {
+                    kind: 'asset',
+                    data_type: 'resource.floor_map',
+                    schema_version: '1',
+                    format: 'png',
+                  },
+                ],
+              },
+              {
+                slot_id: 'beacon_layout',
+                required: true,
+                max_assets: 1,
+                accepted_contracts: [
+                  {
+                    kind: 'asset',
+                    data_type: 'resource.beacon_layout',
+                    schema_version: '1',
+                    format: 'json',
+                  },
+                ],
+              },
+            ],
+          },
+        },
+        recordings: [
+          {
+            recording_id: recordingId,
+            assets: [
+              {
+                data_asset_id: 'acce-1',
+                data_type: 'acce',
+                schema_version: '1',
+                format: 'csv',
+                validation_status: 'valid',
+                object_key: 'organizations/org-1/recordings/recording-1/acce.csv',
+                checksum_sha256: 'acce-digest',
+              },
+              floorMap,
+              beaconLayout,
+            ],
+            bindings: {
+              acce: 'acce-1',
+              floor_map: floorMap.data_asset_id,
+              beacon_layout: beaconLayout.data_asset_id,
+            },
+            issues: [],
+          },
+        ],
+      },
+    })
+
+    const result = await createPositioningAnalysisRun(managerActor, orgId, 'resource-manifest', {
+      recording_ids: [recordingId],
+      pipeline_ids: ['pdr-particle-filter'],
+      parameters_by_pipeline: {},
+    })
+
+    expect(result).toMatchObject({ ok: true, value: { status: 'accepted', item_count: 1 } })
+    expect(mocks.insertItems).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          slot_bindings: {
+            acce: 'acce-1',
+            floor_map: floorMap.data_asset_id,
+            beacon_layout: beaconLayout.data_asset_id,
+          },
+          input_manifest: {
+            acce: [expect.objectContaining({ object_key: expect.stringContaining('/acce.csv') })],
+            floor_map: [
+              expect.objectContaining({
+                data_asset_id: floorMap.data_asset_id,
+                object_key: floorMap.object_key,
+                checksum_sha256: floorMap.checksum_sha256,
+              }),
+            ],
+            beacon_layout: [
+              expect.objectContaining({
+                data_asset_id: beaconLayout.data_asset_id,
+                object_key: beaconLayout.object_key,
+                checksum_sha256: beaconLayout.checksum_sha256,
+              }),
+            ],
+          },
+        }),
+      ],
+      expect.anything()
+    )
+  })
+
   it.each([
     ['pdr', {}],
     [
