@@ -83,4 +83,26 @@ describe('validateDataAssetObject', () => {
     expect(result.valid).toBe(false)
     expect(sendMock).toHaveBeenCalledTimes(1)
   })
+
+  it('小数秒のtimestampとwall_timeなしのCSVを検証する', async () => {
+    mockObject(
+      'timestamp_s,beacon_id,rssi_dbm\n0.000000010,beacon-1,-50\n0.100000000,beacon-1,-51\n'
+    )
+
+    const result = await validateDataAssetObject('ble.csv', 'text/csv', {
+      format: 'csv',
+      required_columns: ['timestamp_s', 'beacon_id', 'rssi_dbm'],
+      timestamp_column: 'timestamp_s',
+      column_types: {
+        timestamp_s: 'number',
+        beacon_id: 'string',
+        rssi_dbm: 'integer',
+      },
+    })
+
+    expect(result.valid).toBe(true)
+    expect(result.sampleCount).toBe(2)
+    expect(result.startedAt).toBeNull()
+    expect(result.endedAt).toBeNull()
+  })
 })

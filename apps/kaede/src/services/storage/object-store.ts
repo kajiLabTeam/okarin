@@ -283,19 +283,22 @@ export const validateDataAssetObject = async (
         if (type === 'number' && !Number.isFinite(Number(value))) invalid = true
       }
       if (definition.timestamp_column) {
-        const timestamp = Number(values[indexes.get(definition.timestamp_column) ?? -1])
-        if (
-          !Number.isSafeInteger(timestamp) ||
-          (previousTimestamp !== undefined && timestamp <= previousTimestamp)
-        )
+        const timestampColumn = definition.timestamp_column
+        const timestamp = Number(values[indexes.get(timestampColumn) ?? -1])
+        const timestampType = definition.column_types[timestampColumn]
+        const timestampValid =
+          timestampType === 'integer' ? Number.isSafeInteger(timestamp) : Number.isFinite(timestamp)
+        if (!timestampValid || (previousTimestamp !== undefined && timestamp <= previousTimestamp))
           invalid = true
         previousTimestamp = timestamp
-        const wallTime = Number(values[indexes.get(definition.wall_time_column ?? '') ?? -1])
-        if (!Number.isSafeInteger(wallTime) || wallTime <= 0) invalid = true
-        const date = new Date(wallTime)
-        if (Number.isNaN(date.getTime())) invalid = true
-        startedAt ??= date
-        endedAt = date
+        if (definition.wall_time_column) {
+          const wallTime = Number(values[indexes.get(definition.wall_time_column) ?? -1])
+          if (!Number.isSafeInteger(wallTime) || wallTime <= 0) invalid = true
+          const date = new Date(wallTime)
+          if (Number.isNaN(date.getTime())) invalid = true
+          startedAt ??= date
+          endedAt = date
+        }
       }
     }
     const consumeText = (text: string) => {
