@@ -288,7 +288,9 @@ export const validateDataAssetObject = async (
         const timestampType = definition.column_types[timestampColumn]
         const timestampValid =
           timestampType === 'integer' ? Number.isSafeInteger(timestamp) : Number.isFinite(timestamp)
-        if (!timestampValid || (previousTimestamp !== undefined && timestamp <= previousTimestamp))
+        // Multiple BLE observations may share a timestamp (one scan can emit
+        // several beacon rows). Reject only timestamps that move backwards.
+        if (!timestampValid || (previousTimestamp !== undefined && timestamp < previousTimestamp))
           invalid = true
         previousTimestamp = timestamp
         if (definition.wall_time_column) {
