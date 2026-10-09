@@ -25,9 +25,9 @@ export const getPositioningAnalysisRun = async (
         ? 'completed'
         : hasInFlightItems
           ? 'processing'
-        : progress.completed > 0 || progress.failed > 0
-          ? 'partially_completed'
-          : run.status
+          : progress.completed > 0 || progress.failed > 0
+            ? 'partially_completed'
+            : run.status
   ) as 'accepted' | 'processing' | 'completed' | 'partially_completed' | 'failed'
   return {
     ok: true as const,
