@@ -226,6 +226,7 @@ export const validateDataAssetObject = async (
     timestamp_column?: string
     wall_time_column?: string
     column_types: Record<string, 'integer' | 'number' | 'string'>
+    column_aliases?: Record<string, string[]>
   },
   maxBytes = 100 * 1024 * 1024
 ): Promise<DataAssetValidationResult> => {
@@ -264,9 +265,15 @@ export const validateDataAssetObject = async (
     let invalid = false
     const consumeRecord = (values: string[]) => {
       if (!headers) {
-        headers = values.map((header, index) =>
-          index === 0 ? header.replace(/^\uFEFF/, '') : header
-        )
+        headers = values.map((header, index) => {
+          const normalizedHeader = index === 0 ? header.replace(/^\uFEFF/, '') : header
+          if (!definition.column_aliases) return normalizedHeader
+          return (
+            Object.entries(definition.column_aliases).find(([, aliases]) =>
+              aliases.includes(normalizedHeader)
+            )?.[0] ?? normalizedHeader
+          )
+        })
         indexes = new Map(headers.map((header, index) => [header, index]))
         invalid = definition.required_columns.some((column) => !indexes.has(column))
         return
