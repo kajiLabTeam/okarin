@@ -10,6 +10,7 @@ import {
 } from './data-asset-repository.js'
 import type { supportedLegacyDataTypes } from './legacy-recording-migration-helpers.js'
 import {
+  legacyColumnAliases,
   legacySensorTargets,
   unsupportedLegacySensorTargets,
 } from './legacy-recording-migration-helpers.js'
@@ -76,7 +77,10 @@ const migrateItem = async (
   const objectKey = buildRecordingRawObjectKey(recording.organization_id, recording.id, dataType)
   let validation
   try {
-    validation = await validateDataAssetObject(objectKey, definition.content_types[0], definition)
+    validation = await validateDataAssetObject(objectKey, definition.content_types[0], {
+      ...definition,
+      column_aliases: legacyColumnAliases,
+    })
   } catch {
     return {
       recording_id: recording.id,

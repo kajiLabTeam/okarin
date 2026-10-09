@@ -51,6 +51,34 @@ describe('validateDataAssetObject', () => {
     expect(result.endedAt?.getTime()).toBe(1700000001000)
   })
 
+  it('旧センサーCSVの単位付き列名をエイリアスとして検証する', async () => {
+    mockObject(
+      'timestamp_ns,wall_time_ms,x(m/s^2),y(m/s^2),z(m/s^2)\n1,1700000000000,1.5,2.5,3.5\n2,1700000001000,1.6,2.6,3.6\n'
+    )
+
+    const result = await validateDataAssetObject('asset.csv', 'text/csv', {
+      format: 'csv',
+      required_columns: ['timestamp_ns', 'wall_time_ms', 'x', 'y', 'z'],
+      timestamp_column: 'timestamp_ns',
+      wall_time_column: 'wall_time_ms',
+      column_types: {
+        timestamp_ns: 'integer',
+        wall_time_ms: 'integer',
+        x: 'number',
+        y: 'number',
+        z: 'number',
+      },
+      column_aliases: {
+        x: ['x(m/s^2)'],
+        y: ['y(m/s^2)'],
+        z: ['z(m/s^2)'],
+      },
+    })
+
+    expect(result.valid).toBe(true)
+    expect(result.sampleCount).toBe(2)
+  })
+
   it('未閉じ引用符をinvalidとして扱う', async () => {
     mockObject('timestamp_ns,wall_time_ms,x,label\n1,1700000000000,1.5,"unterminated')
 
