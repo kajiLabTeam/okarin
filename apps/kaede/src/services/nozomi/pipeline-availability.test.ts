@@ -147,6 +147,33 @@ const pdrPipeline = (): Pipeline => ({
   },
 })
 
+const particleFilterPipeline = (): Pipeline => ({
+  ...pipeline(),
+  definition: {
+    ...pipeline().definition,
+    input_slots: [
+      {
+        slot_id: 'acce',
+        required: true,
+        max_assets: 1,
+        accepted_contracts: [assetContract('acce')],
+      },
+      {
+        slot_id: 'floor_map',
+        required: true,
+        max_assets: 1,
+        accepted_contracts: [assetContract('resource.floor_map', 'png')],
+      },
+      {
+        slot_id: 'beacon_layout',
+        required: true,
+        max_assets: 1,
+        accepted_contracts: [assetContract('resource.beacon_layout', 'json')],
+      },
+    ],
+  },
+})
+
 const catalogEntry = (available = true) => {
   const snapshot = pipeline(available)
   return {
@@ -198,7 +225,7 @@ describe('pipeline availability', () => {
 
     await expect(recordingAssetProvider.listAssets('recording-1')).resolves.toContainEqual(
       expect.objectContaining({
-        data_asset_id: 'floor-1',
+        data_asset_id: 'resource:floor-1:floor-map',
         data_type: 'resource.floor_map',
         schema_version: '1',
         format: 'png',
@@ -259,6 +286,95 @@ describe('pipeline availability', () => {
       new TextDecoder().decode(putBeaconLayoutMock.mock.calls[0][1] as Uint8Array)
     ) as { beacons: { beacon_id: string }[] }
     expect(layout.beacons.map((beacon) => beacon.beacon_id)).toEqual(['beacon-1', 'beacon-2'])
+  })
+
+  it('floor mapとbeacon layoutを同じrecordingの実行bindingへ渡す', async () => {
+    resolvePipelineMock.mockResolvedValue(particleFilterPipeline())
+    findRecordingMock.mockResolvedValue({
+      id: 'recording-1',
+      upload_targets: [],
+      floor_id: 'floor-1',
+      organization_id: 'org-1',
+    })
+    listRecordingAssetsMock.mockResolvedValue([asset('acce-1', 'acce')])
+    findFloorMock.mockResolvedValue({
+      floor_id: 'floor-1',
+      organization_id: 'org-1',
+      image_object_path: 'organizations/org-1/floors/floor-1/map.png',
+    })
+    getFloorMapBytesMock.mockResolvedValue(new Uint8Array([1, 2, 3]))
+    listBeaconsMock.mockResolvedValue([
+      { id: 'beacon-1', pixel_x: 100, pixel_y: 50, enabled: true, deleted_at: null },
+    ])
+
+    await expect(
+      resolvePipelineForExecution('pdr-particle-filter', ['recording-1'])
+    ).resolves.toMatchObject({
+      ok: true,
+      value: {
+        recordings: [
+          {
+            bindings: {
+              acce: 'acce-1',
+              floor_map: 'resource:floor-1:floor-map',
+              beacon_layout: expect.stringMatching(/^resource:floor-1:beacon-layout:[a-f0-9]{64}$/),
+            },
+            issues: [],
+          },
+        ],
+      },
+    })
+  })
+
+  it('resourceが不足したavailabilityにslot単位の失敗理由を返す', async () => {
+    getCatalogMock.mockResolvedValue([catalogEntry()])
+    findRecordingMock.mockResolvedValue({
+      id: 'recording-1',
+      upload_targets: [],
+      floor_id: 'floor-1',
+      organization_id: 'org-1',
+    })
+    listRecordingAssetsMock.mockResolvedValue([asset('acce-1', 'acce')])
+    findFloorMock.mockResolvedValue({
+      floor_id: 'floor-1',
+      organization_id: 'org-1',
+      image_object_path: 'organizations/org-1/floors/floor-1/map.png',
+    })
+    getFloorMapBytesMock.mockResolvedValue(undefined)
+
+    const result = await listPipelineAvailability(['recording-1'])
+
+    expect(result.pipelines[0]).toMatchObject({
+      available: false,
+      unavailable_reasons: [
+        { recording_id: 'recording-1', slot_id: 'floor_map', code: 'RESOURCE_NOT_AVAILABLE' },
+      ],
+      recordings: [
+        {
+          recording_id: 'recording-1',
+          available: false,
+          bindings: { acce: 'acce-1' },
+          issues: [{ slot_id: 'floor_map', code: 'RESOURCE_NOT_AVAILABLE' }],
+        },
+      ],
+    })
+  })
+
+  it('floorが存在しない場合もsensor assetの解決を妨げない', async () => {
+    findRecordingMock.mockResolvedValue({
+      id: 'recording-1',
+      upload_targets: [],
+      floor_id: 'missing-floor',
+      organization_id: 'org-1',
+    })
+    listRecordingAssetsMock.mockResolvedValue([asset('acce-1', 'acce')])
+    findFloorMock.mockResolvedValue(undefined)
+
+    await expect(recordingAssetProvider.listAssets('recording-1')).resolves.toEqual([
+      asset('acce-1', 'acce'),
+    ])
+    expect(getFloorMapBytesMock).not.toHaveBeenCalled()
+    expect(listBeaconsMock).not.toHaveBeenCalled()
   })
 
   it.each([
@@ -409,7 +525,18 @@ describe('pipeline availability', () => {
       resolvePipelineForExecution('pdr-particle-filter', ['first'], provider({ first: [] }))
     ).resolves.toMatchObject({
       ok: false,
-      error: { type: 'PIPELINE_INPUT_UNAVAILABLE' },
+      error: {
+        type: 'PIPELINE_INPUT_UNAVAILABLE',
+        recordings: [
+          {
+            recording_id: 'first',
+            issues: [
+              { slot_id: 'acce', code: 'MISSING_INPUT' },
+              { slot_id: 'floor_map', code: 'RESOURCE_NOT_AVAILABLE' },
+            ],
+          },
+        ],
+      },
     })
     expect(resolvePipelineMock).toHaveBeenCalledWith('pdr-particle-filter')
     expect(getCatalogMock).not.toHaveBeenCalled()
