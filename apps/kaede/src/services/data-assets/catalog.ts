@@ -59,6 +59,36 @@ const builtInCatalogDefinitions: Record<string, DataTypeDefinition> = {
       z: 'number',
     },
   },
+  'ble:1:csv': {
+    data_type: 'ble',
+    schema_version: '1',
+    format: 'csv',
+    content_types: ['text/csv'],
+    required_columns: [
+      'event_seq',
+      'timestamp_ns',
+      'wall_time_ms',
+      'beacon_id',
+      'ibeacon_uuid',
+      'major',
+      'minor',
+      'rssi_dbm',
+      'raw_data_hex',
+    ],
+    timestamp_column: 'timestamp_ns',
+    wall_time_column: 'wall_time_ms',
+    column_types: {
+      event_seq: 'integer',
+      timestamp_ns: 'integer',
+      wall_time_ms: 'integer',
+      beacon_id: 'string',
+      ibeacon_uuid: 'string',
+      major: 'integer',
+      minor: 'integer',
+      rssi_dbm: 'integer',
+      raw_data_hex: 'string',
+    },
+  },
 }
 
 const catalogRoots = [

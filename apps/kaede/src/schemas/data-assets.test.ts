@@ -60,6 +60,21 @@ describe('data asset recording input', () => {
       schema_version: '1',
       required_columns: ['timestamp_ns', 'wall_time_ms', 'x', 'y', 'z'],
     })
+    await expect(loadDataTypeDefinition('ble', '1', 'csv')).resolves.toMatchObject({
+      data_type: 'ble',
+      schema_version: '1',
+      required_columns: [
+        'event_seq',
+        'timestamp_ns',
+        'wall_time_ms',
+        'beacon_id',
+        'ibeacon_uuid',
+        'major',
+        'minor',
+        'rssi_dbm',
+        'raw_data_hex',
+      ],
+    })
     await expect(loadDataTypeDefinition('unknown', '1', 'csv')).resolves.toBeUndefined()
     await expect(loadDataTypeDefinition('acce', '2', 'csv')).resolves.toBeUndefined()
     await expect(loadDataTypeDefinition('acce', '1', 'json')).resolves.toBeUndefined()
