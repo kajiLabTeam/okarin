@@ -435,7 +435,7 @@ describe('Analysis Run Pipeline E2E Integration', () => {
       }
       items: { id: string; recording_id: string; pipeline_id: string; status: string }[]
     }
-    expect(runInitialJson.status).toBe('accepted')
+    expect(runInitialJson.status).toBe('processing')
     expect(runInitialJson.progress.total).toBe(4)
     expect(runInitialJson.progress.queued).toBe(4)
     expect(runInitialJson.items).toHaveLength(4)

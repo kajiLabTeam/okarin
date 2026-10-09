@@ -6,6 +6,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "migrate:legacy-recordings": "tsx src/cli/migrate-legacy-recordings-to-data-assets.ts",
     "test": "vitest run",
     "test:db": "vitest run --config vitest.db.config.ts",
     "test:s3": "vitest run --config vitest.s3.config.ts",
