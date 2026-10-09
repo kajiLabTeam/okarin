@@ -1,6 +1,5 @@
 import { pathToFileURL } from 'node:url'
-import { migrateLegacyRecordingsToDataAssets } from '../services/data-assets/legacy-recording-migration.js'
-import { db } from '../services/db/index.js'
+import type { db as databaseInstance } from '../services/db/index.js'
 import { parseMigrateLegacyRecordingsCliArgs } from './migrate-legacy-recordings-to-data-assets-options.js'
 
 const showUsage = (stdout: Pick<NodeJS.WriteStream, 'write'>) => {
@@ -32,7 +31,13 @@ export const runMigrateLegacyRecordingsCli = async (
     return 0
   }
 
+  let database: typeof databaseInstance | undefined
   try {
+    const [{ migrateLegacyRecordingsToDataAssets }, { db }] = await Promise.all([
+      import('../services/data-assets/legacy-recording-migration.js'),
+      import('../services/db/index.js'),
+    ])
+    database = db
     const report = await migrateLegacyRecordingsToDataAssets({ dryRun: options.dryRun })
     stdout.write(JSON.stringify(report, null, 2) + '\n')
     return report.completed ? 0 : 1
@@ -40,7 +45,7 @@ export const runMigrateLegacyRecordingsCli = async (
     stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
     return 1
   } finally {
-    await db.destroy()
+    await database?.destroy()
   }
 }
 
