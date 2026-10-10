@@ -210,6 +210,7 @@ export const validateMetadataObject = async (organizationId: string, recordingId
 
 export interface DataAssetValidationResult {
   valid: boolean
+  code?: string
   byteSize: number
   checksumSha256: string | null
   sampleCount?: number | null
@@ -360,7 +361,9 @@ export const validateDataAssetObject = async (
     }
     const checksumSha256 = hash.digest('hex')
     if (invalid) return { valid: false, byteSize: totalBytes, checksumSha256 }
-    if (sampleCount === 0) return { valid: false, byteSize: totalBytes, checksumSha256 }
+    if (sampleCount === 0) {
+      return { valid: false, code: 'NO_SAMPLES', byteSize: totalBytes, checksumSha256 }
+    }
     return { valid: true, byteSize: totalBytes, checksumSha256, sampleCount, startedAt, endedAt }
   } catch {
     return { valid: false, byteSize: 0, checksumSha256: null }
