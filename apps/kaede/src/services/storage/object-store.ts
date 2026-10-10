@@ -210,6 +210,7 @@ export const validateMetadataObject = async (organizationId: string, recordingId
 
 export interface DataAssetValidationResult {
   valid: boolean
+  code?: string
   byteSize: number
   checksumSha256: string | null
   sampleCount?: number | null
@@ -290,19 +291,24 @@ export const validateDataAssetObject = async (
         if (type === 'number' && !Number.isFinite(Number(value))) invalid = true
       }
       if (definition.timestamp_column) {
-        const timestamp = Number(values[indexes.get(definition.timestamp_column) ?? -1])
-        if (
-          !Number.isSafeInteger(timestamp) ||
-          (previousTimestamp !== undefined && timestamp <= previousTimestamp)
-        )
+        const timestampColumn = definition.timestamp_column
+        const timestamp = Number(values[indexes.get(timestampColumn) ?? -1])
+        const timestampType = definition.column_types[timestampColumn]
+        const timestampValid =
+          timestampType === 'integer' ? Number.isSafeInteger(timestamp) : Number.isFinite(timestamp)
+        // Multiple BLE observations may share a timestamp (one scan can emit
+        // several beacon rows). Reject only timestamps that move backwards.
+        if (!timestampValid || (previousTimestamp !== undefined && timestamp < previousTimestamp))
           invalid = true
         previousTimestamp = timestamp
-        const wallTime = Number(values[indexes.get(definition.wall_time_column ?? '') ?? -1])
-        if (!Number.isSafeInteger(wallTime) || wallTime <= 0) invalid = true
-        const date = new Date(wallTime)
-        if (Number.isNaN(date.getTime())) invalid = true
-        startedAt ??= date
-        endedAt = date
+        if (definition.wall_time_column) {
+          const wallTime = Number(values[indexes.get(definition.wall_time_column) ?? -1])
+          if (!Number.isSafeInteger(wallTime) || wallTime <= 0) invalid = true
+          const date = new Date(wallTime)
+          if (Number.isNaN(date.getTime())) invalid = true
+          startedAt ??= date
+          endedAt = date
+        }
       }
     }
     const consumeText = (text: string) => {
@@ -362,7 +368,9 @@ export const validateDataAssetObject = async (
     }
     const checksumSha256 = hash.digest('hex')
     if (invalid) return { valid: false, byteSize: totalBytes, checksumSha256 }
-    if (sampleCount === 0) return { valid: false, byteSize: totalBytes, checksumSha256 }
+    if (sampleCount === 0) {
+      return { valid: false, code: 'NO_SAMPLES', byteSize: totalBytes, checksumSha256 }
+    }
     return { valid: true, byteSize: totalBytes, checksumSha256, sampleCount, startedAt, endedAt }
   } catch {
     return { valid: false, byteSize: 0, checksumSha256: null }

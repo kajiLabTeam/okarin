@@ -209,7 +209,14 @@ export const completeUpload = async (
       )
       assetValidations.push({ asset, validation })
     }
-    const hasInvalidAsset = assetValidations.some(({ validation }) => !validation.valid)
+    const hasInvalidAsset = assetValidations.some(({ asset, validation }) => {
+      if (validation.valid) return false
+      return !(
+        asset.data_type === 'ble' &&
+        'code' in validation &&
+        validation.code === 'NO_SAMPLES'
+      )
+    })
     const finalized = await db.transaction().execute(async (trx) => {
       const latest = await findRecordingByIdForUpdate(recording.id, trx)
       if (latest?.upload_status !== 'accepted') return { recording: latest, updated: false }
