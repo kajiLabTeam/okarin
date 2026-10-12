@@ -22,6 +22,20 @@ describe('beacon schemas', () => {
     ).toMatchObject({ uuid: 'FDA50693-A4E2-4FB1-AFCF-C6EB07647825', major: 1, minor: 2 })
   })
 
+  it('RFCのversion/variantがない128bit iBeacon UUIDも受け付ける', () => {
+    expect(
+      createBeaconRequestSchema.safeParse({
+        name: 'legacy-beacon',
+        format_type: 'ibeacon',
+        uuid: 'B5E5BCF7-38E4-BDC7-D59F-48FA72935D78',
+        major: 1,
+        minor: 2,
+        pixel_x: 10,
+        pixel_y: 20,
+      }).success
+    ).toBe(true)
+  })
+
   it('POST payloadのformat_config入力は受け付けない', () => {
     expect(
       createBeaconRequestSchema.safeParse({

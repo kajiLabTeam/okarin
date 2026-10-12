@@ -1,9 +1,18 @@
 import { z } from '@hono/zod-openapi'
 import { isoDatetimeSchema, uuidSchema } from './common.js'
 
+// iBeaconのUUIDは任意の128bit識別子であり、データベース用UUIDのように
+// RFCで定義されたバージョンやvariantを含む必要はない。
+export const ibeaconUuidSchema = z
+  .string()
+  .regex(
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
+    'iBeacon UUID must be a 128-bit hexadecimal identifier'
+  )
+
 export const ibeaconConfigSchema = z
   .object({
-    uuid: uuidSchema,
+    uuid: ibeaconUuidSchema,
     major: z.number().int().min(0).max(65535),
     minor: z.number().int().min(0).max(65535),
   })
@@ -32,7 +41,7 @@ export const beaconSchema = z
 export const createBeaconRequestSchema = z
   .object({
     format_type: beaconFormatTypeSchema.default('ibeacon'),
-    uuid: uuidSchema,
+    uuid: ibeaconUuidSchema,
     major: z.number().int().min(0).max(65535),
     minor: z.number().int().min(0).max(65535),
     name: z.string().trim().min(1).max(200),
@@ -47,7 +56,7 @@ export const createBeaconRequestSchema = z
 export const updateBeaconRequestSchema = z
   .object({
     format_type: beaconFormatTypeSchema.optional(),
-    uuid: uuidSchema.optional(),
+    uuid: ibeaconUuidSchema.optional(),
     major: z.number().int().min(0).max(65535).optional(),
     minor: z.number().int().min(0).max(65535).optional(),
     name: z.string().trim().min(1).max(200).optional(),
