@@ -187,6 +187,45 @@ describe('completeUpload', () => {
     )
   })
 
+  it('BLEが空でもBLEだけをinvalidとしてRecordingをreadyにする', async () => {
+    const recordingId = '11111111-1111-4111-8111-111111111111'
+    const assets = [createAsset('acce'), createAsset('ble')]
+    const accepted = { id: recordingId, upload_status: 'accepted', upload_targets: ['metadata'] }
+    const ready = { ...accepted, upload_status: 'ready' }
+    findRecordingByIdMock.mockResolvedValueOnce(accepted).mockResolvedValueOnce(ready)
+    findRecordingByIdForUpdateMock.mockResolvedValue(accepted)
+    listRecordingDataAssetsMock.mockResolvedValue(assets)
+    loadDataTypeDefinitionMock.mockResolvedValue({ format: 'csv' })
+    validateDataAssetObjectMock
+      .mockResolvedValueOnce({ valid: true, byteSize: 12, checksumSha256: 'ok' })
+      .mockResolvedValueOnce({
+        valid: false,
+        code: 'NO_SAMPLES',
+        byteSize: 12,
+        checksumSha256: 'empty',
+      })
+    mockRecordingAuthorization(recordingId)
+    listRecordingRawObjectKeysMock.mockResolvedValue([
+      `organizations/${organizationId}/recordings/${recordingId}/raw/metadata.json`,
+    ])
+
+    await expect(completeUpload(serviceClientActor, { recordingId })).resolves.toEqual({
+      ok: true,
+      value: { recording_id: recordingId, upload_status: 'ready' },
+    })
+
+    expect(markDataAssetInvalidMock).toHaveBeenCalledWith(
+      'ble-asset',
+      { code: 'NO_SAMPLES' },
+      expect.anything()
+    )
+    expect(updateRecordingMock).toHaveBeenCalledWith(
+      recordingId,
+      { upload_status: 'ready', upload_failure: null },
+      expect.anything()
+    )
+  })
+
   it('transaction取得時にaccepted以外へ変化していれば更新せずfinalizedを返す', async () => {
     const recordingId = '11111111-1111-4111-8111-111111111111'
     const assets = [createAsset('acce')]
