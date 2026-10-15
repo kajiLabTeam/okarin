@@ -4,10 +4,12 @@ import json
 import math
 import struct
 import tempfile
+from dataclasses import asdict, is_dataclass
 from io import BytesIO
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
+import numpy as np
 import pandas as pd
 from rikka.ble.pipeline import run_ble_ranging_input
 from rikka.common.lib.models import FloorMap, Landmark, TrajectoryResult
@@ -20,6 +22,7 @@ from rikka.common.settings import (
 )
 from rikka.particle.pipeline import run_particle
 from rikka.pdr.pipeline import run_pdr
+from rikka.plot.lib.animation import save_particle_animation
 
 from src.registry.catalog import initial_catalog
 from src.schemas.pipeline import ComponentContract
@@ -191,6 +194,20 @@ def _trajectory_payload(
     }
 
 
+def _jsonable(value: Any) -> Any:
+    if is_dataclass(value):
+        return _jsonable(asdict(value))  # type: ignore[arg-type]
+    if hasattr(value, "_asdict"):
+        return _jsonable(value._asdict())
+    if isinstance(value, dict):
+        return {str(key): _jsonable(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(item) for item in value]
+    if hasattr(value, "item"):
+        return value.item()
+    return value
+
+
 class RikkaComponentExecutor:
     """Adapter from Nozomi's component contract to Rikka's public pipelines."""
 
@@ -310,8 +327,77 @@ class RikkaComponentExecutor:
                     landmark_settings=(landmark_settings if uses_ble else None),
                 )
 
-        return {
-            "trajectory": _trajectory_payload(
-                result, component.component_id, parameters
+        trajectory = _trajectory_payload(result, component.component_id, parameters)
+        artifact_targets = parameters.get("_output_artifacts", {})
+        payloads: dict[str, dict[str, bytes]] = {}
+        if (
+            uses_ble
+            and result.landmark is not None
+            and "diagnostics" in artifact_targets
+        ):
+            diagnostics = {
+                "schema_version": "1",
+                "kind": "positioning_diagnostics",
+                "landmark_corrections": _jsonable(result.landmark.corrections),
+                "landmark": _jsonable(result.landmark),
+                "particle": (
+                    None
+                    if result.particle is None
+                    else {"steps": _jsonable(result.particle.diagnostics)}
+                ),
+            }
+            payloads["diagnostics"] = {
+                "body": json.dumps(diagnostics, ensure_ascii=False).encode()
+            }
+        if (
+            uses_particle
+            and result.particle is not None
+            and "particle_animation" in artifact_targets
+        ):
+            animation_path = temporary / "particle-filter.webm"
+            particle_settings = ParticleSettings(
+                floormap_path=str(floor_path),
+                origin_px=floor_map.origin_px if floor_map is not None else (0, 0),
+                scale=floor_map.scale if floor_map is not None else 1.0,
+                seed=(
+                    None
+                    if parameters.get("particle_seed") is None
+                    else int(parameters["particle_seed"])
+                ),
+                count=int(parameters.get("particle_count", 500)),
             )
-        }
+            generated_result = cast(
+                Path | None,
+                save_particle_animation(
+                    np.asarray(result.particle.all_particles),
+                    result.trajectory,
+                    gx_mean=result.prepared.gx_mean,
+                    gz_mean=result.prepared.gz_mean,
+                    floormap_path=particle_settings.floormap_path,
+                    origin_px=particle_settings.origin_px,
+                    scale=particle_settings.scale,
+                    output_path=animation_path,
+                    landmark=result.landmark,
+                ),
+            )
+            if generated_result is not None:
+                generated_path = Path(generated_result)
+            else:
+                generated_candidates = tuple(temporary.glob("particle-filter.*"))
+                if not generated_candidates:
+                    raise PermanentComponentError(
+                        "particle animation was not generated"
+                    )
+                generated_path = generated_candidates[0]
+            if generated_path.suffix not in {".webm", ".mp4"}:
+                raise PermanentComponentError(
+                    "particle animation WebM/MP4 could not be generated"
+                )
+            payloads[
+                "particle_animation"
+                if generated_path.suffix == ".webm"
+                else "particle_animation_mp4"
+            ] = {"body": generated_path.read_bytes()}
+        if payloads:
+            trajectory["_artifact_payloads"] = payloads
+        return {"trajectory": trajectory}

@@ -434,6 +434,77 @@ export const buildAnalysisRunItemResultObjectKey = (
   return `organizations/${validateObjectKeyUuid(organizationId, 'organizationId')}/analysis-runs/${validateObjectKeyUuid(analysisRunId, 'analysisRunId')}/items/${validateObjectKeyUuid(itemId, 'itemId')}/result.json`
 }
 
+export const buildPositioningAnalysisArtifactObjectKey = (
+  organizationId: string,
+  analysisRunId: string,
+  itemId: string,
+  artifactName: string,
+  format: string
+) => {
+  validateObjectKeyUuid(organizationId, 'organizationId')
+  validateObjectKeyUuid(analysisRunId, 'analysisRunId')
+  validateObjectKeyUuid(itemId, 'itemId')
+  if (!/^[a-z][a-z0-9_-]{0,63}$/.test(artifactName)) throw new Error('artifactName is invalid')
+  if (!/^[a-z0-9][a-z0-9._-]{0,19}$/i.test(format)) throw new Error('format is invalid')
+  return `organizations/${organizationId}/analysis-runs/${analysisRunId}/items/${itemId}/artifacts/${artifactName}.${format}`
+}
+
+export const buildPositioningAnalysisArtifactPrefix = (
+  organizationId: string,
+  analysisRunId: string,
+  itemId: string
+) =>
+  `organizations/${validateObjectKeyUuid(organizationId, 'organizationId')}/analysis-runs/${validateObjectKeyUuid(analysisRunId, 'analysisRunId')}/items/${validateObjectKeyUuid(itemId, 'itemId')}/artifacts/`
+
+export const issueInternalPositioningAnalysisArtifactUploadUrl = async (
+  organizationId: string,
+  analysisRunId: string,
+  itemId: string,
+  artifactName: string,
+  format: string,
+  contentType: string,
+  now: Date = new Date()
+) => {
+  const { config, internalClient } = getS3Context()
+  const objectKey = buildPositioningAnalysisArtifactObjectKey(
+    organizationId,
+    analysisRunId,
+    itemId,
+    artifactName,
+    format
+  )
+  const uploadUrl = await getSignedUrl(
+    internalClient,
+    new PutObjectCommand({ Bucket: config.bucket, Key: objectKey, ContentType: contentType }),
+    { expiresIn: config.trajectoryResultUploadUrlTtlSeconds }
+  )
+  return {
+    expiresAt: new Date(
+      now.getTime() + config.trajectoryResultUploadUrlTtlSeconds * 1000
+    ).toISOString(),
+    objectKey,
+    uploadUrl,
+  }
+}
+
+export const issuePositioningAnalysisArtifactDownloadUrl = async (
+  objectKey: string,
+  now: Date = new Date()
+) => {
+  const { config, presignClient } = getS3Context()
+  const downloadUrl = await getSignedUrl(
+    presignClient,
+    new GetObjectCommand({ Bucket: config.bucket, Key: objectKey }),
+    { expiresIn: config.trajectoryResultDownloadUrlTtlSeconds }
+  )
+  return {
+    downloadUrl,
+    expiresAt: new Date(
+      now.getTime() + config.trajectoryResultDownloadUrlTtlSeconds * 1000
+    ).toISOString(),
+  }
+}
+
 export const issueInternalDataAssetDownloadUrl = async (
   objectKey: string,
   now: Date = new Date()

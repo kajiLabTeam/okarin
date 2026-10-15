@@ -1,5 +1,6 @@
 export {
   findTrajectoryById,
+  findTrajectoryOutputManifestById,
   insertTrajectory,
   listTrajectoriesByOrganizationIdPaginated,
   listTrajectoriesByRecordingIdPaginated,

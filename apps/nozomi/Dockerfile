@@ -37,7 +37,7 @@ LABEL org.opencontainers.image.version=$APP_VERSION \
       org.opencontainers.image.revision=$VCS_REF
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates gosu \
+    && apt-get install -y --no-install-recommends ca-certificates gosu ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --shell /usr/sbin/nologin appuser \
     && mkdir -p /var/lib/nozomi \
