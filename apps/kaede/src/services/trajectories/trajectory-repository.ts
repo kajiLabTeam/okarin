@@ -5,10 +5,10 @@ import type {
   TrajectoryConstraints,
   TrajectoryExecutionMetadata,
 } from '../../schemas/trajectories.js'
+import { parseOutputManifest } from '../analysis-runs/output-manifest.js'
 import type { Trajectories } from '../db/generated.js'
 import { db } from '../db/index.js'
 import type { DB } from '../db/index.js'
-import { parseOutputManifest } from '../analysis-runs/output-manifest.js'
 import { buildPositioningAnalysisArtifactPrefix } from '../storage/presigned-url.js'
 
 type DbExecutor = Kysely<DB> | Transaction<DB>
