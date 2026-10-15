@@ -2,13 +2,15 @@ import type { RequestActor } from '../../middleware/request-actor-context.js'
 import type { PositioningAnalysisCallbackRequest } from '../../schemas/positioning-analysis-callbacks.js'
 import { aggregatePositioningRunStatus } from '../../services/analysis-runs/outbox-worker.js'
 import {
+  outputArtifactsFromCallback,
+} from '../../services/analysis-runs/output-manifest.js'
+import {
   findPositioningCallbackByEventId,
   findPositioningRunItemById,
   insertPositioningCallback,
   mergePositioningRunItemOutputManifest,
   updatePositioningRunItemState,
 } from '../../services/analysis-runs/positioning-analysis-callback-repository.js'
-import { outputArtifactsFromCallback } from '../../services/analysis-runs/output-manifest.js'
 import { db } from '../../services/db/index.js'
 import { findRecordingById } from '../../services/recordings/index.js'
 import { insertTrajectory } from '../../services/trajectories/index.js'

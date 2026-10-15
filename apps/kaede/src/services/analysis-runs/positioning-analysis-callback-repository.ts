@@ -5,8 +5,8 @@ import type { DbExecutor } from '../executor.js'
 import {
   mergeOutputManifest,
   outputManifestJson,
-  type OutputArtifactManifest,
 } from './output-manifest.js'
+import type { OutputArtifactManifest } from './output-manifest.js'
 
 export type PositioningCallbackRecord = Selectable<PositioningAnalysisCallbacks>
 type NewCallbackRecord = Omit<Insertable<PositioningAnalysisCallbacks>, 'id'>
