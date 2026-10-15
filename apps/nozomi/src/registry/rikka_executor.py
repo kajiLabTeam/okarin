@@ -15,6 +15,7 @@ from rikka.ble.pipeline import run_ble_ranging_input
 from rikka.common.lib.models import FloorMap, Landmark, TrajectoryResult
 from rikka.common.lib.trajectory_evaluation import (
     evaluate_trajectory_csv,
+    write_evaluation_failure,
     write_evaluation_outputs,
 )
 from rikka.common.settings import (
@@ -433,7 +434,12 @@ class RikkaComponentExecutor:
                     evaluation = {"status": "completed", "summary": _jsonable(summary)}
                 except Exception as exc:
                     # 評価失敗でも軌跡生成結果は返す。
-                    evaluation = {"status": "failed", "error": str(exc)}
+                    error_message = str(exc)
+                    failure_path = write_evaluation_failure(
+                        evaluation_dir / "outputs", error_message
+                    )
+                    payloads["evaluation_summary"] = {"body": failure_path.read_bytes()}
+                    evaluation = {"status": "failed", "error": error_message}
             trajectory["evaluation"] = evaluation
         if (
             uses_ble
