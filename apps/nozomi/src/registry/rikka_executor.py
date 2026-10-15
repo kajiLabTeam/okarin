@@ -246,6 +246,8 @@ class RikkaComponentExecutor:
         with tempfile.TemporaryDirectory(prefix="nozomi-rikka-") as directory:
             temporary = Path(directory)
             floor_map: FloorMap | None = None
+            particle_animation_body: bytes | None = None
+            particle_animation_key: str | None = None
             if uses_particle or uses_ble:
                 floor_path = temporary / "floor-map.png"
                 floor_path.write_bytes(inputs["floor_map"])
@@ -327,6 +329,57 @@ class RikkaComponentExecutor:
                     landmark_settings=(landmark_settings if uses_ble else None),
                 )
 
+            if (
+                uses_particle
+                and result.particle is not None
+                and "particle_animation" in parameters.get("_output_artifacts", {})
+            ):
+                animation_path = temporary / "particle-filter.webm"
+                particle_settings = ParticleSettings(
+                    floormap_path=str(floor_path),
+                    origin_px=floor_map.origin_px if floor_map is not None else (0, 0),
+                    scale=floor_map.scale if floor_map is not None else 1.0,
+                    seed=(
+                        None
+                        if parameters.get("particle_seed") is None
+                        else int(parameters["particle_seed"])
+                    ),
+                    count=int(parameters.get("particle_count", 500)),
+                )
+                generated_result = cast(
+                    Path | None,
+                    save_particle_animation(
+                        np.asarray(result.particle.all_particles),
+                        result.trajectory,
+                        gx_mean=result.prepared.gx_mean,
+                        gz_mean=result.prepared.gz_mean,
+                        floormap_path=particle_settings.floormap_path,
+                        origin_px=particle_settings.origin_px,
+                        scale=particle_settings.scale,
+                        output_path=animation_path,
+                        landmark=result.landmark,
+                    ),
+                )
+                if generated_result is not None:
+                    generated_path = Path(generated_result)
+                else:
+                    generated_candidates = tuple(temporary.glob("particle-filter.*"))
+                    if not generated_candidates:
+                        raise PermanentComponentError(
+                            "particle animation was not generated"
+                        )
+                    generated_path = generated_candidates[0]
+                if generated_path.suffix not in {".webm", ".mp4"}:
+                    raise PermanentComponentError(
+                        "particle animation WebM/MP4 could not be generated"
+                    )
+                particle_animation_key = (
+                    "particle_animation"
+                    if generated_path.suffix == ".webm"
+                    else "particle_animation_mp4"
+                )
+                particle_animation_body = generated_path.read_bytes()
+
         trajectory = _trajectory_payload(result, component.component_id, parameters)
         artifact_targets = parameters.get("_output_artifacts", {})
         payloads: dict[str, dict[str, bytes]] = {}
@@ -349,55 +402,8 @@ class RikkaComponentExecutor:
             payloads["diagnostics"] = {
                 "body": json.dumps(diagnostics, ensure_ascii=False).encode()
             }
-        if (
-            uses_particle
-            and result.particle is not None
-            and "particle_animation" in artifact_targets
-        ):
-            animation_path = temporary / "particle-filter.webm"
-            particle_settings = ParticleSettings(
-                floormap_path=str(floor_path),
-                origin_px=floor_map.origin_px if floor_map is not None else (0, 0),
-                scale=floor_map.scale if floor_map is not None else 1.0,
-                seed=(
-                    None
-                    if parameters.get("particle_seed") is None
-                    else int(parameters["particle_seed"])
-                ),
-                count=int(parameters.get("particle_count", 500)),
-            )
-            generated_result = cast(
-                Path | None,
-                save_particle_animation(
-                    np.asarray(result.particle.all_particles),
-                    result.trajectory,
-                    gx_mean=result.prepared.gx_mean,
-                    gz_mean=result.prepared.gz_mean,
-                    floormap_path=particle_settings.floormap_path,
-                    origin_px=particle_settings.origin_px,
-                    scale=particle_settings.scale,
-                    output_path=animation_path,
-                    landmark=result.landmark,
-                ),
-            )
-            if generated_result is not None:
-                generated_path = Path(generated_result)
-            else:
-                generated_candidates = tuple(temporary.glob("particle-filter.*"))
-                if not generated_candidates:
-                    raise PermanentComponentError(
-                        "particle animation was not generated"
-                    )
-                generated_path = generated_candidates[0]
-            if generated_path.suffix not in {".webm", ".mp4"}:
-                raise PermanentComponentError(
-                    "particle animation WebM/MP4 could not be generated"
-                )
-            payloads[
-                "particle_animation"
-                if generated_path.suffix == ".webm"
-                else "particle_animation_mp4"
-            ] = {"body": generated_path.read_bytes()}
+        if particle_animation_key is not None and particle_animation_body is not None:
+            payloads[particle_animation_key] = {"body": particle_animation_body}
         if payloads:
             trajectory["_artifact_payloads"] = payloads
         return {"trajectory": trajectory}
