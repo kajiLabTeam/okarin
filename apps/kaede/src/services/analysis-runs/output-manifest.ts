@@ -79,5 +79,4 @@ export const outputArtifactsFromCallback = (
   return artifacts
 }
 
-export const outputManifestJson = (value: OutputManifest) =>
-  JSON.stringify(value) as Json
+export const outputManifestJson = (value: OutputManifest) => JSON.stringify(value) as Json

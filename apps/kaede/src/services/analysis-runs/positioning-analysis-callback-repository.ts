@@ -2,10 +2,7 @@ import type { Insertable, Selectable } from 'kysely'
 import type { Json, PositioningAnalysisCallbacks } from '../db/generated.js'
 import { db } from '../db/index.js'
 import type { DbExecutor } from '../executor.js'
-import {
-  mergeOutputManifest,
-  outputManifestJson,
-} from './output-manifest.js'
+import { mergeOutputManifest, outputManifestJson } from './output-manifest.js'
 import type { OutputArtifactManifest } from './output-manifest.js'
 
 export type PositioningCallbackRecord = Selectable<PositioningAnalysisCallbacks>

@@ -1,9 +1,7 @@
 import type { RequestActor } from '../../middleware/request-actor-context.js'
 import type { PositioningAnalysisCallbackRequest } from '../../schemas/positioning-analysis-callbacks.js'
 import { aggregatePositioningRunStatus } from '../../services/analysis-runs/outbox-worker.js'
-import {
-  outputArtifactsFromCallback,
-} from '../../services/analysis-runs/output-manifest.js'
+import { outputArtifactsFromCallback } from '../../services/analysis-runs/output-manifest.js'
 import {
   findPositioningCallbackByEventId,
   findPositioningRunItemById,
