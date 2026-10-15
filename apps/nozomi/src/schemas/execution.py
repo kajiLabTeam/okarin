@@ -55,6 +55,16 @@ class OutputArtifactUpload(StrictModel):
         return validate_outbound_url(value, UrlPurpose.STORAGE)
 
 
+class GroundTruthInput(StrictModel):
+    uri: str
+    digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+    @field_validator("uri")
+    @classmethod
+    def check_uri(cls, value: str) -> str:
+        return validate_outbound_url(value, UrlPurpose.STORAGE)
+
+
 class ExecutionRequest(StrictModel):
     analysis_run_item_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
     pipeline_id: str = Field(pattern=r"^[a-z][a-z0-9-]*$")
@@ -65,6 +75,7 @@ class ExecutionRequest(StrictModel):
     output_artifacts: dict[str, OutputArtifactUpload] = {}
     callback: CallbackInfo
     parameters: dict[str, Any] = {}
+    ground_truth: GroundTruthInput | None = None
 
     @field_validator("output_uri")
     @classmethod

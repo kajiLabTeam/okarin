@@ -13,6 +13,10 @@ import numpy as np
 import pandas as pd
 from rikka.ble.pipeline import run_ble_ranging_input
 from rikka.common.lib.models import FloorMap, Landmark, TrajectoryResult
+from rikka.common.lib.trajectory_evaluation import (
+    evaluate_trajectory_csv,
+    write_evaluation_outputs,
+)
 from rikka.common.settings import (
     BleLandmarkSettings,
     HeadingSettings,
@@ -208,6 +212,11 @@ def _jsonable(value: Any) -> Any:
     return value
 
 
+def _write_trajectory_csv(trajectory: dict[str, Any], path: Path) -> None:
+    dataframe = pd.DataFrame(trajectory["points"])
+    dataframe.to_csv(path, index=False)
+
+
 class RikkaComponentExecutor:
     """Adapter from Nozomi's component contract to Rikka's public pipelines."""
 
@@ -383,6 +392,49 @@ class RikkaComponentExecutor:
         trajectory = _trajectory_payload(result, component.component_id, parameters)
         artifact_targets = parameters.get("_output_artifacts", {})
         payloads: dict[str, dict[str, bytes]] = {}
+        ground_truth_csv = inputs.get("_ground_truth_csv")
+        if ground_truth_csv is not None:
+            if not isinstance(ground_truth_csv, bytes):
+                raise PermanentComponentError("ground truth input must be bytes")
+            evaluation: dict[str, Any]
+            payloads["ground_truth"] = {"body": ground_truth_csv}
+            with tempfile.TemporaryDirectory(
+                prefix="nozomi-rikka-evaluation-"
+            ) as directory:
+                evaluation_dir = Path(directory)
+                estimated_path = evaluation_dir / "estimated.csv"
+                truth_path = evaluation_dir / "ground-truth.csv"
+                _write_trajectory_csv(trajectory, estimated_path)
+                truth_path.write_bytes(ground_truth_csv)
+                try:
+                    evaluation_dataframe, summary = evaluate_trajectory_csv(
+                        estimated_path,
+                        truth_path,
+                        coordinate_system=(
+                            "pixel"
+                            if trajectory["coordinate_system"] == "pixel"
+                            else "meter"
+                        ),
+                        floor_scale=(
+                            float(parameters["floor_scale"])
+                            if trajectory["coordinate_system"] == "pixel"
+                            else None
+                        ),
+                    )
+                    evaluation_csv, evaluation_json = write_evaluation_outputs(
+                        evaluation_dataframe,
+                        summary,
+                        evaluation_dir / "outputs",
+                    )
+                    payloads["evaluation_csv"] = {"body": evaluation_csv.read_bytes()}
+                    payloads["evaluation_summary"] = {
+                        "body": evaluation_json.read_bytes()
+                    }
+                    evaluation = {"status": "completed", "summary": _jsonable(summary)}
+                except Exception as exc:
+                    # 評価失敗でも軌跡生成結果は返す。
+                    evaluation = {"status": "failed", "error": str(exc)}
+            trajectory["evaluation"] = evaluation
         if (
             uses_ble
             and result.landmark is not None

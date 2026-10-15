@@ -215,6 +215,8 @@ class HttpOutputWriter:
                 "available": True,
             }
         result: dict[str, Any] = {"digest": digest}
+        if "evaluation" in trajectory:
+            result["evaluation"] = trajectory["evaluation"]
         if manifest:
             result["output_manifest"] = {"schema_version": "1", "artifacts": manifest}
         return result
@@ -493,6 +495,11 @@ def request_fingerprint(request: ExecutionRequest) -> str:
             )
         ],
         "parameters": request.parameters,
+        "ground_truth": (
+            None
+            if request.ground_truth is None
+            else request.ground_truth.model_dump(mode="json")
+        ),
     }
     payload = json.dumps(semantic_request, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode()).hexdigest()
@@ -711,6 +718,11 @@ def execute_pipeline(
         )
         for item in request.inputs
     }
+    ground_truth_csv = (
+        input_loader.load(request.ground_truth)
+        if request.ground_truth is not None and input_loader is not None
+        else None
+    )
     by_target = {
         (b.target_component_instance, b.target_slot_id): b for b in request.bindings
     }
@@ -729,6 +741,10 @@ def execute_pipeline(
                         f"missing input for {component.instance_id}.{slot.slot_id}"
                     )
                 component_inputs[slot.slot_id] = values[key]
+
+            if ground_truth_csv is not None:
+                # 通常入力契約を変更せず、正解軌跡を評価専用入力として渡す。
+                component_inputs["_ground_truth_csv"] = ground_truth_csv
 
             outputs = executor.execute(component, component_inputs, request.parameters)
             for slot in component.output_slots:

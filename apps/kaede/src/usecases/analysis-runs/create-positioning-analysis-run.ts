@@ -19,6 +19,8 @@ import {
   findRecordingAuthorizationByIdForOrganization,
   findRecordingByIdForOrganization,
 } from '../../services/recordings/index.js'
+import { putAnalysisGroundTruthCsv } from '../../services/storage/object-store.js'
+import { buildAnalysisGroundTruthObjectKey } from '../../services/storage/presigned-url.js'
 import { requireOrganizationManager, requireRecordingAccess } from '../authorization.js'
 
 interface Failure {
@@ -237,6 +239,19 @@ export const createPositioningAnalysisRun = async (
         },
         transaction
       )
+      const groundTruthObjectKey = body.ground_truth_csv
+        ? await putAnalysisGroundTruthCsv(organizationId, run.id, body.ground_truth_csv)
+        : null
+      const groundTruthManifest = body.ground_truth_csv
+        ? {
+            object_key:
+              groundTruthObjectKey ?? buildAnalysisGroundTruthObjectKey(organizationId, run.id),
+            checksum_sha256: createHash('sha256').update(body.ground_truth_csv).digest('hex'),
+            data_type: 'ground_truth_trajectory',
+            schema_version: '1',
+            format: 'csv',
+          }
+        : undefined
       const items = resolutions.flatMap(({ pipeline, recordings }) =>
         recordings.map(({ recording_id, bindings, assets, parameters }) => ({
           analysis_run_id: run.id,
@@ -248,22 +263,25 @@ export const createPositioningAnalysisRun = async (
           pipeline_digest: pipeline.digest,
           pipeline_version: pipeline.definition.definition_version,
           parameters,
-          input_manifest: Object.fromEntries(
-            Object.entries(bindings).map(([slot_id, assetId]) => [
-              slot_id,
-              assets
-                .filter((asset) => asset.data_asset_id === assetId)
-                .map((asset) => ({
-                  data_asset_id: asset.data_asset_id,
-                  data_asset_object_id: asset.data_asset_object_id,
-                  object_key: asset.object_key,
-                  checksum_sha256: asset.checksum_sha256,
-                  data_type: asset.data_type,
-                  schema_version: asset.schema_version,
-                  format: asset.format,
-                })),
-            ])
-          ),
+          input_manifest: {
+            ...Object.fromEntries(
+              Object.entries(bindings).map(([slot_id, assetId]) => [
+                slot_id,
+                assets
+                  .filter((asset) => asset.data_asset_id === assetId)
+                  .map((asset) => ({
+                    data_asset_id: asset.data_asset_id,
+                    data_asset_object_id: asset.data_asset_object_id,
+                    object_key: asset.object_key,
+                    checksum_sha256: asset.checksum_sha256,
+                    data_type: asset.data_type,
+                    schema_version: asset.schema_version,
+                    format: asset.format,
+                  })),
+              ])
+            ),
+            ...(groundTruthManifest ? { __ground_truth__: groundTruthManifest } : {}),
+          },
           error: null,
         }))
       )

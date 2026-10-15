@@ -8,6 +8,7 @@ import {
 import { createHash } from 'node:crypto'
 import {
   buildAnalysisHeatmapObjectKey,
+  buildAnalysisGroundTruthObjectKey,
   buildAnalysisTrajectoryCsvObjectKey,
   buildRecordingRawObjectKey,
   buildRecordingRawObjectPrefix,
@@ -465,6 +466,24 @@ export const doesAnalysisTrajectoryCsvObjectExist = (
   trajectoryId: string
 ) =>
   doesObjectExist(buildAnalysisTrajectoryCsvObjectKey(organizationId, analysisRunId, trajectoryId))
+
+export const putAnalysisGroundTruthCsv = async (
+  organizationId: string,
+  analysisRunId: string,
+  body: string
+) => {
+  const { config, internalClient } = getS3Context()
+  const objectKey = buildAnalysisGroundTruthObjectKey(organizationId, analysisRunId)
+  await internalClient.send(
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: objectKey,
+      Body: body,
+      ContentType: 'text/csv',
+    })
+  )
+  return objectKey
+}
 
 export const getAnalysisHeatmapObjectText = async (
   organizationId: string,
