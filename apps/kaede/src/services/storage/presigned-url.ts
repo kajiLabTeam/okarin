@@ -115,6 +115,9 @@ export const buildAnalysisTrajectoryCsvObjectKey = (
   return `organizations/${validateObjectKeyUuid(organizationId, 'organizationId')}/analysis-runs/${validateObjectKeyUuid(analysisRunId, 'analysisRunId')}/artifacts/trajectories/${validateObjectKeyUuid(trajectoryId, 'trajectoryId')}/stay.csv`
 }
 
+export const buildAnalysisGroundTruthObjectKey = (organizationId: string, analysisRunId: string) =>
+  `organizations/${validateObjectKeyUuid(organizationId, 'organizationId')}/analysis-runs/${validateObjectKeyUuid(analysisRunId, 'analysisRunId')}/inputs/ground-truth.csv`
+
 export const buildAnalysisHeatmapObjectKey = (organizationId: string, analysisRunId: string) => {
   return `organizations/${validateObjectKeyUuid(organizationId, 'organizationId')}/analysis-runs/${validateObjectKeyUuid(analysisRunId, 'analysisRunId')}/artifacts/stay-heatmap.json`
 }

@@ -36,6 +36,11 @@ export interface NozomiExecutionSlotBinding {
   source_slot_id?: string
 }
 
+export interface NozomiGroundTruthInput {
+  uri: string
+  digest: string
+}
+
 export interface NozomiExecutionRequest {
   analysis_run_item_id: string
   pipeline_id: string
@@ -58,6 +63,7 @@ export interface NozomiExecutionRequest {
     secret?: string | null
   }
   parameters: Record<string, unknown>
+  ground_truth?: NozomiGroundTruthInput
 }
 
 export interface NozomiExecutionResponse {

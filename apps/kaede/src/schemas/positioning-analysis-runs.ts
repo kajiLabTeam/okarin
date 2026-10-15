@@ -7,6 +7,7 @@ export const positioningAnalysisRunRequestSchema = z
     pipeline_ids: z.array(z.string().min(1).max(100)).min(1).max(10),
     parameters_by_pipeline: z.record(z.string(), z.record(z.unknown())).default({}),
     retry_of_analysis_run_id: uuidSchema.optional(),
+    ground_truth_csv: z.string().min(1).max(20_000_000).optional(),
   })
   .strict()
   .superRefine((v, ctx) => {

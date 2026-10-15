@@ -118,8 +118,8 @@ export const processOutboxJob = async (
   try {
     const rawInputManifest =
       typeof item.input_manifest === 'string'
-        ? (JSON.parse(item.input_manifest) as Record<string, unknown[]>)
-        : (item.input_manifest as Record<string, unknown[]>)
+        ? (JSON.parse(item.input_manifest) as Record<string, unknown>)
+        : (item.input_manifest as Record<string, unknown>)
     const rawPipelineSnapshot =
       typeof item.pipeline_snapshot === 'string'
         ? (JSON.parse(item.pipeline_snapshot) as { bindings?: NozomiExecutionSlotBinding[] })
@@ -130,7 +130,16 @@ export const processOutboxJob = async (
         : (item.parameters as Record<string, unknown>)
 
     const inputs: NozomiExecutionInputManifest[] = []
+    const rawGroundTruth = rawInputManifest.__ground_truth__
+    const groundTruth =
+      rawGroundTruth && !Array.isArray(rawGroundTruth)
+        ? (rawGroundTruth as {
+            object_key: string
+            checksum_sha256: string
+          })
+        : undefined
     for (const [slot_id, assets] of Object.entries(rawInputManifest)) {
+      if (slot_id === '__ground_truth__') continue
       const assetList = Array.isArray(assets)
         ? (assets as {
             object_key: string
@@ -206,6 +215,56 @@ export const processOutboxJob = async (
         manifest_name: 'particle_animation',
       }
     }
+    let groundTruthRequest: NozomiExecutionRequest['ground_truth']
+    if (groundTruth) {
+      const truth = await issueInternalDataAssetDownloadUrl(groundTruth.object_key)
+      groundTruthRequest = {
+        uri: truth.downloadUrl,
+        digest: groundTruth.checksum_sha256,
+      }
+      const groundTruthArtifact = await issueInternalPositioningAnalysisArtifactUploadUrl(
+        run.organization_id,
+        run.id,
+        item.id,
+        'ground_truth',
+        'csv',
+        'text/csv'
+      )
+      outputArtifacts.ground_truth = {
+        upload_uri: groundTruthArtifact.uploadUrl,
+        object_key: groundTruthArtifact.objectKey,
+        content_type: 'text/csv',
+        format: 'csv',
+      }
+      const evaluationCsv = await issueInternalPositioningAnalysisArtifactUploadUrl(
+        run.organization_id,
+        run.id,
+        item.id,
+        'evaluation_csv',
+        'csv',
+        'text/csv'
+      )
+      outputArtifacts.evaluation_csv = {
+        upload_uri: evaluationCsv.uploadUrl,
+        object_key: evaluationCsv.objectKey,
+        content_type: 'text/csv',
+        format: 'csv',
+      }
+      const evaluationSummary = await issueInternalPositioningAnalysisArtifactUploadUrl(
+        run.organization_id,
+        run.id,
+        item.id,
+        'evaluation_summary',
+        'json',
+        'application/json'
+      )
+      outputArtifacts.evaluation_summary = {
+        upload_uri: evaluationSummary.uploadUrl,
+        object_key: evaluationSummary.objectKey,
+        content_type: 'application/json',
+        format: 'json',
+      }
+    }
 
     const callbackConfig = getCallbackRuntimeConfig()
     const appConfig = getAppRuntimeConfig()
@@ -223,6 +282,7 @@ export const processOutboxJob = async (
         secret: appConfig.apiSharedToken ?? null,
       },
       parameters: rawParameters,
+      ...(groundTruthRequest ? { ground_truth: groundTruthRequest } : {}),
     }
 
     await updatePositioningRunItemState(item.id, { status: 'processing' }, executor)
