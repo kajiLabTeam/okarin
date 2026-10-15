@@ -43,6 +43,15 @@ export interface NozomiExecutionRequest {
   inputs: NozomiExecutionInputManifest[]
   bindings: NozomiExecutionSlotBinding[]
   output_uri: string
+  output_artifacts?: Record<
+    string,
+    {
+      upload_uri: string
+      object_key: string
+      content_type: string
+      format: string
+    }
+  >
   callback: {
     url: string
     secret?: string | null

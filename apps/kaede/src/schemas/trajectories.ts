@@ -360,6 +360,25 @@ export const trajectoryResultResponseSchema = z
     expires_at: isoDatetimeSchema.openapi({
       description: 'download_url の有効期限',
     }),
+    output_manifest: z
+      .object({
+        schema_version: z.literal('1'),
+        artifacts: z.record(
+          z.string(),
+          z.object({
+            object_key: z.string(),
+            checksum_sha256: z.string(),
+            content_type: z.string(),
+            format: z.string(),
+            size_bytes: z.number().int().nonnegative().optional(),
+            generated_at: z.string().datetime().optional(),
+            available: z.boolean().optional(),
+            download_url: z.string().url().optional(),
+            expires_at: isoDatetimeSchema.optional(),
+          })
+        ),
+      })
+      .optional(),
   })
   .openapi('TrajectoryResultResponse')
 

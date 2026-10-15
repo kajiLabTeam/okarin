@@ -10,6 +10,7 @@ import type {
 } from '../nozomi/nozomi-execution-client.js'
 import {
   issueInternalDataAssetDownloadUrl,
+  issueInternalPositioningAnalysisArtifactUploadUrl,
   issueInternalTrajectoryResultUploadUrl,
 } from '../storage/presigned-url.js'
 import { claimPendingOutboxJobs, completeOutboxJob, failOutboxJob } from './outbox-repository.js'
@@ -157,6 +158,39 @@ export const processOutboxJob = async (
     }
 
     const { uploadUrl } = await issueInternalTrajectoryResultUploadUrl(run.organization_id, item.id)
+    const outputArtifacts: NonNullable<NozomiExecutionRequest['output_artifacts']> = {}
+    if (item.pipeline_id.endsWith('-ble')) {
+      const artifact = await issueInternalPositioningAnalysisArtifactUploadUrl(
+        run.organization_id,
+        run.id,
+        item.id,
+        'diagnostics',
+        'json',
+        'application/json'
+      )
+      outputArtifacts.diagnostics = {
+        upload_uri: artifact.uploadUrl,
+        object_key: artifact.objectKey,
+        content_type: 'application/json',
+        format: 'json',
+      }
+    }
+    if (item.pipeline_id.includes('particle-filter')) {
+      const artifact = await issueInternalPositioningAnalysisArtifactUploadUrl(
+        run.organization_id,
+        run.id,
+        item.id,
+        'particle_animation',
+        'webm',
+        'video/webm'
+      )
+      outputArtifacts.particle_animation = {
+        upload_uri: artifact.uploadUrl,
+        object_key: artifact.objectKey,
+        content_type: 'video/webm',
+        format: 'webm',
+      }
+    }
 
     const callbackConfig = getCallbackRuntimeConfig()
     const appConfig = getAppRuntimeConfig()
@@ -168,6 +202,7 @@ export const processOutboxJob = async (
       inputs,
       bindings: rawPipelineSnapshot.bindings ?? [],
       output_uri: uploadUrl,
+      output_artifacts: outputArtifacts,
       callback: {
         url: `${callbackConfig.baseUrl}/api/internal/pipeline-executions/callbacks`,
         secret: appConfig.apiSharedToken ?? null,

@@ -1,17 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UserRequestActor } from '../../middleware/request-actor-context.js'
 
-const { findTrajectoryByIdMock, issueTrajectoryResultDownloadUrlMock } = vi.hoisted(() => ({
+const {
+  findTrajectoryByIdMock,
+  findTrajectoryOutputManifestByIdMock,
+  issueTrajectoryResultDownloadUrlMock,
+  issuePositioningAnalysisArtifactDownloadUrlMock,
+} = vi.hoisted(() => ({
   findTrajectoryByIdMock: vi.fn(),
+  findTrajectoryOutputManifestByIdMock: vi.fn(),
   issueTrajectoryResultDownloadUrlMock: vi.fn(),
+  issuePositioningAnalysisArtifactDownloadUrlMock: vi.fn(),
 }))
 
 vi.mock('../../services/trajectories/index.js', () => ({
   findTrajectoryById: findTrajectoryByIdMock,
+  findTrajectoryOutputManifestById: findTrajectoryOutputManifestByIdMock,
 }))
 
 vi.mock('../../services/storage/index.js', () => ({
   issueTrajectoryResultDownloadUrl: issueTrajectoryResultDownloadUrlMock,
+  issuePositioningAnalysisArtifactDownloadUrl: issuePositioningAnalysisArtifactDownloadUrlMock,
 }))
 
 import { getTrajectoryResult } from './get-trajectory-result.js'
@@ -45,6 +54,51 @@ const memberActor: UserRequestActor = {
 describe('getTrajectoryResult', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    findTrajectoryOutputManifestByIdMock.mockResolvedValue(null)
+  })
+
+  it('成果物manifestの各オブジェクトに署名付きURLを付ける', async () => {
+    const trajectoryId = '22222222-2222-4222-8222-222222222222'
+    findTrajectoryByIdMock.mockResolvedValue({
+      id: trajectoryId,
+      organization_id: '11111111-1111-4111-8111-111111111111',
+      status: 'completed',
+    })
+    issueTrajectoryResultDownloadUrlMock.mockResolvedValue({
+      downloadUrl: 'https://storage.example.test/result.csv',
+      expiresAt: '2026-07-07T00:30:00.000Z',
+    })
+    findTrajectoryOutputManifestByIdMock.mockResolvedValue({
+      schema_version: '1',
+      artifacts: {
+        diagnostics: {
+          object_key: 'analysis/diagnostics.json',
+          checksum_sha256: 'a'.repeat(64),
+          content_type: 'application/json',
+          format: 'json',
+        },
+      },
+    })
+    issuePositioningAnalysisArtifactDownloadUrlMock.mockResolvedValue({
+      downloadUrl: 'https://storage.example.test/diagnostics.json',
+      expiresAt: '2026-07-07T00:30:00.000Z',
+    })
+
+    const result = await getTrajectoryResult(managerActor, { trajectoryId })
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        output_manifest: {
+          schema_version: '1',
+          artifacts: {
+            diagnostics: {
+              object_key: 'analysis/diagnostics.json',
+              download_url: 'https://storage.example.test/diagnostics.json',
+            },
+          },
+        },
+      },
+    })
   })
 
   it('completed trajectory の result download URL を返す', async () => {

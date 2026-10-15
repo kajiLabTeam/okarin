@@ -1,7 +1,13 @@
 import type { RequestActor } from '../../middleware/request-actor-context.js'
 import type { TrajectoryResultResponse } from '../../schemas/trajectories.js'
-import { issueTrajectoryResultDownloadUrl } from '../../services/storage/index.js'
-import { findTrajectoryById } from '../../services/trajectories/index.js'
+import {
+  issuePositioningAnalysisArtifactDownloadUrl,
+  issueTrajectoryResultDownloadUrl,
+} from '../../services/storage/index.js'
+import {
+  findTrajectoryById,
+  findTrajectoryOutputManifestById,
+} from '../../services/trajectories/index.js'
 import type { AuthorizationError } from '../authorization.js'
 import { requireOrganizationManager } from '../authorization.js'
 
@@ -64,6 +70,17 @@ export const getTrajectoryResult = async (
     trajectory.organization_id,
     trajectory.id
   )
+  const outputManifest = await findTrajectoryOutputManifestById(trajectory.id)
+  const artifactEntries = await Promise.all(
+    Object.entries(outputManifest?.artifacts ?? {}).map(async ([name, artifact]) => {
+      if (artifact.available === false) return [name, artifact] as const
+      const download = await issuePositioningAnalysisArtifactDownloadUrl(artifact.object_key)
+      return [
+        name,
+        { ...artifact, download_url: download.downloadUrl, expires_at: download.expiresAt },
+      ] as const
+    })
+  )
 
   return {
     ok: true,
@@ -71,6 +88,14 @@ export const getTrajectoryResult = async (
       trajectory_id: trajectory.id,
       download_url: resultDownload.downloadUrl,
       expires_at: resultDownload.expiresAt,
+      ...(artifactEntries.length > 0
+        ? {
+            output_manifest: {
+              schema_version: '1' as const,
+              artifacts: Object.fromEntries(artifactEntries),
+            },
+          }
+        : {}),
     },
   }
 }

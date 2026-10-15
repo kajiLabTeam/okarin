@@ -34,6 +34,9 @@ export {
   issueTrajectoryResultDownloadUrl,
   issueAnalysisTrajectoryCsvDownloadUrl,
   buildAnalysisRunItemResultObjectKey,
+  buildPositioningAnalysisArtifactObjectKey,
+  issueInternalPositioningAnalysisArtifactUploadUrl,
+  issuePositioningAnalysisArtifactDownloadUrl,
   issueInternalDataAssetDownloadUrl,
   issueInternalAnalysisItemResultUploadUrl,
 } from './presigned-url.js'

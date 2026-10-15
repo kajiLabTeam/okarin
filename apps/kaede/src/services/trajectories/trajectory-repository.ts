@@ -8,6 +8,7 @@ import type {
 import type { Trajectories } from '../db/generated.js'
 import { db } from '../db/index.js'
 import type { DB } from '../db/index.js'
+import { parseOutputManifest } from '../analysis-runs/output-manifest.js'
 
 type DbExecutor = Kysely<DB> | Transaction<DB>
 export type Trajectory = Selectable<Trajectories>
@@ -157,6 +158,18 @@ export const findTrajectoryById = async (
 
   if (!row) return undefined
   return mapRowToTrajectoryWithExecution(row)
+}
+
+export const findTrajectoryOutputManifestById = async (
+  trajectoryId: string,
+  executor: DbExecutor = db
+) => {
+  const row = await executor
+    .selectFrom('positioning_analysis_run_items')
+    .select('output_manifest')
+    .where('result_trajectory_id', '=', trajectoryId)
+    .executeTakeFirst()
+  return row ? parseOutputManifest(row.output_manifest) : null
 }
 
 export const listTrajectoriesByRecordingIdPaginated = async (
