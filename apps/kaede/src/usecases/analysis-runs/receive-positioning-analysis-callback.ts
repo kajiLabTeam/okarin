@@ -5,8 +5,10 @@ import {
   findPositioningCallbackByEventId,
   findPositioningRunItemById,
   insertPositioningCallback,
+  mergePositioningRunItemOutputManifest,
   updatePositioningRunItemState,
 } from '../../services/analysis-runs/positioning-analysis-callback-repository.js'
+import { outputArtifactsFromCallback } from '../../services/analysis-runs/output-manifest.js'
 import { db } from '../../services/db/index.js'
 import { findRecordingById } from '../../services/recordings/index.js'
 import { insertTrajectory } from '../../services/trajectories/index.js'
@@ -84,6 +86,15 @@ export const receivePositioningAnalysisCallback = async (
 
     if (!inserted) {
       return { status: 'already_processed' as const }
+    }
+
+    const outputArtifacts = outputArtifactsFromCallback(payload.outputs)
+    if (Object.keys(outputArtifacts).length > 0) {
+      await mergePositioningRunItemOutputManifest(
+        payload.analysis_run_item_id,
+        outputArtifacts,
+        transaction
+      )
     }
 
     let trajectoryId: string | null = null
