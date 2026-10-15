@@ -36,8 +36,7 @@ def test_pdr_accepts_optional_floor_coordinate_parameters() -> None:
     schema = pdr.parameters_schema
 
     assert all(
-        key in schema["properties"]
-        for key in ("origin_x", "origin_y", "floor_scale")
+        key in schema["properties"] for key in ("origin_x", "origin_y", "floor_scale")
     )
     assert schema["required"] == []
 

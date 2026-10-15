@@ -1,10 +1,13 @@
 import type { RequestActor } from '../../middleware/request-actor-context.js'
 import type { PositioningAnalysisCallbackRequest } from '../../schemas/positioning-analysis-callbacks.js'
 import { aggregatePositioningRunStatus } from '../../services/analysis-runs/outbox-worker.js'
+import { outputArtifactsFromCallback } from '../../services/analysis-runs/output-manifest.js'
 import {
   findPositioningCallbackByEventId,
   findPositioningRunItemById,
+  findPositioningRunItemByIdForUpdate,
   insertPositioningCallback,
+  mergePositioningRunItemOutputManifest,
   updatePositioningRunItemState,
 } from '../../services/analysis-runs/positioning-analysis-callback-repository.js'
 import { db } from '../../services/db/index.js'
@@ -86,27 +89,48 @@ export const receivePositioningAnalysisCallback = async (
       return { status: 'already_processed' as const }
     }
 
-    let trajectoryId: string | null = null
-    if (payload.status === 'completed') {
-      const recording = await findRecordingById(item.recording_id, transaction)
-      const trajectory = await insertTrajectory(
-        {
-          id: item.id,
-          organization_id: recording?.organization_id ?? '',
-          recording_id: item.recording_id,
-          floor_id: recording?.floor_id ?? '',
-          status: 'completed',
-        },
+    const lockedItem = await findPositioningRunItemByIdForUpdate(
+      payload.analysis_run_item_id,
+      transaction
+    )
+    if (!lockedItem) {
+      throw new Error(`analysis run item ${payload.analysis_run_item_id} disappeared`)
+    }
+
+    const outputArtifacts = outputArtifactsFromCallback(payload.outputs)
+    if (Object.keys(outputArtifacts).length > 0) {
+      await mergePositioningRunItemOutputManifest(
+        payload.analysis_run_item_id,
+        outputArtifacts,
         transaction
       )
-      trajectoryId = trajectory.id
+    }
+
+    let trajectoryId: string | null = null
+    if (payload.status === 'completed') {
+      trajectoryId = lockedItem.result_trajectory_id
+      if (!trajectoryId) {
+        const recording = await findRecordingById(lockedItem.recording_id, transaction)
+        const trajectory = await insertTrajectory(
+          {
+            id: lockedItem.id,
+            organization_id: recording?.organization_id ?? '',
+            recording_id: lockedItem.recording_id,
+            floor_id: recording?.floor_id ?? '',
+            status: 'completed',
+          },
+          transaction
+        )
+        trajectoryId = trajectory.id
+      }
     }
 
     await updatePositioningRunItemState(
       payload.analysis_run_item_id,
       {
         status: payload.status,
-        result_trajectory_id: trajectoryId,
+        result_trajectory_id:
+          payload.status === 'completed' ? trajectoryId : lockedItem.result_trajectory_id,
         error:
           payload.status === 'failed'
             ? (payload.error ?? { code: 'EXECUTION_FAILED', message: 'Pipeline execution failed' })

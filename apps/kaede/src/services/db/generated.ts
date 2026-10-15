@@ -73,6 +73,7 @@ export interface PositioningAnalysisRunItems {
   pipeline_version: string
   parameters: Json
   input_manifest: Json
+  output_manifest: Json
   result_trajectory_id: string | null
   error: Json | null
   created_at: Generated<Timestamp>

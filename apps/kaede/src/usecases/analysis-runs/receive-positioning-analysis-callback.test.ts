@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   findCallback: vi.fn(),
   insertCallback: vi.fn(),
   findItem: vi.fn(),
+  findItemForUpdate: vi.fn(),
+  mergeOutputManifest: vi.fn(),
   updateItem: vi.fn(),
   findRecording: vi.fn(),
   insertTrajectory: vi.fn(),
@@ -17,6 +19,8 @@ vi.mock('../../services/analysis-runs/positioning-analysis-callback-repository.j
   findPositioningCallbackByEventId: mocks.findCallback,
   insertPositioningCallback: mocks.insertCallback,
   findPositioningRunItemById: mocks.findItem,
+  findPositioningRunItemByIdForUpdate: mocks.findItemForUpdate,
+  mergePositioningRunItemOutputManifest: mocks.mergeOutputManifest,
   updatePositioningRunItemState: mocks.updateItem,
 }))
 
@@ -67,6 +71,13 @@ describe('receivePositioningAnalysisCallback', () => {
       status: 'processing',
       analysis_run_id: '33333333-3333-4333-8333-333333333333',
     })
+    mocks.findItemForUpdate.mockResolvedValue({
+      id: itemId,
+      recording_id: recordingId,
+      status: 'processing',
+      result_trajectory_id: null,
+      analysis_run_id: '33333333-3333-4333-8333-333333333333',
+    })
     mocks.findRecording.mockResolvedValue({
       id: recordingId,
       organization_id: 'org-1',
@@ -76,6 +87,7 @@ describe('receivePositioningAnalysisCallback', () => {
       Promise.resolve({ id: input.id ?? itemId })
     )
     mocks.insertCallback.mockResolvedValue({ id: 'cb-1' })
+    mocks.mergeOutputManifest.mockResolvedValue({})
     mocks.updateItem.mockResolvedValue({})
     mocks.aggregateRunStatus.mockResolvedValue(undefined)
   })
@@ -168,6 +180,50 @@ describe('receivePositioningAnalysisCallback', () => {
     )
     expect(mocks.aggregateRunStatus).toHaveBeenCalledWith(
       '33333333-3333-4333-8333-333333333333',
+      expect.anything()
+    )
+  })
+
+  it('完了済みitemへの成果物追加では軌跡を再作成しない', async () => {
+    mocks.findItem.mockResolvedValue({
+      id: itemId,
+      recording_id: recordingId,
+      status: 'completed',
+      result_trajectory_id: itemId,
+      analysis_run_id: '33333333-3333-4333-8333-333333333333',
+    })
+    mocks.findItemForUpdate.mockResolvedValue({
+      id: itemId,
+      recording_id: recordingId,
+      status: 'completed',
+      result_trajectory_id: itemId,
+      analysis_run_id: '33333333-3333-4333-8333-333333333333',
+    })
+
+    const result = await receivePositioningAnalysisCallback(serviceActor, {
+      event_id: 'artifact-event',
+      analysis_run_item_id: itemId,
+      status: 'completed',
+      outputs: {
+        output_manifest: {
+          schema_version: '1',
+          artifacts: {
+            diagnostics: {
+              object_key: 'items/item/diagnostics.json',
+              checksum_sha256: 'a'.repeat(64),
+              content_type: 'application/json',
+              format: 'json',
+            },
+          },
+        },
+      },
+    })
+
+    expect(result.ok).toBe(true)
+    expect(mocks.insertTrajectory).not.toHaveBeenCalled()
+    expect(mocks.updateItem).toHaveBeenCalledWith(
+      itemId,
+      expect.objectContaining({ result_trajectory_id: itemId }),
       expect.anything()
     )
   })

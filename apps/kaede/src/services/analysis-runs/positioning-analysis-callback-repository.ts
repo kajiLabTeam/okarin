@@ -2,6 +2,8 @@ import type { Insertable, Selectable } from 'kysely'
 import type { Json, PositioningAnalysisCallbacks } from '../db/generated.js'
 import { db } from '../db/index.js'
 import type { DbExecutor } from '../executor.js'
+import { mergeOutputManifest, outputManifestJson } from './output-manifest.js'
+import type { OutputArtifactManifest } from './output-manifest.js'
 
 export type PositioningCallbackRecord = Selectable<PositioningAnalysisCallbacks>
 type NewCallbackRecord = Omit<Insertable<PositioningAnalysisCallbacks>, 'id'>
@@ -36,6 +38,14 @@ export const findPositioningRunItemById = (itemId: string, executor: DbExecutor 
     .where('id', '=', itemId)
     .executeTakeFirst()
 
+export const findPositioningRunItemByIdForUpdate = (itemId: string, executor: DbExecutor = db) =>
+  executor
+    .selectFrom('positioning_analysis_run_items')
+    .selectAll()
+    .where('id', '=', itemId)
+    .forUpdate()
+    .executeTakeFirst()
+
 export const updatePositioningRunItemState = (
   itemId: string,
   updates: {
@@ -56,3 +66,22 @@ export const updatePositioningRunItemState = (
     .where('id', '=', itemId)
     .returningAll()
     .executeTakeFirst()
+
+export const mergePositioningRunItemOutputManifest = async (
+  itemId: string,
+  artifacts: Record<string, OutputArtifactManifest>,
+  executor: DbExecutor = db
+) => {
+  const item = await findPositioningRunItemByIdForUpdate(itemId, executor)
+  if (!item) return undefined
+
+  return executor
+    .updateTable('positioning_analysis_run_items')
+    .set({
+      output_manifest: outputManifestJson(mergeOutputManifest(item.output_manifest, artifacts)),
+      updated_at: new Date(),
+    })
+    .where('id', '=', itemId)
+    .returningAll()
+    .executeTakeFirst()
+}
