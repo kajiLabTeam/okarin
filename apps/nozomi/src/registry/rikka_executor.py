@@ -7,7 +7,7 @@ import tempfile
 from dataclasses import asdict, is_dataclass
 from io import BytesIO
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -366,24 +366,29 @@ class RikkaComponentExecutor:
                 ),
                 count=int(parameters.get("particle_count", 500)),
             )
-            save_particle_animation(
-                np.asarray(result.particle.all_particles),
-                result.trajectory,
-                gx_mean=result.prepared.gx_mean,
-                gz_mean=result.prepared.gz_mean,
-                floormap_path=particle_settings.floormap_path,
-                origin_px=particle_settings.origin_px,
-                scale=particle_settings.scale,
-                output_path=animation_path,
-                landmark=result.landmark,
+            generated_result = cast(
+                Path | None,
+                save_particle_animation(
+                    np.asarray(result.particle.all_particles),
+                    result.trajectory,
+                    gx_mean=result.prepared.gx_mean,
+                    gz_mean=result.prepared.gz_mean,
+                    floormap_path=particle_settings.floormap_path,
+                    origin_px=particle_settings.origin_px,
+                    scale=particle_settings.scale,
+                    output_path=animation_path,
+                    landmark=result.landmark,
+                ),
             )
-            generated_candidates = tuple(temporary.glob("particle-filter.*"))
-            if not generated_candidates:
-                raise PermanentComponentError("particle animation was not generated")
-            generated_path = next(
-                (path for path in generated_candidates if path.suffix == ".webm"),
-                generated_candidates[0],
-            )
+            if generated_result is not None:
+                generated_path = Path(generated_result)
+            else:
+                generated_candidates = tuple(temporary.glob("particle-filter.*"))
+                if not generated_candidates:
+                    raise PermanentComponentError(
+                        "particle animation was not generated"
+                    )
+                generated_path = generated_candidates[0]
             if generated_path.suffix not in {".webm", ".mp4"}:
                 raise PermanentComponentError(
                     "particle animation WebM/MP4 could not be generated"
