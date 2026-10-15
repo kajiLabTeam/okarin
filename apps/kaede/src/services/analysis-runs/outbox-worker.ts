@@ -190,6 +190,21 @@ export const processOutboxJob = async (
         content_type: 'video/webm',
         format: 'webm',
       }
+      const fallback = await issueInternalPositioningAnalysisArtifactUploadUrl(
+        run.organization_id,
+        run.id,
+        item.id,
+        'particle_animation',
+        'mp4',
+        'video/mp4'
+      )
+      outputArtifacts.particle_animation_mp4 = {
+        upload_uri: fallback.uploadUrl,
+        object_key: fallback.objectKey,
+        content_type: 'video/mp4',
+        format: 'mp4',
+        manifest_name: 'particle_animation',
+      }
     }
 
     const callbackConfig = getCallbackRuntimeConfig()

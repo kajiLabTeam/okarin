@@ -47,6 +47,7 @@ class OutputArtifactUpload(StrictModel):
     object_key: str = Field(min_length=1)
     content_type: str = Field(min_length=1)
     format: str = Field(min_length=1)
+    manifest_name: str | None = Field(default=None, min_length=1)
 
     @field_validator("upload_uri")
     @classmethod

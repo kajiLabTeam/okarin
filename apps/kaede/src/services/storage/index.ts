@@ -35,6 +35,7 @@ export {
   issueAnalysisTrajectoryCsvDownloadUrl,
   buildAnalysisRunItemResultObjectKey,
   buildPositioningAnalysisArtifactObjectKey,
+  buildPositioningAnalysisArtifactPrefix,
   issueInternalPositioningAnalysisArtifactUploadUrl,
   issuePositioningAnalysisArtifactDownloadUrl,
   issueInternalDataAssetDownloadUrl,

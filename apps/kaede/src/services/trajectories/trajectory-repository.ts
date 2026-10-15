@@ -9,6 +9,7 @@ import type { Trajectories } from '../db/generated.js'
 import { db } from '../db/index.js'
 import type { DB } from '../db/index.js'
 import { parseOutputManifest } from '../analysis-runs/output-manifest.js'
+import { buildPositioningAnalysisArtifactPrefix } from '../storage/presigned-url.js'
 
 type DbExecutor = Kysely<DB> | Transaction<DB>
 export type Trajectory = Selectable<Trajectories>
@@ -165,11 +166,26 @@ export const findTrajectoryOutputManifestById = async (
   executor: DbExecutor = db
 ) => {
   const row = await executor
-    .selectFrom('positioning_analysis_run_items')
-    .select('output_manifest')
+    .selectFrom('positioning_analysis_run_items as item')
+    .innerJoin('positioning_analysis_runs as run', 'run.id', 'item.analysis_run_id')
+    .select(['item.output_manifest', 'run.organization_id', 'item.analysis_run_id', 'item.id'])
     .where('result_trajectory_id', '=', trajectoryId)
     .executeTakeFirst()
-  return row ? parseOutputManifest(row.output_manifest) : null
+  if (!row) return null
+  const manifest = parseOutputManifest(row.output_manifest)
+  const prefix = buildPositioningAnalysisArtifactPrefix(
+    row.organization_id,
+    row.analysis_run_id,
+    row.id
+  )
+  return {
+    ...manifest,
+    artifacts: Object.fromEntries(
+      Object.entries(manifest.artifacts).filter(([, artifact]) =>
+        artifact.object_key.startsWith(prefix)
+      )
+    ),
+  }
 }
 
 export const listTrajectoriesByRecordingIdPaginated = async (

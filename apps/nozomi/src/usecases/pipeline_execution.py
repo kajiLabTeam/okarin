@@ -205,7 +205,7 @@ class HttpOutputWriter:
                 raise
             except Exception as exc:
                 raise PermanentComponentError(f"artifact upload failed: {exc}") from exc
-            manifest[name] = {
+            manifest[target.manifest_name or name] = {
                 "object_key": target.object_key,
                 "checksum_sha256": artifact_digest,
                 "content_type": target.content_type,

@@ -384,11 +384,15 @@ class RikkaComponentExecutor:
                 (path for path in generated_candidates if path.suffix == ".webm"),
                 generated_candidates[0],
             )
-            if generated_path.suffix != ".webm":
+            if generated_path.suffix not in {".webm", ".mp4"}:
                 raise PermanentComponentError(
-                    "particle animation WebM could not be generated"
+                    "particle animation WebM/MP4 could not be generated"
                 )
-            payloads["particle_animation"] = {"body": generated_path.read_bytes()}
+            payloads[
+                "particle_animation"
+                if generated_path.suffix == ".webm"
+                else "particle_animation_mp4"
+            ] = {"body": generated_path.read_bytes()}
         if payloads:
             trajectory["_artifact_payloads"] = payloads
         return {"trajectory": trajectory}

@@ -50,6 +50,7 @@ export interface NozomiExecutionRequest {
       object_key: string
       content_type: string
       format: string
+      manifest_name?: string
     }
   >
   callback: {

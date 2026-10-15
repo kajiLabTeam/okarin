@@ -449,6 +449,13 @@ export const buildPositioningAnalysisArtifactObjectKey = (
   return `organizations/${organizationId}/analysis-runs/${analysisRunId}/items/${itemId}/artifacts/${artifactName}.${format}`
 }
 
+export const buildPositioningAnalysisArtifactPrefix = (
+  organizationId: string,
+  analysisRunId: string,
+  itemId: string
+) =>
+  `organizations/${validateObjectKeyUuid(organizationId, 'organizationId')}/analysis-runs/${validateObjectKeyUuid(analysisRunId, 'analysisRunId')}/items/${validateObjectKeyUuid(itemId, 'itemId')}/artifacts/`
+
 export const issueInternalPositioningAnalysisArtifactUploadUrl = async (
   organizationId: string,
   analysisRunId: string,
