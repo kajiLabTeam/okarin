@@ -9,6 +9,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 from rikka.ble.pipeline import run_ble_ranging_input
 from rikka.common.lib.models import FloorMap, Landmark, TrajectoryResult
@@ -195,7 +196,7 @@ def _trajectory_payload(
 
 def _jsonable(value: Any) -> Any:
     if is_dataclass(value):
-        return _jsonable(asdict(value))
+        return _jsonable(asdict(value))  # type: ignore[arg-type]
     if hasattr(value, "_asdict"):
         return _jsonable(value._asdict())
     if isinstance(value, dict):
@@ -365,8 +366,8 @@ class RikkaComponentExecutor:
                 ),
                 count=int(parameters.get("particle_count", 500)),
             )
-            generated_path = save_particle_animation(
-                result.particle.all_particles,
+            save_particle_animation(
+                np.asarray(result.particle.all_particles),
                 result.trajectory,
                 gx_mean=result.prepared.gx_mean,
                 gz_mean=result.prepared.gz_mean,
@@ -376,6 +377,17 @@ class RikkaComponentExecutor:
                 output_path=animation_path,
                 landmark=result.landmark,
             )
+            generated_candidates = tuple(temporary.glob("particle-filter.*"))
+            if not generated_candidates:
+                raise PermanentComponentError("particle animation was not generated")
+            generated_path = next(
+                (path for path in generated_candidates if path.suffix == ".webm"),
+                generated_candidates[0],
+            )
+            if generated_path.suffix != ".webm":
+                raise PermanentComponentError(
+                    "particle animation WebM could not be generated"
+                )
             payloads["particle_animation"] = {"body": generated_path.read_bytes()}
         if payloads:
             trajectory["_artifact_payloads"] = payloads

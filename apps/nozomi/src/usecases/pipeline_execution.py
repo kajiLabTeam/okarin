@@ -214,7 +214,7 @@ class HttpOutputWriter:
                 "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 "available": True,
             }
-        result = {"digest": digest}
+        result: dict[str, Any] = {"digest": digest}
         if manifest:
             result["output_manifest"] = {"schema_version": "1", "artifacts": manifest}
         return result
