@@ -28,6 +28,7 @@ from src.schemas.execution import (
     ExecutionRequest,
     ExecutionStatus,
     InputManifest,
+    OutputArtifactUpload,
 )
 from src.schemas.pipeline import ComponentContract, PipelineSnapshot
 
@@ -118,7 +119,12 @@ class HttpInputLoader:
 
 
 class HttpOutputWriter:
-    def write(self, output_uri: str, outputs: dict[str, Any]) -> dict[str, Any]:
+    def write(
+        self,
+        output_uri: str,
+        outputs: dict[str, Any],
+        artifact_uploads: dict[str, OutputArtifactUpload] | None = None,
+    ) -> dict[str, Any]:
         validate_outbound_url(output_uri, UrlPurpose.STORAGE)
         trajectory = outputs.get("trajectory")
         if not isinstance(trajectory, dict) or not isinstance(
@@ -171,7 +177,47 @@ class HttpOutputWriter:
             raise
         except Exception as exc:
             raise PermanentComponentError(f"output upload failed: {exc}") from exc
-        return {"digest": digest}
+        manifest: dict[str, Any] = {}
+        payloads = trajectory.pop("_artifact_payloads", {})
+        for name, target in (artifact_uploads or {}).items():
+            payload = payloads.get(name)
+            if not isinstance(payload, dict) or not isinstance(
+                payload.get("body"), bytes
+            ):
+                continue
+            body = payload["body"]
+            artifact_digest = hashlib.sha256(body).hexdigest()
+            try:
+                with build_opener(_NoRedirect).open(
+                    Request(
+                        target.upload_uri,
+                        data=body,
+                        method="PUT",
+                        headers={"content-type": target.content_type},
+                    ),
+                    timeout=120,
+                ) as response:
+                    if response.status >= 300:
+                        raise PermanentComponentError(
+                            f"artifact upload failed with HTTP {response.status}"
+                        )
+            except PermanentComponentError:
+                raise
+            except Exception as exc:
+                raise PermanentComponentError(f"artifact upload failed: {exc}") from exc
+            manifest[name] = {
+                "object_key": target.object_key,
+                "checksum_sha256": artifact_digest,
+                "content_type": target.content_type,
+                "format": target.format,
+                "size_bytes": len(body),
+                "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "available": True,
+            }
+        result = {"digest": digest}
+        if manifest:
+            result["output_manifest"] = {"schema_version": "1", "artifacts": manifest}
+        return result
 
 
 class ExecutionRepository:

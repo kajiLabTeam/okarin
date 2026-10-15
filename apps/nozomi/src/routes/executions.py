@@ -102,9 +102,24 @@ def _run_execution(request: ExecutionRequest) -> None:
             if not snapshot.availability.available:
                 raise ValueError("pipeline is unavailable")
             validate_request(snapshot, request)
-            event = execute_pipeline(snapshot, request, executor, input_loader)
+            execution_request = request.model_copy(
+                update={
+                    "parameters": {
+                        **request.parameters,
+                        "_output_artifacts": {
+                            name: value.model_dump()
+                            for name, value in request.output_artifacts.items()
+                        },
+                    }
+                }
+            )
+            event = execute_pipeline(
+                snapshot, execution_request, executor, input_loader
+            )
             if event.status == ExecutionStatus.COMPLETED:
-                references = output_writer.write(request.output_uri, event.outputs)
+                references = output_writer.write(
+                    request.output_uri, event.outputs, request.output_artifacts
+                )
                 event = event.model_copy(update={"outputs": references})
         except ValueError as exc:
             event = ExecutionEvent(

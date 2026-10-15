@@ -42,6 +42,18 @@ class CallbackInfo(StrictModel):
         return validated
 
 
+class OutputArtifactUpload(StrictModel):
+    upload_uri: str
+    object_key: str = Field(min_length=1)
+    content_type: str = Field(min_length=1)
+    format: str = Field(min_length=1)
+
+    @field_validator("upload_uri")
+    @classmethod
+    def check_upload_uri(cls, value: str) -> str:
+        return validate_outbound_url(value, UrlPurpose.STORAGE)
+
+
 class ExecutionRequest(StrictModel):
     analysis_run_item_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
     pipeline_id: str = Field(pattern=r"^[a-z][a-z0-9-]*$")
@@ -49,6 +61,7 @@ class ExecutionRequest(StrictModel):
     inputs: tuple[InputManifest, ...] = ()
     bindings: tuple[SlotBinding, ...] = ()
     output_uri: str
+    output_artifacts: dict[str, OutputArtifactUpload] = {}
     callback: CallbackInfo
     parameters: dict[str, Any] = {}
 

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from src.schemas.execution import OutputArtifactUpload
 from src.usecases.pipeline_execution import HttpOutputWriter
 
 CONTRACT_PATH = (
@@ -56,3 +57,41 @@ def test_http_output_writer_uploads_kaede_compatible_csv(monkeypatch: Any) -> No
         b"step_index,timestamp_s,x,y\n0,,10.0,20.0\n1,0.5,11.0,21.5\n"
     )
     assert reference["digest"]
+
+
+def test_http_output_writer_uploads_declared_diagnostics(monkeypatch: Any) -> None:
+    calls: list[Any] = []
+
+    def fake_open(request: Any, timeout: int) -> StubResponse:
+        calls.append(request)
+        return StubResponse()
+
+    opener = type("Opener", (), {"open": staticmethod(fake_open)})()
+    monkeypatch.setattr(
+        "src.usecases.pipeline_execution.build_opener", lambda *_args: opener
+    )
+    reference = HttpOutputWriter().write(
+        "http://seaweedfs:8333/result.csv",
+        {
+            "trajectory": {
+                "points": [{"x": 1.0, "y": 2.0, "timestamp_s": None}],
+                "_artifact_payloads": {
+                    "diagnostics": {"body": b'{"landmark_corrections": []}'},
+                },
+            }
+        },
+        {
+            "diagnostics": OutputArtifactUpload(
+                upload_uri="http://seaweedfs:8333/diagnostics.json",
+                object_key="analysis/diagnostics.json",
+                content_type="application/json",
+                format="json",
+            )
+        },
+    )
+
+    assert len(calls) == 2
+    assert calls[1].get_header("Content-type") == "application/json"
+    assert reference["output_manifest"]["artifacts"]["diagnostics"]["object_key"] == (
+        "analysis/diagnostics.json"
+    )
