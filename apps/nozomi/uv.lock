@@ -554,7 +554,7 @@ requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.135.1" },
     { name = "pandas", specifier = ">=3.0.1" },
     { name = "pydantic", specifier = ">=2.12.5" },
-    { name = "rikka", git = "https://github.com/kajiLabTeam/rikka.git?rev=3f7497b" },
+    { name = "rikka", git = "https://github.com/kajiLabTeam/rikka.git?rev=a6b4b44" },
     { name = "scalar-fastapi", specifier = ">=1.4.1" },
     { name = "sentry-sdk", specifier = ">=2.54.0" },
 ]
@@ -928,7 +928,7 @@ wheels = [
 [[package]]
 name = "rikka"
 version = "0.1.0"
-source = { git = "https://github.com/kajiLabTeam/rikka.git?rev=3f7497b#3f7497b871c3ec5c6eaea9089fc4c36ec94dc83e" }
+source = { git = "https://github.com/kajiLabTeam/rikka.git?rev=a6b4b44#a6b4b4401e48b71df5fe865eaa2788a4c3623abd" }
 dependencies = [
     { name = "click" },
     { name = "matplotlib" },
