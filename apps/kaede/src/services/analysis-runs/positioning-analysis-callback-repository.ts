@@ -38,6 +38,14 @@ export const findPositioningRunItemById = (itemId: string, executor: DbExecutor 
     .where('id', '=', itemId)
     .executeTakeFirst()
 
+export const findPositioningRunItemByIdForUpdate = (itemId: string, executor: DbExecutor = db) =>
+  executor
+    .selectFrom('positioning_analysis_run_items')
+    .selectAll()
+    .where('id', '=', itemId)
+    .forUpdate()
+    .executeTakeFirst()
+
 export const updatePositioningRunItemState = (
   itemId: string,
   updates: {
@@ -64,7 +72,7 @@ export const mergePositioningRunItemOutputManifest = async (
   artifacts: Record<string, OutputArtifactManifest>,
   executor: DbExecutor = db
 ) => {
-  const item = await findPositioningRunItemById(itemId, executor)
+  const item = await findPositioningRunItemByIdForUpdate(itemId, executor)
   if (!item) return undefined
 
   return executor

@@ -1,3 +1,4 @@
+import { outputManifestSchema } from '../../schemas/positioning-analysis-callbacks.js'
 import type { Json } from '../db/generated.js'
 
 export interface OutputArtifactManifest {
@@ -24,25 +25,19 @@ export const emptyOutputManifest = (): OutputManifest => ({
 })
 
 export const parseOutputManifest = (value: unknown): OutputManifest => {
-  const raw = typeof value === 'string' ? JSON.parse(value) : value
-  if (!isObject(raw) || raw.schema_version !== '1' || !isObject(raw.artifacts)) {
+  let raw: unknown = value
+  if (typeof value === 'string') {
+    try {
+      raw = JSON.parse(value)
+    } catch {
+      return emptyOutputManifest()
+    }
+  }
+  const parsed = outputManifestSchema.safeParse(raw)
+  if (!parsed.success) {
     return emptyOutputManifest()
   }
-
-  const artifacts: Record<string, OutputArtifactManifest> = {}
-  for (const [name, artifact] of Object.entries(raw.artifacts)) {
-    if (!isObject(artifact)) continue
-    if (
-      typeof artifact.object_key !== 'string' ||
-      typeof artifact.checksum_sha256 !== 'string' ||
-      typeof artifact.content_type !== 'string' ||
-      typeof artifact.format !== 'string'
-    ) {
-      continue
-    }
-    artifacts[name] = artifact as unknown as OutputArtifactManifest
-  }
-  return { schema_version: '1', artifacts }
+  return parsed.data
 }
 
 export const mergeOutputManifest = (
@@ -62,21 +57,8 @@ export const outputArtifactsFromCallback = (
   if (!isObject(outputs) || !isObject(outputs.output_manifest)) return {}
   const rawArtifacts = outputs.output_manifest.artifacts
   if (!isObject(rawArtifacts)) return {}
-
-  const artifacts: Record<string, OutputArtifactManifest> = {}
-  for (const [name, artifact] of Object.entries(rawArtifacts)) {
-    if (!isObject(artifact)) continue
-    if (
-      typeof artifact.object_key !== 'string' ||
-      typeof artifact.checksum_sha256 !== 'string' ||
-      typeof artifact.content_type !== 'string' ||
-      typeof artifact.format !== 'string'
-    ) {
-      continue
-    }
-    artifacts[name] = artifact as unknown as OutputArtifactManifest
-  }
-  return artifacts
+  const parsed = outputManifestSchema.safeParse(outputs.output_manifest)
+  return parsed.success ? parsed.data.artifacts : {}
 }
 
 export const outputManifestJson = (value: OutputManifest) => JSON.stringify(value) as Json
