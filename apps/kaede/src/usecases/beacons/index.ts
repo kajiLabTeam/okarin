@@ -121,6 +121,9 @@ export const createOrganizationBeacon = async (
     uuid: payload.uuid.toLowerCase(),
     major: payload.major,
     minor: payload.minor,
+    ...(payload.mac_address === undefined
+      ? {}
+      : { mac_address: payload.mac_address.toLowerCase() }),
   })
   if (!config.success) return { ok: false, error: { type: 'BEACON_FORMAT_INVALID' } as const }
   try {
@@ -167,13 +170,26 @@ export const updateOrganizationBeacon = async (
       error: { type: 'BEACON_COORDINATES_INVALID', floorId: current.floor_id } as const,
     }
   const config =
-    payload.uuid !== undefined || payload.major !== undefined || payload.minor !== undefined
+    payload.uuid !== undefined ||
+    payload.major !== undefined ||
+    payload.minor !== undefined ||
+    payload.mac_address !== undefined
       ? ibeaconConfigSchema.safeParse({
           uuid: (
             payload.uuid ?? ibeaconConfigSchema.parse(current.format_config).uuid
           ).toLowerCase(),
           major: payload.major ?? ibeaconConfigSchema.parse(current.format_config).major,
           minor: payload.minor ?? ibeaconConfigSchema.parse(current.format_config).minor,
+          ...(payload.mac_address === undefined
+            ? (() => {
+                const currentMacAddress = ibeaconConfigSchema.parse(
+                  current.format_config
+                ).mac_address
+                return currentMacAddress === undefined ? {} : { mac_address: currentMacAddress }
+              })()
+            : payload.mac_address === null
+              ? {}
+              : { mac_address: payload.mac_address.toLowerCase() }),
         })
       : undefined
   if (config && !config.success)

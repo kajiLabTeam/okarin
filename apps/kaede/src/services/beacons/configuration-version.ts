@@ -46,6 +46,9 @@ export const configurationVersion = (beacons: ConfigurationBeacon[]) => {
           uuid: config.uuid.toLowerCase(),
           major: config.major,
           minor: config.minor,
+          ...(config.mac_address === undefined
+            ? {}
+            : { mac_address: config.mac_address.toLowerCase() }),
         },
         pixel_x: beacon.pixel_x,
         pixel_y: beacon.pixel_y,
