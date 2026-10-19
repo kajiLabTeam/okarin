@@ -180,10 +180,16 @@ export const updateOrganizationBeacon = async (
           ).toLowerCase(),
           major: payload.major ?? ibeaconConfigSchema.parse(current.format_config).major,
           minor: payload.minor ?? ibeaconConfigSchema.parse(current.format_config).minor,
-          mac_address:
-            payload.mac_address === undefined
-              ? ibeaconConfigSchema.parse(current.format_config).mac_address
-              : payload.mac_address.toLowerCase(),
+          ...(payload.mac_address === undefined
+            ? (() => {
+                const currentMacAddress = ibeaconConfigSchema.parse(
+                  current.format_config
+                ).mac_address
+                return currentMacAddress === undefined ? {} : { mac_address: currentMacAddress }
+              })()
+            : payload.mac_address === null
+              ? {}
+              : { mac_address: payload.mac_address.toLowerCase() }),
         })
       : undefined
   if (config && !config.success)

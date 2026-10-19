@@ -48,6 +48,10 @@ describe('beacon schemas', () => {
     ).toBe(false)
   })
 
+  it('PATCHはnullでMACアドレスを解除できる', () => {
+    expect(updateBeaconRequestSchema.parse({ mac_address: null })).toEqual({ mac_address: null })
+  })
+
   it('RFCのversion/variantがない128bit iBeacon UUIDも受け付ける', () => {
     expect(
       createBeaconRequestSchema.safeParse({

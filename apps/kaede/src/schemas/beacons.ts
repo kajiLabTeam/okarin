@@ -69,7 +69,7 @@ export const updateBeaconRequestSchema = z
     uuid: ibeaconUuidSchema.optional(),
     major: z.number().int().min(0).max(65535).optional(),
     minor: z.number().int().min(0).max(65535).optional(),
-    mac_address: beaconMacAddressSchema.optional(),
+    mac_address: beaconMacAddressSchema.nullable().optional(),
     name: z.string().trim().min(1).max(200).optional(),
     pixel_x: z.number().nonnegative().optional(),
     pixel_y: z.number().nonnegative().optional(),
