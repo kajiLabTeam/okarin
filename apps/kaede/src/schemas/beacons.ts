@@ -10,11 +10,20 @@ export const ibeaconUuidSchema = z
     'iBeacon UUID must be a 128-bit hexadecimal identifier'
   )
 
+export const beaconMacAddressSchema = z
+  .string()
+  .regex(
+    /^[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}$/,
+    'MAC address must be six hexadecimal octets separated by colons'
+  )
+  .transform((value) => value.toLowerCase())
+
 export const ibeaconConfigSchema = z
   .object({
     uuid: ibeaconUuidSchema,
     major: z.number().int().min(0).max(65535),
     minor: z.number().int().min(0).max(65535),
+    mac_address: beaconMacAddressSchema.optional(),
   })
   .strict()
 
@@ -44,6 +53,7 @@ export const createBeaconRequestSchema = z
     uuid: ibeaconUuidSchema,
     major: z.number().int().min(0).max(65535),
     minor: z.number().int().min(0).max(65535),
+    mac_address: beaconMacAddressSchema.optional(),
     name: z.string().trim().min(1).max(200),
     pixel_x: z.number().nonnegative(),
     pixel_y: z.number().nonnegative(),
@@ -59,6 +69,7 @@ export const updateBeaconRequestSchema = z
     uuid: ibeaconUuidSchema.optional(),
     major: z.number().int().min(0).max(65535).optional(),
     minor: z.number().int().min(0).max(65535).optional(),
+    mac_address: beaconMacAddressSchema.optional(),
     name: z.string().trim().min(1).max(200).optional(),
     pixel_x: z.number().nonnegative().optional(),
     pixel_y: z.number().nonnegative().optional(),

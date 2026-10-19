@@ -22,6 +22,32 @@ describe('beacon schemas', () => {
     ).toMatchObject({ uuid: 'FDA50693-A4E2-4FB1-AFCF-C6EB07647825', major: 1, minor: 2 })
   })
 
+  it('MACアドレスは任意で受け付けるが形式を検証する', () => {
+    expect(
+      createBeaconRequestSchema.safeParse({
+        name: 'mac-beacon',
+        format_type: 'ibeacon',
+        uuid: 'FDA50693-A4E2-4FB1-AFCF-C6EB07647825',
+        major: 1,
+        minor: 2,
+        mac_address: 'AA:BB:CC:DD:EE:FF',
+        pixel_x: 10,
+        pixel_y: 20,
+      }).success
+    ).toBe(true)
+    expect(
+      createBeaconRequestSchema.safeParse({
+        name: 'mac-beacon',
+        uuid: 'FDA50693-A4E2-4FB1-AFCF-C6EB07647825',
+        major: 1,
+        minor: 2,
+        mac_address: 'AABBCCDDEEFF',
+        pixel_x: 10,
+        pixel_y: 20,
+      }).success
+    ).toBe(false)
+  })
+
   it('RFCのversion/variantがない128bit iBeacon UUIDも受け付ける', () => {
     expect(
       createBeaconRequestSchema.safeParse({
@@ -83,7 +109,12 @@ describe('beacon schemas', () => {
     const first = {
       ...base,
       id: '33333333-3333-4333-8333-333333333333',
-      format_config: { uuid: 'FDA50693-A4E2-4FB1-AFCF-C6EB07647825', major: 1, minor: 2 },
+      format_config: {
+        uuid: 'FDA50693-A4E2-4FB1-AFCF-C6EB07647825',
+        major: 1,
+        minor: 2,
+        mac_address: 'AA:BB:CC:DD:EE:FF',
+      },
     }
     const second = {
       ...base,
