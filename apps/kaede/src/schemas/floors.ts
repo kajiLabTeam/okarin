@@ -66,6 +66,17 @@ export const floorIdParamsSchema = z
   })
   .openapi('FloorIdParams')
 
+export const organizationFloorIdParamsSchema = z
+  .object({
+    organizationId: uuidSchema.openapi({
+      description: 'organization を一意に識別する ID',
+    }),
+    floorId: uuidSchema.openapi({
+      description: 'floor を一意に識別する ID',
+    }),
+  })
+  .openapi('OrganizationFloorIdParams')
+
 export const floorsListResponseSchema = z
   .object({
     floors: z.array(floorSchema).openapi({
@@ -111,7 +122,26 @@ export const createFloorMultipartRequestSchema = z
   })
   .openapi('CreateFloorMultipartRequest')
 
+export const updateFloorRequestSchema = z
+  .object({
+    level: z.number().int().optional().openapi({
+      description: '階層',
+    }),
+    name: z.string().trim().min(1).max(255).optional().openapi({
+      description: 'floor の名称',
+    }),
+    scale: z.number().positive().finite().nullable().optional().openapi({
+      description: '縮尺。未設定の場合は null',
+    }),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'at least one field is required',
+  })
+  .openapi('UpdateFloorRequest')
+
 export type CreateFloorRequest = z.infer<typeof createFloorRequestSchema>
 export type CreateFloorMultipartRequest = z.infer<typeof createFloorMultipartRequestSchema>
+export type UpdateFloorRequest = z.infer<typeof updateFloorRequestSchema>
 export type FloorIdParams = z.infer<typeof floorIdParamsSchema>
 export type FloorResponse = z.infer<typeof floorSchema>

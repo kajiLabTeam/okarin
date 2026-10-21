@@ -1,4 +1,4 @@
-import type { Insertable, Selectable } from 'kysely'
+import type { Insertable, Selectable, Updateable } from 'kysely'
 import type { Floors } from '../db/generated.js'
 import { db } from '../db/index.js'
 import type { DbExecutor } from '../executor.js'
@@ -45,6 +45,7 @@ const floorRowsQuery = (executor: DbExecutor = db) =>
       'floors.created_at',
       'floors.updated_at',
     ])
+    .where('floors.deleted_at', 'is', null)
     .whereRef('buildings.organization_id', '=', 'floors.organization_id')
 
 export const listFloors = async ({
@@ -98,6 +99,34 @@ export const insertFloor = async (
   return executor.insertInto('floors').values(newFloor).returningAll().executeTakeFirstOrThrow()
 }
 
+export const updateFloor = async (
+  floorId: string,
+  patch: Pick<Updateable<Floors>, 'level' | 'name' | 'scale'>,
+  executor: DbExecutor = db
+): Promise<Floor | undefined> => {
+  return executor
+    .updateTable('floors')
+    .set(patch)
+    .where('id', '=', floorId)
+    .where('deleted_at', 'is', null)
+    .returningAll()
+    .executeTakeFirst()
+}
+
+export const softDeleteFloor = async (
+  floorId: string,
+  executor: DbExecutor = db
+): Promise<boolean> => {
+  const result = await executor
+    .updateTable('floors')
+    .set({ deleted_at: new Date() })
+    .where('id', '=', floorId)
+    .where('deleted_at', 'is', null)
+    .executeTakeFirst()
+
+  return Number(result.numUpdatedRows) > 0
+}
+
 export const findFloorById = async (
   floorId: string,
   executor: DbExecutor = db
@@ -108,5 +137,6 @@ export const findFloorById = async (
     .selectFrom('floors')
     .select(['id', 'organization_id', 'scale', 'map_width_px', 'map_height_px'])
     .where('id', '=', floorId)
+    .where('deleted_at', 'is', null)
     .executeTakeFirst()
 }

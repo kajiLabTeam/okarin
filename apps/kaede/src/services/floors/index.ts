@@ -1,1 +1,8 @@
-export { findFloorById, findFloorDetailById, insertFloor, listFloors } from './floor-repository.js'
+export {
+  findFloorById,
+  findFloorDetailById,
+  insertFloor,
+  listFloors,
+  softDeleteFloor,
+  updateFloor,
+} from './floor-repository.js'
