@@ -20,6 +20,7 @@ import { registerListOrganizationRecordingsRoute } from './list-organization-rec
 import { registerListOrganizationTrajectoriesRoute } from './list-organization-trajectories.js'
 import { registerListOrganizationUsersRoute } from './list-organization-users.js'
 import { registerListOrganizationsRoute } from './list-organizations.js'
+import { registerManageOrganizationFloorRoute } from './manage-organization-floor.js'
 import { registerOrganizationMemberProfileRoutes } from './member-profiles.js'
 import { registerMembershipAdministrationRoutes } from './membership-administration.js'
 import { registerOrganizationOidcLinkRoutes } from './oidc-links.js'
@@ -40,6 +41,7 @@ registerCreateOrganizationBuildingRoute(organizationsRoutes)
 registerCreateOrganizationBuildingFloorRoute(organizationsRoutes)
 registerListOrganizationBuildingFloorsRoute(organizationsRoutes)
 registerListOrganizationFloorsRoute(organizationsRoutes)
+registerManageOrganizationFloorRoute(organizationsRoutes)
 registerListOrganizationRecordingsRoute(organizationsRoutes)
 registerListOrganizationTrajectoriesRoute(organizationsRoutes)
 registerListOrganizationUsersRoute(organizationsRoutes)

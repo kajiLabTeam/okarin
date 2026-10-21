@@ -34,6 +34,7 @@ const listCountsByBuilding = async (
       .select(({ fn }) => fn.countAll<string>().as('floor_count'))
       .where('organization_id', '=', organizationId)
       .where('building_id', 'in', buildingIds)
+      .where('deleted_at', 'is', null)
       .groupBy('building_id')
       .execute(),
     executor
@@ -44,6 +45,7 @@ const listCountsByBuilding = async (
       .where('recordings.organization_id', '=', organizationId)
       .where('floors.organization_id', '=', organizationId)
       .where('floors.building_id', 'in', buildingIds)
+      .where('floors.deleted_at', 'is', null)
       .where('recordings.deleted_at', 'is', null)
       .groupBy('floors.building_id')
       .execute(),

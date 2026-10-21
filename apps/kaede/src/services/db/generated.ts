@@ -184,6 +184,7 @@ export interface Beacons {
 export interface Floors {
   building_id: string
   created_at: Generated<Timestamp>
+  deleted_at: Timestamp | null
   id: Generated<string>
   image_object_path: string
   level: number
