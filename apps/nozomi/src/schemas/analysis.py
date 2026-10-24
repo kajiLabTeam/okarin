@@ -56,6 +56,9 @@ Constraint = StartConstraint | WaypointConstraint | GoalConstraint
 class RawDataUrls(BaseModel):
     acce: HttpUrl = Field(description="加速度センサ raw データ取得用 URL")
     gyro: HttpUrl = Field(description="ジャイロセンサ raw データ取得用 URL")
+    metadata: HttpUrl | None = Field(
+        default=None, description="収録開始時刻を含む metadata raw データ取得用 URL"
+    )
     pressure: HttpUrl | None = Field(
         default=None, description="気圧センサ raw データ取得用 URL"
     )

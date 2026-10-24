@@ -57,7 +57,7 @@ vi.mock('../beacons/index.js', () => ({
 }))
 vi.mock('../storage/index.js', () => ({
   buildRecordingRawObjectKey: (organizationId: string, recordingId: string, target: string) =>
-    `organizations/${organizationId}/recordings/${recordingId}/raw/${target}.csv`,
+    `organizations/${organizationId}/recordings/${recordingId}/raw/${target === 'metadata' ? 'metadata.json' : `${target}.csv`}`,
   getFloorMapObjectBytes: getFloorMapBytesMock,
   putBeaconLayoutObject: putBeaconLayoutMock,
 }))
@@ -398,6 +398,11 @@ describe('pipeline availability', () => {
           data_type: 'gyro',
           object_key: 'organizations/org-1/recordings/legacy-recording/raw/gyro.csv',
         },
+        {
+          data_asset_id: 'legacy:legacy-recording:metadata',
+          data_type: 'metadata',
+          object_key: 'organizations/org-1/recordings/legacy-recording/raw/metadata.json',
+        },
       ],
     },
     {
@@ -412,6 +417,11 @@ describe('pipeline availability', () => {
       expectedAssets: [
         { data_asset_id: 'acce-1', data_type: 'acce' },
         { data_asset_id: 'gyro-1', data_type: 'gyro' },
+        {
+          data_asset_id: 'legacy:asset-recording:metadata',
+          data_type: 'metadata',
+          object_key: 'organizations/org-1/recordings/asset-recording/raw/metadata.json',
+        },
       ],
     },
   ])('$labelでもPDRの実行入力を解決できる', async ({ recording, assets, expectedAssets }) => {

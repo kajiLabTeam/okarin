@@ -80,6 +80,26 @@ describe('pipeline schemas', () => {
     expect(pipelineCatalogSchema.parse([catalogEntry])).toHaveLength(1)
   })
 
+  it('metadata asset contractを受理する', () => {
+    expect(
+      pipelineCatalogSchema.parse([
+        {
+          ...catalogEntry,
+          input_slots: [
+            {
+              slot_id: 'metadata',
+              required: true,
+              max_assets: 1,
+              accepted_contracts: [
+                { kind: 'asset', data_type: 'metadata', schema_version: '1', format: 'json' },
+              ],
+            },
+          ],
+        },
+      ])
+    ).toHaveLength(1)
+  })
+
   it('必須のdigestとslot契約が欠けた応答を拒否する', () => {
     expect(pipelineSchema.safeParse({ ...pipeline, digest: undefined }).success).toBe(false)
     expect(

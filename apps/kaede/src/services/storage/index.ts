@@ -5,6 +5,7 @@ export {
   getTrajectoryAnalyzedResultObjectText,
   getAnalysisHeatmapObjectText,
   getFloorMapObjectBytes,
+  getObjectBytes,
   listRecordingRawObjectKeys,
   validateBleCsvObject,
   validateDataAssetObject,

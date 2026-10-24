@@ -15,6 +15,7 @@ from src.schemas.pipeline import (
 
 ACCE = AssetContract(data_type=DataType.ACCE, schema_version="1", format="csv")
 GYRO = AssetContract(data_type=DataType.GYRO, schema_version="1", format="csv")
+METADATA = AssetContract(data_type=DataType.METADATA, schema_version="1", format="json")
 BLE = AssetContract(data_type=DataType.BLE, schema_version="1", format="csv")
 FLOOR_MAP_PNG = AssetContract(
     data_type=DataType.FLOOR_MAP, schema_version="1", format="png"
@@ -116,6 +117,7 @@ def _pipeline(
 def initial_catalog() -> tuple[PipelineDefinition, ...]:
     acce = _slot("acce", ACCE)
     gyro = _slot("gyro", GYRO)
+    metadata = _slot("metadata", METADATA)
     ble = _slot("ble", BLE)
     floor_map = _slot("floor_map", FLOOR_MAP_PNG)
     beacon_layout = _slot("beacon_layout", BEACON_LAYOUT)
@@ -125,7 +127,7 @@ def initial_catalog() -> tuple[PipelineDefinition, ...]:
             pipeline_id="pdr",
             display_name="PDR",
             component_id="rikka-pdr",
-            inputs=(acce, gyro),
+            inputs=(acce, gyro, metadata),
             parameters_schema=_parameters_schema(
                 map_required=False, particle=False, ble=False
             ),
@@ -134,7 +136,7 @@ def initial_catalog() -> tuple[PipelineDefinition, ...]:
             pipeline_id="pdr-particle-filter",
             display_name="PDR + Particle Filter",
             component_id="rikka-pdr-particle-filter",
-            inputs=(acce, gyro, floor_map),
+            inputs=(acce, gyro, metadata, floor_map),
             parameters_schema=_parameters_schema(
                 map_required=True, particle=True, ble=False
             ),
@@ -143,7 +145,7 @@ def initial_catalog() -> tuple[PipelineDefinition, ...]:
             pipeline_id="pdr-ble",
             display_name="PDR + BLE",
             component_id="rikka-pdr-ble",
-            inputs=(acce, gyro, ble, floor_map, beacon_layout),
+            inputs=(acce, gyro, metadata, ble, floor_map, beacon_layout),
             parameters_schema=_parameters_schema(
                 map_required=True, particle=False, ble=True
             ),
@@ -152,7 +154,7 @@ def initial_catalog() -> tuple[PipelineDefinition, ...]:
             pipeline_id="pdr-particle-filter-ble",
             display_name="PDR + Particle Filter + BLE",
             component_id="rikka-pdr-particle-filter-ble",
-            inputs=(acce, gyro, ble, floor_map, beacon_layout),
+            inputs=(acce, gyro, metadata, ble, floor_map, beacon_layout),
             parameters_schema=_parameters_schema(
                 map_required=True, particle=True, ble=True
             ),
