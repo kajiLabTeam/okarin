@@ -234,6 +234,9 @@ export const refreshUploadUrlsResponseSchema = z
     upload_urls: uploadUrlsSchema.openapi({
       description: '再発行されたアップロード URL',
     }),
+    asset_upload_urls: uploadUrlsSchema.optional().openapi({
+      description: '再発行されたデータ資産用アップロード URL',
+    }),
     expires_at: isoDatetimeSchema.openapi({
       description: '再発行したアップロード URL の有効期限',
     }),
