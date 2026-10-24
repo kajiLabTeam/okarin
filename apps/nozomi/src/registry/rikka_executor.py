@@ -327,6 +327,7 @@ class RikkaComponentExecutor:
                         else int(parameters["particle_seed"])
                     ),
                     count=int(parameters.get("particle_count", 500)),
+                    landmark_mode="ranging" if uses_ble else "hybrid",
                 )
                 result = run_particle(
                     pdr_result.prepared,
