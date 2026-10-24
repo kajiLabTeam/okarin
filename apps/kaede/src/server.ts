@@ -56,6 +56,11 @@ export const createApp = () => {
   app.route('/api/invites', organizationInvitesRoutes)
 
   app.onError((err, c) => {
+    console.error('Unhandled request error', {
+      method: c.req.method,
+      path: c.req.path,
+      error: err instanceof Error ? (err.stack ?? err.message) : err,
+    })
     if ('issues' in err) {
       console.error('Request validation failed', {
         method: c.req.method,
