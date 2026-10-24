@@ -32,7 +32,7 @@ export interface RecordingAuthorizationRow {
 }
 
 const activeRecordingsQuery = (executor: DbExecutor) =>
-  executor.selectFrom('recordings').where('deleted_at', 'is', null)
+  executor.selectFrom('recordings').where('recordings.deleted_at', 'is', null)
 
 export const findRecordingById = async (
   recordingId: string,
