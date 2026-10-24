@@ -8,6 +8,7 @@ export const assetContractSchema = z
       'acce',
       'gyro',
       'ble',
+      'metadata',
       'resource.floor_map',
       'resource.beacon_layout',
       'pose',
