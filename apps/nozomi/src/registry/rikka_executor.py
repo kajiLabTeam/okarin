@@ -53,7 +53,11 @@ def _find_column(dataframe: pd.DataFrame, candidates: tuple[str, ...]) -> str | 
     return next((candidate for candidate in candidates if candidate in dataframe), None)
 
 
-def _sensor_dataframe(content: bytes, sensor_kind: str) -> pd.DataFrame:
+def _sensor_dataframe(
+    content: bytes,
+    sensor_kind: str,
+    recording_start_wall_time_ms: float | None = None,
+) -> pd.DataFrame:
     try:
         source = pd.read_csv(BytesIO(content)).rename(
             columns=lambda column: str(column).strip()
@@ -69,7 +73,17 @@ def _sensor_dataframe(content: bytes, sensor_kind: str) -> pd.DataFrame:
         normalized["t"] = pd.to_numeric(source[time_column], errors="coerce")
     elif "timestamp_ns" in source:
         timestamps = pd.to_numeric(source["timestamp_ns"], errors="coerce")
-        normalized["t"] = (timestamps - timestamps.iloc[0]) / 1_000_000_000
+        start_offset_s = 0.0
+        if recording_start_wall_time_ms is not None and "wall_time_ms" in source:
+            first_wall_time_ms = pd.to_numeric(
+                source["wall_time_ms"], errors="coerce"
+            ).iloc[0]
+            start_offset_s = (
+                float(first_wall_time_ms) - recording_start_wall_time_ms
+            ) / 1_000.0
+        normalized["t"] = (
+            timestamps - timestamps.iloc[0]
+        ) / 1_000_000_000 + start_offset_s
     elif "wall_time_ms" in source:
         timestamps = pd.to_numeric(source["wall_time_ms"], errors="coerce")
         normalized["t"] = (timestamps - timestamps.iloc[0]) / 1_000
@@ -94,6 +108,19 @@ def _png_dimensions(content: bytes) -> tuple[int, int]:
     if width == 0 or height == 0:
         raise PermanentComponentError("floor_map dimensions must be positive")
     return width, height
+
+
+def _recording_start_wall_time_ms(content: bytes) -> float:
+    try:
+        metadata = json.loads(content)
+        value = metadata["recording_start_wall_time_ms"]
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError
+        return float(value)
+    except (TypeError, ValueError, KeyError, json.JSONDecodeError) as exc:
+        raise PermanentComponentError(
+            "metadata input does not contain a valid recording_start_wall_time_ms"
+        ) from exc
 
 
 def _landmarks(content: bytes, map_dimensions: tuple[int, int]) -> tuple[Landmark, ...]:
@@ -248,8 +275,17 @@ class RikkaComponentExecutor:
         if not all(isinstance(value, bytes) for value in inputs.values()):
             raise PermanentComponentError("Rikka inputs must be downloaded bytes")
 
-        acce = _sensor_dataframe(inputs["acce"], "acce")
-        gyro = _sensor_dataframe(inputs["gyro"], "gyro")
+        recording_start_wall_time_ms = _recording_start_wall_time_ms(inputs["metadata"])
+        acce = _sensor_dataframe(
+            inputs["acce"],
+            "acce",
+            recording_start_wall_time_ms,
+        )
+        gyro = _sensor_dataframe(
+            inputs["gyro"],
+            "gyro",
+            recording_start_wall_time_ms,
+        )
         uses_particle = "particle-filter" in component.component_id
         uses_ble = component.component_id.endswith("-ble")
 
