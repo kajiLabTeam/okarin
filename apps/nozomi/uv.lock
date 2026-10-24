@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.14"
 resolution-markers = [
     "sys_platform == 'win32'",
@@ -554,7 +554,7 @@ requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.135.1" },
     { name = "pandas", specifier = ">=3.0.1" },
     { name = "pydantic", specifier = ">=2.12.5" },
-    { name = "rikka", git = "https://github.com/kajiLabTeam/rikka.git?rev=d9451f9" },
+    { name = "rikka", git = "https://github.com/kajiLabTeam/rikka.git?rev=a62c31069fea19503cdefcc3fb9aa12c3a131e7b" },
     { name = "scalar-fastapi", specifier = ">=1.4.1" },
     { name = "sentry-sdk", specifier = ">=2.54.0" },
 ]
@@ -928,7 +928,7 @@ wheels = [
 [[package]]
 name = "rikka"
 version = "0.1.0"
-source = { git = "https://github.com/kajiLabTeam/rikka.git?rev=d9451f9#d9451f904bb7514cce2416ad5bf7700999911e7d" }
+source = { git = "https://github.com/kajiLabTeam/rikka.git?rev=a62c31069fea19503cdefcc3fb9aa12c3a131e7b#a62c31069fea19503cdefcc3fb9aa12c3a131e7b" }
 dependencies = [
     { name = "click" },
     { name = "matplotlib" },
