@@ -107,7 +107,7 @@ export const buildingDetailFloorSchema = z
     }),
     map_image: z
       .object({
-        download_url: z.string().url(),
+        download_url: z.url(),
         download_expires_at: isoDatetimeSchema,
         content_type: z.enum(['image/png', 'image/svg+xml']),
         extension: z.enum(['png', 'svg']),

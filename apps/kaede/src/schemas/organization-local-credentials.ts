@@ -22,7 +22,7 @@ export const organizationLocalCredentialSchema = z
       organization_id: uuidSchema,
       membership_id: uuidSchema,
       configured: z.literal(true),
-      login_email: z.string().email().max(255),
+      login_email: z.email().max(255),
       enabled: z.boolean(),
       password_changed_at: isoDatetimeSchema,
       updated_at: isoDatetimeSchema,
@@ -32,7 +32,7 @@ export const organizationLocalCredentialSchema = z
 
 export const putOrganizationLocalCredentialRequestSchema = z
   .object({
-    login_email: z.string().email().max(255),
+    login_email: z.email().max(255),
     new_password: passwordSchema,
     current_password: passwordSchema.optional(),
   })

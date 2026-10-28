@@ -7,7 +7,6 @@ import type { RequestActorContext } from '../../middleware/request-actor-context
 import { organizationBuildingIdParamsSchema } from '../../schemas/buildings.js'
 import { errorResponseSchema } from '../../schemas/common.js'
 import { createFloorMultipartRequestSchema, floorSchema } from '../../schemas/floors.js'
-import type { FloorMapContentType } from '../../services/storage/index.js'
 import { createFloor, floorMapImageMaxBytes } from '../../usecases/floors/create-floor.js'
 import type { CreateFloorResult } from '../../usecases/floors/create-floor.js'
 import { toAuthorizationErrorResponse } from '../authorization-error.js'
@@ -127,7 +126,7 @@ const parseFloorMultipartBody = async (c: Context) => {
       payload: parsed.data,
       mapImage: {
         bytes,
-        contentType: contentType as FloorMapContentType,
+        contentType: contentType,
       },
     },
   } as const
@@ -149,7 +148,17 @@ export const registerCreateOrganizationBuildingFloorRoute = (app: OpenAPIHono) =
           },
           413
         ),
-    })
+    }),
+    async (c, next) => {
+      if (
+        c.req.method === 'POST' &&
+        !/^multipart\/form-data(?:;|$)/i.test(c.req.header('content-type') ?? '')
+      ) {
+        const error = badRequest('FLOOR_REQUEST_INVALID', 'floor request is invalid')
+        return c.json(error.body, error.status)
+      }
+      await next()
+    }
   )
 
   const route = createRoute({

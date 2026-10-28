@@ -1,6 +1,5 @@
 import type { RequestActor } from '../../middleware/request-actor-context.js'
 import type { UpdateOrganizationAuthSettingsRequest } from '../../schemas/organization-auth-settings.js'
-import type { Json } from '../../services/db/index.js'
 import { db } from '../../services/db/index.js'
 import type { DbExecutor } from '../../services/executor.js'
 import {
@@ -136,11 +135,11 @@ export const patchOrganizationAuthSettings = async (
         before_values: {
           ...beforeValues,
           policy_version: Number(current.policy_version),
-        } as Json,
+        },
         after_values: {
           ...afterValues,
           policy_version: Number(updated.policy_version),
-        } as Json,
+        },
       },
       trx
     )

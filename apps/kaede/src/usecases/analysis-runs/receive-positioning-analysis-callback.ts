@@ -26,10 +26,7 @@ export type ReceivePositioningAnalysisCallbackResult =
       ok: false
       error: {
         type:
-          | 'UNAUTHORIZED'
-          | 'RUN_ITEM_NOT_FOUND'
-          | 'CALLBACK_ALREADY_PROCESSED'
-          | 'INTERNAL_ERROR'
+          'UNAUTHORIZED' | 'RUN_ITEM_NOT_FOUND' | 'CALLBACK_ALREADY_PROCESSED' | 'INTERNAL_ERROR'
         status: number
         message?: string
       }

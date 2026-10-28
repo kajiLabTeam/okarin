@@ -185,8 +185,7 @@ export const completeUpload = async (
     interface AssetValidation {
       asset: (typeof dataAssets)[number]
       validation:
-        | Awaited<ReturnType<typeof validateDataAssetObject>>
-        | { valid: false; code: string }
+        Awaited<ReturnType<typeof validateDataAssetObject>> | { valid: false; code: string }
     }
     const assetValidations: AssetValidation[] = []
     for (const asset of dataAssets) {

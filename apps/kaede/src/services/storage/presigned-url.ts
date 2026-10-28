@@ -50,7 +50,7 @@ export const getFloorMapExtensionFromObjectKey = (
   return undefined
 }
 
-const objectKeyUuidSchema = z.string().uuid()
+const objectKeyUuidSchema = z.uuid()
 
 const validateObjectKeyUuid = (value: string, name: string) => {
   const parsed = objectKeyUuidSchema.safeParse(value)

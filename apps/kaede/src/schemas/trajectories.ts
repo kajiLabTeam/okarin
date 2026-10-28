@@ -3,7 +3,7 @@ import { z } from '@hono/zod-openapi'
 import { isoDatetimeSchema, trajectoryStatusSchema, uuidSchema } from './common.js'
 import { paginationMetadataSchema } from './pagination.js'
 
-const finiteNumberSchema = z.number().finite()
+const finiteNumberSchema = z.number()
 const directionSchema = finiteNumberSchema.min(0).lt(360)
 
 const startConstraintSchema = z
@@ -93,21 +93,21 @@ const validateTrajectoryConstraints = (
 
   if (startCount !== 1) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       message: 'constraints must contain exactly one start point',
     })
   }
 
   if (goalCount > 1) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       message: 'constraints must contain at most one goal point',
     })
   }
 
   if (new Set(seqs).size !== seqs.length) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       message: 'constraint seq must be unique',
     })
   }
@@ -115,7 +115,7 @@ const validateTrajectoryConstraints = (
   for (const [index, seq] of seqs.entries()) {
     if (seq !== index) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'constraints must be ordered by seq starting at 0 with no gaps',
       })
       break
@@ -274,10 +274,10 @@ export const trajectoryExecutionMetadataSchema = z
     pipeline_digest: z.string().nullable().openapi({
       description: 'pipeline 定義のスナップショットダイジェスト',
     }),
-    parameters: z.record(z.unknown()).openapi({
+    parameters: z.record(z.string(), z.unknown()).openapi({
       description: '実行時に渡されたパラメータ',
     }),
-    inputs: z.record(z.unknown()).nullable().openapi({
+    inputs: z.record(z.string(), z.unknown()).nullable().openapi({
       description: '入力として渡された data asset のマニフェスト',
     }),
     executed_at: isoDatetimeSchema.openapi({
@@ -354,7 +354,7 @@ export const trajectoryResultResponseSchema = z
     trajectory_id: uuidSchema.openapi({
       description: 'result を取得する trajectory の ID',
     }),
-    download_url: z.string().url().openapi({
+    download_url: z.url().openapi({
       description: 'result.csv を取得するための署名付き URL',
     }),
     expires_at: isoDatetimeSchema.openapi({
@@ -371,9 +371,9 @@ export const trajectoryResultResponseSchema = z
             content_type: z.string(),
             format: z.string(),
             size_bytes: z.number().int().nonnegative().optional(),
-            generated_at: z.string().datetime().optional(),
+            generated_at: z.iso.datetime().optional(),
             available: z.boolean().optional(),
-            download_url: z.string().url().optional(),
+            download_url: z.url().optional(),
             expires_at: isoDatetimeSchema.optional(),
           })
         ),
@@ -482,7 +482,7 @@ export const uploadUrlWithPathResponseSchema = z
     trajectory_id: uuidSchema.openapi({
       description: '対象 trajectory の ID',
     }),
-    upload_url: z.string().url().openapi({
+    upload_url: z.url().openapi({
       description: 'アップロード用の署名付き URL',
     }),
     upload_path: z.string().min(1).openapi({

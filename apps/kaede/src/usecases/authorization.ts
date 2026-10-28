@@ -2,13 +2,10 @@ import type { RequestActor } from '../middleware/request-actor-context.js'
 import type { AccountState, MembershipRole } from '../schemas/common.js'
 
 export type AuthorizationError =
-  | { type: 'AUTH_DASHBOARD_FORBIDDEN' }
-  | { type: 'AUTH_ORGANIZATION_FORBIDDEN' }
+  { type: 'AUTH_DASHBOARD_FORBIDDEN' } | { type: 'AUTH_ORGANIZATION_FORBIDDEN' }
 
 export type AuthenticationGateError =
-  | { type: 'AUTH_UNAUTHENTICATED' }
-  | { type: 'AUTH_USER_DISABLED' }
-  | AuthorizationError
+  { type: 'AUTH_UNAUTHENTICATED' } | { type: 'AUTH_USER_DISABLED' } | AuthorizationError
 
 const roleRanks = {
   member: 1,

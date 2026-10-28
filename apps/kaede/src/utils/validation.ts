@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
-import type { ZodSchema } from 'zod'
+import type { ZodType } from 'zod'
 
-export const parseWithSchema = <T>(schema: ZodSchema<T>, input: unknown): T => {
+export const parseWithSchema = <T>(schema: ZodType<T>, input: unknown): T => {
   return schema.parse(input)
 }
 

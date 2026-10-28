@@ -2,12 +2,12 @@ import { z } from 'zod'
 import { getNozomiRuntimeConfig } from '../../config/runtime.js'
 
 const analyzeAcceptedResponseSchema = z.object({
-  trajectory_id: z.string().uuid(),
+  trajectory_id: z.uuid(),
   status: z.literal('accepted'),
 })
 
 const stayHeatmapAcceptedResponseSchema = z.object({
-  analysis_run_id: z.string().uuid(),
+  analysis_run_id: z.uuid(),
   status: z.literal('accepted'),
 })
 

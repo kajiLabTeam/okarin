@@ -5,7 +5,7 @@ import { paginationMetadataSchema, paginationQuerySchema } from './pagination.js
 const parameterSchema = (minimum: number, maximum: number) =>
   z
     .number()
-    .finite()
+
     .min(minimum)
     .max(maximum)
     .refine((value) => Number.isInteger(value * 1000), 'must have at most 3 decimal places')
@@ -70,12 +70,12 @@ export const stayHeatmapArtifactSchema = z
       .object({
         width_px: z.number().int().positive(),
         height_px: z.number().int().positive(),
-        scale_m_per_px: z.number().positive().finite(),
+        scale_m_per_px: z.number().positive(),
       })
       .strict(),
     grid: z
       .object({
-        size_m: z.number().positive().finite(),
+        size_m: z.number().positive(),
         column_count: z.number().int().positive(),
         row_count: z.number().int().positive(),
       })
@@ -91,7 +91,7 @@ export const stayHeatmapArtifactSchema = z
         .superRefine((trajectory, ctx) => {
           const cells = trajectory.cells.map((cell) => `${cell.grid_row}:${cell.grid_column}`)
           if (new Set(cells).size !== cells.length) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'cells must be unique' })
+            ctx.addIssue({ code: 'custom', message: 'cells must be unique' })
           }
         })
     ),
@@ -100,10 +100,10 @@ export const stayHeatmapArtifactSchema = z
   .superRefine((artifact, ctx) => {
     const ids = artifact.trajectories.map((trajectory) => trajectory.trajectory_id)
     if (artifact.input_trajectory_count !== artifact.trajectories.length) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'trajectory count does not match' })
+      ctx.addIssue({ code: 'custom', message: 'trajectory count does not match' })
     }
     if (new Set(ids).size !== ids.length) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'trajectory IDs must be unique' })
+      ctx.addIssue({ code: 'custom', message: 'trajectory IDs must be unique' })
     }
     for (const trajectory of artifact.trajectories) {
       for (const cell of trajectory.cells) {
@@ -111,7 +111,7 @@ export const stayHeatmapArtifactSchema = z
           cell.grid_column >= artifact.grid.column_count ||
           cell.grid_row >= artifact.grid.row_count
         ) {
-          ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'cell must be inside the grid' })
+          ctx.addIssue({ code: 'custom', message: 'cell must be inside the grid' })
         }
       }
     }
@@ -163,7 +163,7 @@ const trajectoryCountsSchema = z.object({
   excluded_deleted: z.number().int().nonnegative(),
 })
 const analysisRunErrorSchema = z.object({ code: z.string(), message: z.string() }).nullable()
-const nullableDateTimeSchema = z.string().datetime().nullable()
+const nullableDateTimeSchema = z.iso.datetime().nullable()
 
 export const analysisRunParamsSchema = z.object({
   organizationId: uuidSchema,
@@ -187,8 +187,8 @@ const analysisRunSummarySchema = z.object({
   definition_version: z.string(),
   trajectory_counts: trajectoryCountsSchema,
   error: analysisRunErrorSchema,
-  created_at: z.string().datetime(),
-  updated_at: z.string().datetime(),
+  created_at: z.iso.datetime(),
+  updated_at: z.iso.datetime(),
   finished_at: nullableDateTimeSchema,
 })
 
@@ -206,7 +206,7 @@ export const analysisRunDetailResponseSchema = analysisRunSummarySchema.extend({
     })
   ),
   started_at: nullableDateTimeSchema,
-  deadline_at: z.string().datetime(),
+  deadline_at: z.iso.datetime(),
 })
 
 export const analysisRunResultResponseSchema = z.object({
@@ -235,7 +235,7 @@ export const analysisRunResultResponseSchema = z.object({
   }),
   trajectory_counts: trajectoryCountsSchema,
   trajectory_csvs: z.array(
-    z.object({ trajectory_id: uuidSchema, download_url: z.string().url(), expires_at: z.string() })
+    z.object({ trajectory_id: uuidSchema, download_url: z.url(), expires_at: z.string() })
   ),
 })
 

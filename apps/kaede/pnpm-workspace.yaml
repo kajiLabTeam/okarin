@@ -1,3 +1,11 @@
+overrides:
+  # Keep transitive dependencies above the security fixes until upstream catches up.
+  'vite@>=7.0.0 <7.3.7': ^7.3.7
+  'dockerode>uuid': ^11.1.1
+  'postcss@<8.5.23': ^8.5.23
+  'nanoid@<3.3.18': ^3.3.18
+  'source-map-js@<1.2.2': ^1.2.2
+
 allowBuilds:
   argon2: true
   cpu-features: true

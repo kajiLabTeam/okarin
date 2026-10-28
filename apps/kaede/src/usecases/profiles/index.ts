@@ -8,7 +8,7 @@ import type {
   UserProfileResponse,
 } from '../../schemas/profiles.js'
 import { db } from '../../services/db/index.js'
-import type { DB, Json } from '../../services/db/index.js'
+import type { DB } from '../../services/db/index.js'
 import type { DbExecutor } from '../../services/executor.js'
 import {
   findMemberProfileContextById,
@@ -312,8 +312,8 @@ export const updateOrganizationMemberProfile = async (
           target_id: membershipId,
           action: 'update',
           changed_fields: changedFields,
-          before_values: before as Json,
-          after_values: { ...after, actor_role: actorRole } as Json,
+          before_values: before,
+          after_values: { ...after, actor_role: actorRole },
         },
         trx
       )

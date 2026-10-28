@@ -7,7 +7,7 @@ import type { DbExecutor } from '../executor.js'
 export type OutboxJob = Selectable<OutboxJobs>
 export type NewOutboxJob = Omit<Insertable<OutboxJobs>, 'id' | 'created_at' | 'updated_at'>
 
-const json = (value: unknown): Json => JSON.stringify(value) as Json
+const json = (value: unknown): Json => JSON.stringify(value)
 
 export interface PositioningAnalysisDispatchPayload {
   analysis_run_item_id: string

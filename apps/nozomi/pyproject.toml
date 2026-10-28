@@ -3,9 +3,9 @@ name = "nozomi"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.14.10"
 dependencies = [
-    "fastapi[standard]>=0.135.1",
+    "fastapi[standard]>=0.162.0",
     "pandas>=3.0.1",
     "pydantic>=2.12.5",
     "rikka",
@@ -28,7 +28,7 @@ include = ["src*"]
 [dependency-groups]
 dev = [
     "ruff>=0.15",
-    "pytest>=9.0",
+    "pytest>=9.2.0",
     "mypy>=1.19",
 ]
 

@@ -1,4 +1,6 @@
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import sentry_sdk
 import uvicorn
@@ -90,7 +92,17 @@ def start() -> None:
     uvicorn.run("src.server:app", host=os.getenv("HOST", "0.0.0.0"), port=_port())
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    start_callback_retry_worker()
+    try:
+        yield
+    finally:
+        stop_callback_retry_worker()
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="nozomi API",
     description=(
         "nozomi は解析サーバーとして動作する API サーバーであり、"
@@ -149,6 +161,3 @@ app.include_router(analysis_router)
 app.include_router(debug_router)
 app.include_router(pipelines_router)
 app.include_router(executions_router)
-
-app.add_event_handler("startup", start_callback_retry_worker)
-app.add_event_handler("shutdown", stop_callback_retry_worker)

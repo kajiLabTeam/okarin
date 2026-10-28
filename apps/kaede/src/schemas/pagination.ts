@@ -7,8 +7,7 @@ const base64UrlSchema = z
   .min(1)
   .max(MAX_CURSOR_LENGTH)
   .regex(/^[A-Za-z0-9_-]+$/)
-const cursorTimestampSchema = z
-  .string()
+const cursorTimestampSchema = z.iso
   .datetime({ offset: false, precision: 6 })
   .regex(/Z$/)
   .refine((value) => !value.startsWith('0000-'), {
@@ -19,7 +18,7 @@ const paginationCursorPayloadSchema = z
   .object({
     v: z.literal(1),
     created_at: cursorTimestampSchema,
-    id: z.string().uuid(),
+    id: z.uuid(),
   })
   .strict()
 

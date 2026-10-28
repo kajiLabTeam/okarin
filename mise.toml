@@ -1,2 +1,6 @@
 [tools]
 lefthook = "2.1.10"
+node = "24.22.1"
+pnpm = "11.18.0"
+python = "3.14.10"
+uv = "0.13.6"

@@ -4,7 +4,6 @@ import type {
   PutOrganizationLocalCredentialRequest,
 } from '../../schemas/organization-local-credentials.js'
 import { hashPassword, verifyPassword } from '../../services/auth/index.js'
-import type { Json } from '../../services/db/index.js'
 import { db } from '../../services/db/index.js'
 import type { DbExecutor } from '../../services/executor.js'
 import { normalizeLocalLoginEmail } from '../../services/organization-local-auth/index.js'
@@ -32,8 +31,7 @@ export type OrganizationLocalCredentialManagementError =
   | { type: 'LOCAL_LOGIN_EMAIL_CONFLICT' }
 
 type Result<T> =
-  | { ok: true; value: T }
-  | { ok: false; error: OrganizationLocalCredentialManagementError }
+  { ok: true; value: T } | { ok: false; error: OrganizationLocalCredentialManagementError }
 
 export interface LocalCredentialManagementMetadata {
   requestId?: string
@@ -254,12 +252,12 @@ export const putMyOrganizationLocalCredential = async (
           action: current ? 'update' : 'create',
           changed_fields: changedFields,
           before_values: current
-            ? ({ login_email: current.login_email, enabled: current.enabled } as Json)
+            ? { login_email: current.login_email, enabled: current.enabled }
             : null,
           after_values: {
             login_email: credential.login_email,
             enabled: credential.enabled,
-          } as Json,
+          },
           request_id: metadata.requestId ?? null,
         },
         trx
@@ -325,8 +323,8 @@ export const disableMyOrganizationLocalCredential = async (
         target_id: credential.id,
         action: 'disable',
         changed_fields: ['enabled'],
-        before_values: { login_email: current.login_email, enabled: true } as Json,
-        after_values: { login_email: credential.login_email, enabled: false } as Json,
+        before_values: { login_email: current.login_email, enabled: true },
+        after_values: { login_email: credential.login_email, enabled: false },
         request_id: metadata.requestId ?? null,
       },
       trx

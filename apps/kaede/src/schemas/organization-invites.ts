@@ -68,9 +68,9 @@ const newUserProfileSchema = z.object({
 
 export const acceptLocalOrganizationInviteRequestSchema = z.object({
   token: z.string().min(1).max(512),
-  login_email: z.string().trim().email().max(255),
+  login_email: z.string().trim().pipe(z.email().max(255)),
   password: z.string().min(8).max(100),
-  contact_email: z.string().trim().email().max(255).optional(),
+  contact_email: z.string().trim().pipe(z.email().max(255)).optional(),
   profile: newUserProfileSchema.optional(),
 })
 

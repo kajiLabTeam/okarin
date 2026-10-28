@@ -29,7 +29,7 @@ export const organizationOidcStartRequestSchema = z
     return_to: safeReturnToSchema.optional(),
     mobile: z
       .object({
-        redirect_uri: z.string().url(),
+        redirect_uri: z.url(),
         code_challenge: z
           .string()
           .length(43)
@@ -42,14 +42,14 @@ export const organizationOidcStartRequestSchema = z
   .superRefine((value, context) => {
     if (value.intent === 'accept_invite' && !value.invite_token) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'invite_token is required for accept_invite',
         path: ['invite_token'],
       })
     }
     if (value.intent !== 'accept_invite' && value.invite_token) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'invite_token is only allowed for accept_invite',
         path: ['invite_token'],
       })
@@ -57,21 +57,21 @@ export const organizationOidcStartRequestSchema = z
     const isMobileIntent = value.intent === 'login' || value.intent === 'reauthenticate'
     if (isMobileIntent && !value.return_to && !value.mobile) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'return_to or mobile is required',
         path: ['return_to'],
       })
     }
     if (value.mobile && !isMobileIntent) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'mobile is only allowed for login or reauthenticate',
         path: ['mobile'],
       })
     }
     if (value.mobile && value.return_to) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'return_to cannot be combined with mobile',
         path: ['return_to'],
       })
@@ -79,7 +79,7 @@ export const organizationOidcStartRequestSchema = z
   })
 
 export const organizationOidcStartResponseSchema = z.object({
-  authorization_url: z.string().url(),
+  authorization_url: z.url(),
 })
 
 const hostedDomainSchema = z
