@@ -60,7 +60,8 @@ export const organizationCreationRequestSchema = z
     request_id: uuidSchema,
     requester_user_id: uuidSchema,
     requested_organization_name: z.string().min(1),
-    requested_slug: organizationSlugSchema.nullable(),
+    // z.nullable keeps this inline; .nullable() emits an invalid nullable $ref in OpenAPI 3.0.
+    requested_slug: z.nullable(organizationSlugSchema),
     status: organizationCreationRequestStatusSchema,
     reviewed_by_user_id: uuidSchema.nullable(),
     reviewed_at: isoDatetimeSchema.nullable(),
@@ -80,7 +81,7 @@ export const organizationCreationRequestsResponseSchema = z
 export const createOrganizationCreationRequestRequestSchema = z
   .object({
     organization_name: z.string().min(1).max(255),
-    requested_slug: organizationSlugSchema.nullable().optional(),
+    requested_slug: z.nullable(organizationSlugSchema).optional(),
   })
   .openapi('CreateOrganizationCreationRequestRequest')
 
