@@ -50,11 +50,24 @@ jobs:
       - name: Test
         run: pnpm test
 
-      - name: DB Test
-        run: pnpm run test:db
+      - name: DB and S3 Tests
+        shell: bash
+        run: |
+          pnpm run test:db &
+          db_pid=$!
+          pnpm run test:s3 &
+          s3_pid=$!
 
-      - name: S3 Test
-        run: pnpm run test:s3
+          db_status=0
+          wait "$db_pid" || db_status=$?
+          s3_status=0
+          wait "$s3_pid" || s3_status=$?
+
+          echo "DB Test exit code: $db_status"
+          echo "S3 Test exit code: $s3_status"
+          if (( db_status != 0 || s3_status != 0 )); then
+            exit 1
+          fi
 
       - name: Build
         run: pnpm build
