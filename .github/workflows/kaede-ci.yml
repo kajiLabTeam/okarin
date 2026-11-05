@@ -6,15 +6,15 @@ on:
     paths:
       - "apps/kaede/**"
       - ".github/workflows/kaede-ci.yml"
-      - ".github/workflows/kaede-db-ci.yml"
-      - ".github/workflows/kaede-s3-ci.yml"
   pull_request:
     branches: [main, 219/main]
     paths:
       - "apps/kaede/**"
       - ".github/workflows/kaede-ci.yml"
-      - ".github/workflows/kaede-db-ci.yml"
-      - ".github/workflows/kaede-s3-ci.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   checks-and-build:
@@ -49,6 +49,12 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: DB Test
+        run: pnpm run test:db
+
+      - name: S3 Test
+        run: pnpm run test:s3
 
       - name: Build
         run: pnpm build
