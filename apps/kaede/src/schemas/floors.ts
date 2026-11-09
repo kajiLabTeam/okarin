@@ -33,7 +33,7 @@ export const floorSchema = z
     }),
     map_image: z
       .object({
-        download_url: z.string().url().openapi({
+        download_url: z.url().openapi({
           description: 'floor map 画像を取得するための署名付き URL',
         }),
         download_expires_at: isoDatetimeSchema.openapi({
@@ -130,7 +130,7 @@ export const updateFloorRequestSchema = z
     name: z.string().trim().min(1).max(255).optional().openapi({
       description: 'floor の名称',
     }),
-    scale: z.number().positive().finite().nullable().optional().openapi({
+    scale: z.number().positive().nullable().optional().openapi({
       description: '縮尺。未設定の場合は null',
     }),
   })

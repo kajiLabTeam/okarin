@@ -12,7 +12,6 @@ import {
   hashActivationToken,
   hashPassword,
 } from '../../services/auth/index.js'
-import type { Json } from '../../services/db/index.js'
 import { db } from '../../services/db/index.js'
 import type { DbExecutor } from '../../services/executor.js'
 import {
@@ -200,7 +199,7 @@ export const issueOrganizationInvite = async (
         after_values: {
           role: payload.role,
           expires_at: created.invite.expires_at.toISOString(),
-        } as Json,
+        },
       },
       trx
     )
@@ -275,8 +274,8 @@ export const revokeInvite = async (
         target_id: inviteId,
         action: 'revoke',
         changed_fields: ['revoked_at'],
-        before_values: { revoked_at: null } as Json,
-        after_values: { revoked_at: now.toISOString() } as Json,
+        before_values: { revoked_at: null },
+        after_values: { revoked_at: now.toISOString() },
       },
       trx
     )
@@ -314,8 +313,8 @@ export const reissueInvite = async (
         target_id: created.invite.id,
         action: 'reissue',
         changed_fields: ['revoked_at', 'replacement_invite_id'],
-        before_values: { invite_id: inviteId } as Json,
-        after_values: { invite_id: created.invite.id } as Json,
+        before_values: { invite_id: inviteId },
+        after_values: { invite_id: created.invite.id },
       },
       trx
     )

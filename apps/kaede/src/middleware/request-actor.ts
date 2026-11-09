@@ -155,7 +155,7 @@ export const requestActorMiddleware = ({
       global_role: user.global_role as 'none' | 'admin',
       account_state: deriveAccountState({
         globalRole: user.global_role as 'none' | 'admin',
-        status: user.status as 'pending_activation' | 'active' | 'disabled',
+        status: user.status,
         membershipCount: memberships.length,
       }),
       memberships: memberships.map((membership) => ({

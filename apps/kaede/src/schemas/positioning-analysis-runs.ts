@@ -5,7 +5,7 @@ export const positioningAnalysisRunRequestSchema = z
   .object({
     recording_ids: z.array(uuidSchema).min(1).max(50),
     pipeline_ids: z.array(z.string().min(1).max(100)).min(1).max(10),
-    parameters_by_pipeline: z.record(z.string(), z.record(z.unknown())).default({}),
+    parameters_by_pipeline: z.record(z.string(), z.record(z.string(), z.unknown())).default({}),
     retry_of_analysis_run_id: uuidSchema.optional(),
     ground_truth_csv: z.string().min(1).max(20_000_000).optional(),
   })
@@ -59,7 +59,7 @@ export const positioningAnalysisRunDetailSchema = z
         result_trajectory_id: uuidSchema.nullable(),
         pipeline_digest: z.string(),
         pipeline_version: z.string(),
-        error: z.record(z.unknown()).nullable(),
+        error: z.record(z.string(), z.unknown()).nullable(),
       })
     ),
   })

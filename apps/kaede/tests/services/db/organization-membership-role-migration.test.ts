@@ -1,10 +1,11 @@
 import { sql } from 'kysely'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createDb } from '../../../src/services/db/client.js'
 import type { DbExecutor } from '../../../src/services/executor.js'
+import { resetDatabase } from '../../db/helpers.js'
 
 const db = createDb()
 const __filename = fileURLToPath(import.meta.url)
@@ -51,6 +52,10 @@ const insertOrganizationAndUser = async (trx: DbExecutor) => {
 }
 
 describe('organization membership role migration', () => {
+  beforeEach(async () => {
+    await resetDatabase(db)
+  })
+
   afterAll(async () => {
     await db.destroy()
   })

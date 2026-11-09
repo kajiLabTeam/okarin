@@ -8,6 +8,7 @@ export const assetContractSchema = z
       'acce',
       'gyro',
       'ble',
+      'metadata',
       'resource.floor_map',
       'resource.beacon_layout',
       'pose',
@@ -38,7 +39,7 @@ export const pipelineSlotSchema = z
   .strict()
 
 const jsonObjectSchema = z
-  .record(z.unknown())
+  .record(z.string(), z.unknown())
   .refine((value) => value.type === 'object', 'JSON schema must have type=object')
 
 export const componentContractSchema = z
@@ -136,7 +137,7 @@ export const pipelineAvailabilityQuerySchema = z.object({
         .superRefine((ids, context) => {
           if (new Set(ids).size !== ids.length) {
             context.addIssue({
-              code: z.ZodIssueCode.custom,
+              code: 'custom',
               message: 'recording_ids must not contain duplicates',
             })
           }

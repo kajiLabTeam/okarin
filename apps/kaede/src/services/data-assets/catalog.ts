@@ -22,7 +22,7 @@ const dataTypeDefinitionSchema = z
     required_columns: z.array(z.string().min(1)).min(1),
     timestamp_column: z.string().min(1).optional(),
     wall_time_column: z.string().min(1).optional(),
-    column_types: z.record(z.enum(['integer', 'number', 'string'])),
+    column_types: z.record(z.string(), z.enum(['integer', 'number', 'string'])),
   })
   .strict()
 

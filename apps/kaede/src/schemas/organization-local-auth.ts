@@ -18,7 +18,7 @@ export const organizationLocalAuthParamsSchema = z
 export const localOrganizationLoginRequestSchema = z
   .object({
     intent: z.enum(['login', 'reauthenticate']).optional(),
-    login_email: z.string().email().max(255),
+    login_email: z.email().max(255),
     password: z.string().min(1).max(100),
     return_to: safeReturnToSchema.optional(),
   })

@@ -21,9 +21,9 @@ export const managedMembershipSchema = z
     user_id: uuidSchema,
     role: membershipRoleSchema,
     status: z.enum(['active', 'suspended', 'left']),
-    joined_at: z.string().datetime(),
-    left_at: z.string().datetime().nullable(),
-    updated_at: z.string().datetime(),
+    joined_at: z.iso.datetime(),
+    left_at: z.iso.datetime().nullable(),
+    updated_at: z.iso.datetime(),
   })
   .openapi('ManagedMembership')
 

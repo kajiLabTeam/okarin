@@ -79,7 +79,7 @@ export const updateBeaconRequestSchema = z
   .strict()
   .superRefine((value, context) => {
     if (Object.keys(value).length === 0)
-      context.addIssue({ code: z.ZodIssueCode.custom, message: 'patch must not be empty' })
+      context.addIssue({ code: 'custom', message: 'patch must not be empty' })
   })
   .openapi('UpdateBeaconRequest')
 

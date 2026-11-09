@@ -16,6 +16,7 @@ export interface RecordingUploadUrls {
 export interface RecordingRawDownloadUrls {
   acce: string
   gyro: string
+  metadata: string
   pressure?: string
   wifi?: string
 }
@@ -49,7 +50,7 @@ export const getFloorMapExtensionFromObjectKey = (
   return undefined
 }
 
-const objectKeyUuidSchema = z.string().uuid()
+const objectKeyUuidSchema = z.uuid()
 
 const validateObjectKeyUuid = (value: string, name: string) => {
   const parsed = objectKeyUuidSchema.safeParse(value)
@@ -233,7 +234,7 @@ export const issueInternalRecordingRawDownloadUrls = async (
     throw new Error('recording raw download URLs require acce and gyro targets')
   }
 
-  const [acceUrl, gyroUrl] = await Promise.all([
+  const [acceUrl, gyroUrl, metadataUrl] = await Promise.all([
     getSignedUrl(
       internalClient,
       new GetObjectCommand({
@@ -250,11 +251,20 @@ export const issueInternalRecordingRawDownloadUrls = async (
       }),
       { expiresIn: config.trajectoryRawDownloadUrlTtlSeconds }
     ),
+    getSignedUrl(
+      internalClient,
+      new GetObjectCommand({
+        Bucket: config.bucket,
+        Key: buildRecordingRawObjectKey(organizationId, recordingId, 'metadata'),
+      }),
+      { expiresIn: config.trajectoryRawDownloadUrlTtlSeconds }
+    ),
   ])
 
   const rawDataUrls: RecordingRawDownloadUrls = {
     acce: acceUrl,
     gyro: gyroUrl,
+    metadata: metadataUrl,
   }
 
   if (targets.includes('pressure')) {

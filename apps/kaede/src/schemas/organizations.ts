@@ -40,7 +40,7 @@ export const createOrganizationRequestSchema = z
   })
   .openapi('CreateOrganizationRequest')
 
-export const organizationSlugSchema = z
+const organizationSlugValueSchema = z
   .string()
   .min(3)
   .max(63)
@@ -49,7 +49,8 @@ export const organizationSlugSchema = z
     (slug) => !['admin', 'api', 'auth', 'platform', 'new', 'settings'].includes(slug),
     'reserved organization slug'
   )
-  .openapi('OrganizationSlug')
+
+export const organizationSlugSchema = organizationSlugValueSchema.openapi('OrganizationSlug')
 
 export const organizationCreationRequestStatusSchema = z
   .enum(['pending', 'approved', 'rejected'])
@@ -60,7 +61,8 @@ export const organizationCreationRequestSchema = z
     request_id: uuidSchema,
     requester_user_id: uuidSchema,
     requested_organization_name: z.string().min(1),
-    requested_slug: organizationSlugSchema.nullable(),
+    // Keep nullable slugs inline to preserve null support in OpenAPI 3.0.
+    requested_slug: z.nullable(organizationSlugValueSchema),
     status: organizationCreationRequestStatusSchema,
     reviewed_by_user_id: uuidSchema.nullable(),
     reviewed_at: isoDatetimeSchema.nullable(),
@@ -80,7 +82,7 @@ export const organizationCreationRequestsResponseSchema = z
 export const createOrganizationCreationRequestRequestSchema = z
   .object({
     organization_name: z.string().min(1).max(255),
-    requested_slug: organizationSlugSchema.nullable().optional(),
+    requested_slug: z.nullable(organizationSlugValueSchema).optional(),
   })
   .openapi('CreateOrganizationCreationRequestRequest')
 
@@ -134,7 +136,7 @@ export const createOrganizationUserRequestSchema = z
   .superRefine((payload, ctx) => {
     if (payload.create_pedestrian && !payload.pedestrian) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'pedestrian is required when create_pedestrian is true',
         path: ['pedestrian'],
       })

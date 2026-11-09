@@ -49,16 +49,22 @@ export const recordingAssetProvider: PipelineResourceProvider = {
     // upload_targets. Present them as virtual assets so the pipeline resolver can
     // use the same binding and input-manifest path as typed data assets.
     const legacyAssets = recording.upload_targets
-      .filter((target): target is Exclude<UploadTarget, 'metadata'> => target !== 'metadata')
       .filter((target) => !assets.some((asset) => asset.data_type === target))
-      .map((target) => ({
-        data_asset_id: `legacy:${recording.id}:${target}`,
-        data_type: target,
-        schema_version: '1',
-        format: 'csv',
-        validation_status: 'valid',
-        object_key: buildRecordingRawObjectKey(recording.organization_id, recording.id, target),
-      }))
+      .map((target) => {
+        const uploadTarget = target as UploadTarget
+        return {
+          data_asset_id: `legacy:${recording.id}:${uploadTarget}`,
+          data_type: uploadTarget,
+          schema_version: '1',
+          format: uploadTarget === 'metadata' ? 'json' : 'csv',
+          validation_status: 'valid',
+          object_key: buildRecordingRawObjectKey(
+            recording.organization_id,
+            recording.id,
+            uploadTarget
+          ),
+        }
+      })
 
     const resources = await resolveFloorResources(recording)
     return [...assets, ...legacyAssets, ...resources]

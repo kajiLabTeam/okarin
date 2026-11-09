@@ -1,11 +1,11 @@
 import { z } from '@hono/zod-openapi'
 
-export const uuidSchema = z.string().uuid().openapi({
+export const uuidSchema = z.uuid().openapi({
   description: 'UUID 形式の識別子',
   example: '550e8400-e29b-41d4-a716-446655440000',
 })
 
-export const isoDatetimeSchema = z.string().datetime({ offset: true }).openapi({
+export const isoDatetimeSchema = z.iso.datetime({ offset: true }).openapi({
   description: 'タイムゾーン付き ISO 8601 日時',
   example: '2026-04-23T12:34:56+09:00',
 })
@@ -54,21 +54,21 @@ export const uploadTargetsSchema = z
   .superRefine((targets, ctx) => {
     if (!targets.includes('acce')) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'upload_targets must include acce',
       })
     }
 
     if (!targets.includes('gyro')) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'upload_targets must include gyro',
       })
     }
 
     if (new Set(targets).size !== targets.length) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'upload_targets must not contain duplicates',
       })
     }
@@ -79,7 +79,7 @@ export const notImplementedResponseSchema = z
     error: z.literal('NOT_IMPLEMENTED'),
     endpoint: z.string(),
     description: z.string(),
-    params: z.record(z.string()).optional(),
+    params: z.record(z.string(), z.string()).optional(),
   })
   .openapi('NotImplementedResponse')
 

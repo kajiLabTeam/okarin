@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createHash } from 'node:crypto'
 import type { DbExecutor } from '../executor.js'
 
 vi.mock('../db/index.js', () => ({
@@ -27,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   dispatchToNozomi: vi.fn(),
   issueAssetDownloadUrl: vi.fn(),
   issueItemResultUploadUrl: vi.fn(),
+  getObjectBytes: vi.fn(),
 }))
 
 vi.mock('./outbox-repository.js', () => ({
@@ -61,6 +63,9 @@ vi.mock('../storage/presigned-url.js', () => ({
   issueInternalDataAssetDownloadUrl: mocks.issueAssetDownloadUrl,
   issueInternalTrajectoryResultUploadUrl: mocks.issueItemResultUploadUrl,
 }))
+vi.mock('../storage/object-store.js', () => ({
+  getObjectBytes: mocks.getObjectBytes,
+}))
 
 import { FatalDispatchError, RetriableDispatchError } from '../nozomi/nozomi-execution-client.js'
 import type { OutboxJob } from './outbox-repository.js'
@@ -78,6 +83,7 @@ describe('outbox-worker', () => {
     mocks.issueItemResultUploadUrl.mockResolvedValue({
       uploadUrl: 'http://s3/trajectories/item-1/analyzed/result.csv',
     })
+    mocks.getObjectBytes.mockResolvedValue(new Uint8Array())
   })
 
   describe('aggregatePositioningRunStatus', () => {
@@ -236,6 +242,34 @@ describe('outbox-worker', () => {
         })
       )
       expect(mocks.completeJob).toHaveBeenCalledWith('job-1', expect.anything())
+    })
+
+    it('checksumがないlegacy assetはオブジェクトからdigestを計算する', async () => {
+      mocks.findItemById.mockResolvedValue({
+        ...mockItem,
+        input_manifest: {
+          imu: [{ ...mockItem.input_manifest.imu[0], checksum_sha256: null }],
+        },
+      })
+      mocks.findRunById.mockResolvedValue(mockRun)
+      mocks.getObjectBytes.mockResolvedValue(new TextEncoder().encode('metadata'))
+      mocks.dispatchToNozomi.mockResolvedValue({
+        analysis_run_item_id: 'item-1',
+        status: 'processing',
+      })
+
+      await processOutboxJob(mockJob)
+
+      expect(mocks.getObjectBytes).toHaveBeenCalledWith('orgs/1/rec/1/raw/imu.csv')
+      expect(mocks.dispatchToNozomi).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inputs: [
+            expect.objectContaining({
+              digest: createHash('sha256').update('metadata').digest('hex'),
+            }),
+          ],
+        })
+      )
     })
 
     it('決定的エラー（FatalDispatchError）の場合は再試行せず即座にfailedにする', async () => {

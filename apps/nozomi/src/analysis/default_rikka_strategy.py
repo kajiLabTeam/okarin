@@ -35,9 +35,28 @@ class DefaultRikkaStrategy:
 
     def run(self, request: AnalyzeRequest) -> None:
         try:
-            df_acc = self._download_sensor_csv(request.raw_data_urls.acce, "acce")
-            df_gyro = self._download_sensor_csv(request.raw_data_urls.gyro, "gyro")
-            result_csv = self._analyze_to_csv(request, df_acc, df_gyro)
+            recording_start_wall_time_ms = (
+                self._download_recording_start_wall_time_ms(
+                    request.raw_data_urls.metadata
+                )
+                if request.raw_data_urls.metadata is not None
+                else None
+            )
+            df_acc = self._download_sensor_csv(
+                request.raw_data_urls.acce,
+                "acce",
+                recording_start_wall_time_ms=recording_start_wall_time_ms,
+            )
+            df_gyro = self._download_sensor_csv(
+                request.raw_data_urls.gyro,
+                "gyro",
+                recording_start_wall_time_ms=recording_start_wall_time_ms,
+            )
+            result_csv = self._analyze_to_csv(
+                request,
+                df_acc,
+                df_gyro,
+            )
             self._upload_result(request.result_upload_url, result_csv)
             self._send_callback(
                 request,
@@ -64,6 +83,7 @@ class DefaultRikkaStrategy:
         self,
         url: object,
         sensor_kind: SensorKind,
+        recording_start_wall_time_ms: float | None = None,
     ) -> pd.DataFrame:
         with urlopen(str(url), timeout=DEFAULT_HTTP_TIMEOUT_SECONDS) as response:
             if response.status >= 400:
@@ -72,7 +92,11 @@ class DefaultRikkaStrategy:
             csv_bytes = response.read()
 
         df = pd.read_csv(BytesIO(csv_bytes))
-        df = self._normalize_sensor_csv(df, sensor_kind)
+        df = self._normalize_sensor_csv(
+            df,
+            sensor_kind,
+            recording_start_wall_time_ms=recording_start_wall_time_ms,
+        )
 
         required_columns = {"x", "y", "z"}
         missing_columns = required_columns - set(df.columns)
@@ -91,6 +115,7 @@ class DefaultRikkaStrategy:
         self,
         df: pd.DataFrame,
         sensor_kind: SensorKind,
+        recording_start_wall_time_ms: float | None = None,
     ) -> pd.DataFrame:
         df = df.rename(columns=lambda column: str(column).strip())
         normalized = pd.DataFrame()
@@ -100,7 +125,20 @@ class DefaultRikkaStrategy:
             normalized["t"] = pd.to_numeric(df[time_column], errors="coerce")
         elif "timestamp_ns" in df.columns:
             timestamp_ns = pd.to_numeric(df["timestamp_ns"], errors="coerce")
-            normalized["t"] = (timestamp_ns - timestamp_ns.iloc[0]) / 1_000_000_000
+            start_offset_s = 0.0
+            if (
+                recording_start_wall_time_ms is not None
+                and "wall_time_ms" in df.columns
+            ):
+                first_wall_time_ms = pd.to_numeric(
+                    df["wall_time_ms"], errors="coerce"
+                ).iloc[0]
+                start_offset_s = (
+                    float(first_wall_time_ms) - recording_start_wall_time_ms
+                ) / 1_000.0
+            normalized["t"] = (
+                timestamp_ns - timestamp_ns.iloc[0]
+            ) / 1_000_000_000 + start_offset_s
         elif "wall_time_ms" in df.columns:
             wall_time_ms = pd.to_numeric(df["wall_time_ms"], errors="coerce")
             normalized["t"] = (wall_time_ms - wall_time_ms.iloc[0]) / 1_000
@@ -117,6 +155,18 @@ class DefaultRikkaStrategy:
                 )
 
         return normalized
+
+    def _download_recording_start_wall_time_ms(self, url: object) -> float:
+        with urlopen(str(url), timeout=DEFAULT_HTTP_TIMEOUT_SECONDS) as response:
+            if response.status >= 400:
+                raise RuntimeError(
+                    f"metadata download failed with status {response.status}"
+                )
+            metadata = json.loads(response.read())
+        value = metadata.get("recording_start_wall_time_ms")
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise ValueError("metadata.json の recording_start_wall_time_ms が不正です")
+        return float(value)
 
     def _find_column(
         self,

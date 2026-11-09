@@ -26,13 +26,13 @@ export const positioningAnalysisCallbackRequestSchema = z
     analysis_run_item_id: uuidSchema,
     status: z.enum(['processing', 'completed', 'failed']),
     outputs: z
-      .record(z.unknown())
+      .record(z.string(), z.unknown())
       .superRefine((outputs, context) => {
         if (!('output_manifest' in outputs)) return
         const parsed = outputManifestSchema.safeParse(outputs.output_manifest)
         if (!parsed.success) {
           context.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             path: ['output_manifest'],
             message: 'invalid output manifest',
           })

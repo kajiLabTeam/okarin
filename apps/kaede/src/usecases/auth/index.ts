@@ -81,8 +81,7 @@ export type ActiveSessionUserResult =
     }
 
 export type GetMeResult =
-  | { ok: true; value: AuthMeResponse }
-  | { ok: false; error: ActiveSessionUserError }
+  { ok: true; value: AuthMeResponse } | { ok: false; error: ActiveSessionUserError }
 
 export interface LoginResultValue extends AuthUserResponse {
   sessionToken: string

@@ -1,5 +1,4 @@
 import type { RequestActor } from '../../middleware/request-actor-context.js'
-import type { Json } from '../../services/db/index.js'
 import { db } from '../../services/db/index.js'
 import type { DbExecutor } from '../../services/executor.js'
 import {
@@ -122,12 +121,12 @@ export const unlinkMyOrganizationOidcIdentity = async (
           revoked_at: null,
           provider_id: link.provider_id,
           revoked_grant_count: 0,
-        } as Json,
+        },
         after_values: {
           revoked_at: now.toISOString(),
           provider_id: link.provider_id,
           revoked_grant_count: revokedGrantCount,
-        } as Json,
+        },
       },
       trx
     )

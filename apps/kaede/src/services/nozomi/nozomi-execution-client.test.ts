@@ -57,7 +57,7 @@ describe('dispatchExecutionToNozomi', () => {
         analysis_run_item_id: 'item-1',
         status: 'processing',
       }),
-    } as unknown as Response)
+    })
 
     const result = await dispatchExecutionToNozomi(sampleRequest)
 
@@ -85,7 +85,7 @@ describe('dispatchExecutionToNozomi', () => {
     global.fetch = vi.fn().mockResolvedValue({
       status: 503,
       text: vi.fn().mockResolvedValue('Service Unavailable'),
-    } as unknown as Response)
+    })
 
     await expect(dispatchExecutionToNozomi(sampleRequest)).rejects.toThrow(RetriableDispatchError)
   })
@@ -94,7 +94,7 @@ describe('dispatchExecutionToNozomi', () => {
     global.fetch = vi.fn().mockResolvedValue({
       status: 422,
       text: vi.fn().mockResolvedValue('Unprocessable Entity'),
-    } as unknown as Response)
+    })
 
     await expect(dispatchExecutionToNozomi(sampleRequest)).rejects.toThrow(FatalDispatchError)
   })

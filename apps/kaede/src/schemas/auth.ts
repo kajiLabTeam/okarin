@@ -42,7 +42,7 @@ export const authMembershipSchema = z
 
 const authUserBaseShape = {
   user_id: uuidSchema,
-  email: z.string().email().max(255),
+  email: z.email().max(255),
   display_name: z.string().min(1).max(255),
   global_role: z.enum(['none', 'admin']),
   status: userStatusSchema,
@@ -59,7 +59,7 @@ export const authUserSchema = z
 
 export const loginRequestSchema = z
   .object({
-    email: z.string().email().max(255),
+    email: z.email().max(255),
     password: z.string().min(1).max(100),
   })
   .openapi('LoginRequest')

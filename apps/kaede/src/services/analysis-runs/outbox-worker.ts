@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { getAppRuntimeConfig, getCallbackRuntimeConfig } from '../../config/runtime.js'
 import { db } from '../db/index.js'
 import type { DbExecutor } from '../executor.js'
@@ -8,6 +8,7 @@ import type {
   NozomiExecutionRequest,
   NozomiExecutionSlotBinding,
 } from '../nozomi/nozomi-execution-client.js'
+import { getObjectBytes } from '../storage/object-store.js'
 import {
   issueInternalDataAssetDownloadUrl,
   issueInternalPositioningAnalysisArtifactUploadUrl,
@@ -146,11 +147,16 @@ export const processOutboxJob = async (
             data_type: string
             schema_version: string
             format: string
-            checksum_sha256: string
+            checksum_sha256: string | null
           }[])
         : []
       for (const asset of assetList) {
         const { downloadUrl } = await issueInternalDataAssetDownloadUrl(asset.object_key)
+        const assetDigest =
+          asset.checksum_sha256 ??
+          createHash('sha256')
+            .update(await getObjectBytes(asset.object_key))
+            .digest('hex')
         inputs.push({
           slot_id,
           contract: {
@@ -160,7 +166,7 @@ export const processOutboxJob = async (
             format: asset.format,
           },
           uri: downloadUrl,
-          digest: asset.checksum_sha256,
+          digest: assetDigest,
           available: true,
         })
       }

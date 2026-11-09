@@ -14,6 +14,7 @@ class StrictModel(BaseModel):
 class DataType(StrEnum):
     ACCE = "acce"
     GYRO = "gyro"
+    METADATA = "metadata"
     BLE = "ble"
     FLOOR_MAP = "resource.floor_map"
     BEACON_LAYOUT = "resource.beacon_layout"

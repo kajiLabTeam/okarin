@@ -13,62 +13,22 @@ import { trajectoryConstraintsSchema, trajectoryExecutionMetadataSchema } from '
 
 const uploadUrlsSchema = z
   .object({
-    acce: z.string().url().optional().openapi({ description: '加速度センサ用のアップロード URL' }),
-    gyro: z
-      .string()
-      .url()
-      .optional()
-      .openapi({ description: 'ジャイロセンサ用のアップロード URL' }),
-    metadata: z
-      .string()
-      .url()
-      .optional()
-      .openapi({ description: '収録メタデータ用のアップロード URL' }),
-    pressure: z
-      .string()
-      .url()
-      .optional()
-      .openapi({ description: '気圧センサ用のアップロード URL' }),
-    wifi: z
-      .string()
-      .url()
-      .optional()
-      .openapi({ description: 'Wi-Fi スキャン用のアップロード URL' }),
-    ble: z
-      .string()
-      .url()
-      .optional()
-      .openapi({ description: 'BLEビーコンデータ用のアップロード URL' }),
+    acce: z.url().optional().openapi({ description: '加速度センサ用のアップロード URL' }),
+    gyro: z.url().optional().openapi({ description: 'ジャイロセンサ用のアップロード URL' }),
+    metadata: z.url().optional().openapi({ description: '収録メタデータ用のアップロード URL' }),
+    pressure: z.url().optional().openapi({ description: '気圧センサ用のアップロード URL' }),
+    wifi: z.url().optional().openapi({ description: 'Wi-Fi スキャン用のアップロード URL' }),
+    ble: z.url().optional().openapi({ description: 'BLEビーコンデータ用のアップロード URL' }),
   })
   .openapi('RecordingUploadUrls')
 
 const downloadUrlsSchema = z
   .object({
-    acce: z
-      .string()
-      .url()
-      .optional()
-      .openapi({ description: '加速度センサデータのダウンロード URL' }),
-    gyro: z
-      .string()
-      .url()
-      .optional()
-      .openapi({ description: 'ジャイロセンサデータのダウンロード URL' }),
-    metadata: z
-      .string()
-      .url()
-      .optional()
-      .openapi({ description: '収録メタデータのダウンロード URL' }),
-    pressure: z
-      .string()
-      .url()
-      .optional()
-      .openapi({ description: '気圧センサデータのダウンロード URL' }),
-    wifi: z
-      .string()
-      .url()
-      .optional()
-      .openapi({ description: 'Wi-Fi スキャンデータのダウンロード URL' }),
+    acce: z.url().optional().openapi({ description: '加速度センサデータのダウンロード URL' }),
+    gyro: z.url().optional().openapi({ description: 'ジャイロセンサデータのダウンロード URL' }),
+    metadata: z.url().optional().openapi({ description: '収録メタデータのダウンロード URL' }),
+    pressure: z.url().optional().openapi({ description: '気圧センサデータのダウンロード URL' }),
+    wifi: z.url().optional().openapi({ description: 'Wi-Fi スキャンデータのダウンロード URL' }),
   })
   .openapi('RecordingDownloadUrls')
 
@@ -131,13 +91,13 @@ export const initRecordingRequestSchema = z
   .superRefine((value, context) => {
     if (!value.upload_targets && !value.assets) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'upload_targets or assets is required',
       })
     }
     if (value.upload_targets && value.assets) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'upload_targets and assets are mutually exclusive',
       })
     }
@@ -146,7 +106,7 @@ export const initRecordingRequestSchema = z
       new Set(value.assets.map((asset) => asset.data_type)).size !== value.assets.length
     ) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['assets'],
         message: 'the same data_type may only appear once per recording',
       })
@@ -172,7 +132,7 @@ export const initRecordingResponseSchema = z
           data_asset_id: uuidSchema,
           data_type: z.string(),
           schema_version: z.string(),
-          object_upload_url: z.string().url(),
+          object_upload_url: z.url(),
         })
       )
       .optional(),
@@ -217,7 +177,7 @@ export const refreshUploadUrlsRequestSchema = z
       .superRefine((targets, ctx) => {
         if (new Set(targets).size !== targets.length) {
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             message: 'targets must not contain duplicates',
           })
         }
@@ -233,6 +193,9 @@ export const refreshUploadUrlsResponseSchema = z
     upload_status: recordingUploadStatusSchema,
     upload_urls: uploadUrlsSchema.openapi({
       description: '再発行されたアップロード URL',
+    }),
+    asset_upload_urls: uploadUrlsSchema.optional().openapi({
+      description: '再発行されたデータ資産用アップロード URL',
     }),
     expires_at: isoDatetimeSchema.openapi({
       description: '再発行したアップロード URL の有効期限',
@@ -262,7 +225,7 @@ export const failRecordingRequestSchema = z
       new Set(value.missing_targets).size !== value.missing_targets.length
     ) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['missing_targets'],
         message: 'missing_targets must not contain duplicates',
       })
@@ -368,7 +331,7 @@ export const recordingGroundTruthUploadUrlResponseSchema = z
     truth_type: groundTruthTypeSchema.openapi({
       description: '今回の upload URL が対象とする ground truth raw の種別',
     }),
-    upload_url: z.string().url().openapi({
+    upload_url: z.url().openapi({
       description: 'ground truth raw をアップロードするための署名付き URL',
     }),
     upload_path: z.string().min(1).openapi({

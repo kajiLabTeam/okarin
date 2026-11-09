@@ -1,12 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RequestActor } from '../../middleware/request-actor-context.js'
 
-const { findRecordingAuthorizationByIdMock, findRecordingByIdMock, issueRecordingUploadUrlsMock } =
-  vi.hoisted(() => ({
-    findRecordingAuthorizationByIdMock: vi.fn(),
-    findRecordingByIdMock: vi.fn(),
-    issueRecordingUploadUrlsMock: vi.fn(),
-  }))
+const {
+  findRecordingAuthorizationByIdMock,
+  findRecordingByIdMock,
+  issueRecordingUploadUrlsMock,
+  listRecordingDataAssetsMock,
+} = vi.hoisted(() => ({
+  findRecordingAuthorizationByIdMock: vi.fn(),
+  findRecordingByIdMock: vi.fn(),
+  issueRecordingUploadUrlsMock: vi.fn(),
+  listRecordingDataAssetsMock: vi.fn(),
+}))
 
 vi.mock('../../services/recordings/index.js', () => ({
   findRecordingAuthorizationById: findRecordingAuthorizationByIdMock,
@@ -15,6 +20,10 @@ vi.mock('../../services/recordings/index.js', () => ({
 
 vi.mock('../../services/storage/index.js', () => ({
   issueRecordingUploadUrls: issueRecordingUploadUrlsMock,
+}))
+
+vi.mock('../../services/data-assets/index.js', () => ({
+  listRecordingDataAssets: listRecordingDataAssetsMock,
 }))
 
 import { refreshUploadUrls } from './refresh-upload-urls.js'
@@ -34,6 +43,7 @@ const mockRecordingAuthorization = (recordingId: string) => {
 describe('refreshUploadUrls', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    listRecordingDataAssetsMock.mockResolvedValue([])
   })
 
   it('accepted recording の指定 target に対して upload URL を再発行する', async () => {
@@ -68,6 +78,7 @@ describe('refreshUploadUrls', () => {
         upload_urls: {
           gyro: 'https://storage.example.test/gyro',
         },
+        asset_upload_urls: {},
         expires_at: '2026-05-13T00:15:00.000Z',
       },
     })

@@ -6,32 +6,32 @@ on:
     paths:
       - "apps/kaede/**"
       - ".github/workflows/kaede-ci.yml"
-      - ".github/workflows/kaede-db-ci.yml"
-      - ".github/workflows/kaede-s3-ci.yml"
   pull_request:
     branches: [main, 219/main]
     paths:
       - "apps/kaede/**"
       - ".github/workflows/kaede-ci.yml"
-      - ".github/workflows/kaede-db-ci.yml"
-      - ".github/workflows/kaede-s3-ci.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   checks-and-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: apps/kaede
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           version: 11.18.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24.22.1
           cache: pnpm
           cache-dependency-path: apps/kaede/pnpm-lock.yaml
 
@@ -49,6 +49,25 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: DB and S3 Tests
+        shell: bash
+        run: |
+          pnpm run test:db &
+          db_pid=$!
+          pnpm run test:s3 &
+          s3_pid=$!
+
+          db_status=0
+          wait "$db_pid" || db_status=$?
+          s3_status=0
+          wait "$s3_pid" || s3_status=$?
+
+          echo "DB Test exit code: $db_status"
+          echo "S3 Test exit code: $s3_status"
+          if (( db_status != 0 || s3_status != 0 )); then
+            exit 1
+          fi
 
       - name: Build
         run: pnpm build

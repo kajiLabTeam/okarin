@@ -81,6 +81,15 @@ export const getFloorMapObjectBytes = async (
   }
 }
 
+export const getObjectBytes = async (objectKey: string): Promise<Uint8Array> => {
+  const { config, internalClient } = getS3Context()
+  const response = await internalClient.send(
+    new GetObjectCommand({ Bucket: config.bucket, Key: objectKey })
+  )
+  if (!response.Body) throw new Error(`Object body is empty: ${objectKey}`)
+  return response.Body.transformToByteArray()
+}
+
 export const listRecordingRawObjectKeys = async (organizationId: string, recordingId: string) => {
   const { config, internalClient } = getS3Context()
   const prefix = buildRecordingRawObjectPrefix(organizationId, recordingId)

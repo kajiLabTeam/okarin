@@ -174,6 +174,18 @@ def test_execution_api_accepts_rikka_pipeline_before_background_download() -> No
                 "digest": "b" * 64,
                 "available": True,
             },
+            {
+                "slot_id": "metadata",
+                "contract": {
+                    "kind": "asset",
+                    "data_type": "metadata",
+                    "schema_version": "1",
+                    "format": "json",
+                },
+                "uri": "http://seaweedfs:8333/metadata.json",
+                "digest": "c" * 64,
+                "available": True,
+            },
         ],
         "bindings": snapshot["definition"]["bindings"],
         "output_uri": "http://seaweedfs:8333/output.json",
@@ -410,6 +422,10 @@ def _sample_sensor_bytes() -> tuple[bytes, bytes]:
     )
 
 
+def _sample_metadata_bytes() -> bytes:
+    return b'{"recording_start_wall_time_ms": 0}'
+
+
 def _component(pipeline_id: str) -> ComponentContract:
     definition = next(
         item for item in initial_catalog() if item.pipeline_id == pipeline_id
@@ -421,7 +437,7 @@ def test_rikka_executor_runs_real_pdr() -> None:
     acce, gyro = _sample_sensor_bytes()
     outputs = RikkaComponentExecutor().execute(
         _component("pdr"),
-        {"acce": acce, "gyro": gyro},
+        {"acce": acce, "gyro": gyro, "metadata": _sample_metadata_bytes()},
         {"initial_direction": 90.0, "user_height_m": 1.7},
     )
     trajectory = outputs["trajectory"]
@@ -436,7 +452,12 @@ def test_rikka_executor_runs_real_particle_filter(tmp_path: Path) -> None:
     mpimg.imsave(map_path, np.ones((1024, 1024)), cmap="gray", vmin=0, vmax=1)
     outputs = RikkaComponentExecutor().execute(
         _component("pdr-particle-filter"),
-        {"acce": acce, "gyro": gyro, "floor_map": map_path.read_bytes()},
+        {
+            "acce": acce,
+            "gyro": gyro,
+            "metadata": _sample_metadata_bytes(),
+            "floor_map": map_path.read_bytes(),
+        },
         {
             "origin_x": 512,
             "origin_y": 512,
@@ -478,6 +499,7 @@ def test_rikka_executor_runs_real_pdr_with_ble(tmp_path: Path) -> None:
         {
             "acce": acce,
             "gyro": gyro,
+            "metadata": _sample_metadata_bytes(),
             "ble": ble,
             "floor_map": map_path.read_bytes(),
             "beacon_layout": layout,
@@ -518,6 +540,7 @@ def test_rikka_executor_runs_real_particle_filter_with_ble(tmp_path: Path) -> No
         {
             "acce": acce,
             "gyro": gyro,
+            "metadata": _sample_metadata_bytes(),
             "ble": ble,
             "floor_map": map_path.read_bytes(),
             "beacon_layout": layout,
@@ -557,6 +580,7 @@ def test_rikka_executor_rejects_duplicate_or_out_of_map_beacons(
             {
                 "acce": acce,
                 "gyro": gyro,
+                "metadata": _sample_metadata_bytes(),
                 "ble": ble,
                 "floor_map": map_path.read_bytes(),
                 "beacon_layout": invalid_layout,
