@@ -177,3 +177,35 @@ describe('getPositioningAnalysisRun', () => {
     })
   })
 })
+
+it('軌跡が完了して動画生成中の場合はcompletedと動画状態を分けて返す', async () => {
+  mocks.findRun.mockResolvedValue({ id: runId, organization_id: orgId, status: 'completed' })
+  mocks.listItems.mockResolvedValue([
+    {
+      id: 'item',
+      recording_id: 'recording',
+      pipeline_id: 'pdr-particle-filter',
+      status: 'completed',
+      result_trajectory_id: 'trajectory',
+      pipeline_digest: 'a'.repeat(64),
+      pipeline_version: '1',
+      error: null,
+      output_manifest: {
+        schema_version: '1',
+        artifacts: {
+          particle_animation: {
+            object_key: 'video.webm',
+            content_type: 'video/webm',
+            format: 'webm',
+            available: false,
+            generation_status: 'processing',
+          },
+        },
+      },
+    },
+  ])
+  expect(await getPositioningAnalysisRun(managerActor, orgId, runId)).toMatchObject({
+    ok: true,
+    value: { status: 'completed', video_progress: { processing: 1, failed: 0 } },
+  })
+})

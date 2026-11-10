@@ -1,8 +1,10 @@
 import type { RequestActor } from '../../middleware/request-actor-context.js'
+import { parseOutputManifest } from '../../services/analysis-runs/output-manifest.js'
 import {
   findPositioningRun,
   listPositioningItems,
 } from '../../services/analysis-runs/positioning-analysis-run-repository.js'
+import { positioningRunStatus } from '../../services/analysis-runs/positioning-run-progress.js'
 import { requireOrganizationManager } from '../authorization.js'
 
 export const getPositioningAnalysisRun = async (
@@ -17,24 +19,26 @@ export const getPositioningAnalysisRun = async (
   const items = await listPositioningItems(run.id)
   const progress = { total: items.length, queued: 0, processing: 0, completed: 0, failed: 0 }
   for (const item of items) progress[item.status as keyof typeof progress]++
-  const hasInFlightItems = progress.queued > 0 || progress.processing > 0
-  const status = (
-    progress.failed === progress.total
-      ? 'failed'
-      : progress.completed === progress.total
-        ? 'completed'
-        : hasInFlightItems
-          ? 'processing'
-          : progress.completed > 0 || progress.failed > 0
-            ? 'partially_completed'
-            : run.status
-  ) as 'accepted' | 'processing' | 'completed' | 'partially_completed' | 'failed'
+  const status = positioningRunStatus(progress, run.status)
+  const videos = items.flatMap((item) => {
+    const artifacts = parseOutputManifest(item.output_manifest).artifacts
+    return Object.hasOwn(artifacts, 'particle_animation') ? [artifacts.particle_animation] : []
+  })
+
   return {
     ok: true as const,
     value: {
       analysis_run_id: run.id,
       status,
       progress,
+      ...(videos.length > 0
+        ? {
+            video_progress: {
+              processing: videos.filter((video) => video.generation_status === 'processing').length,
+              failed: videos.filter((video) => video.generation_status === 'failed').length,
+            },
+          }
+        : {}),
       items: items.map((item) => ({
         id: item.id,
         recording_id: item.recording_id,

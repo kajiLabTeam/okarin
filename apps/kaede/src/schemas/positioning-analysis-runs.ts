@@ -1,5 +1,6 @@
 import { z } from '@hono/zod-openapi'
 import { uuidSchema } from './common.js'
+import { paginationMetadataSchema, paginationQuerySchema } from './pagination.js'
 
 export const positioningAnalysisRunRequestSchema = z
   .object({
@@ -39,6 +40,11 @@ export const positioningAnalysisRunResponseSchema = z
   })
   .openapi('CreatePositioningAnalysisRunResponse')
 
+export const positioningRunVideoProgressSchema = z.object({
+  processing: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+})
+
 export const positioningAnalysisRunDetailSchema = z
   .object({
     analysis_run_id: uuidSchema,
@@ -50,6 +56,7 @@ export const positioningAnalysisRunDetailSchema = z
       completed: z.number().int(),
       failed: z.number().int(),
     }),
+    video_progress: positioningRunVideoProgressSchema.optional(),
     items: z.array(
       z.object({
         id: uuidSchema,
@@ -66,3 +73,28 @@ export const positioningAnalysisRunDetailSchema = z
   .openapi('PositioningAnalysisRunDetail')
 
 export type PositioningAnalysisRunRequest = z.infer<typeof positioningAnalysisRunRequestSchema>
+
+export const positioningAnalysisRunListQuerySchema = paginationQuerySchema.extend({
+  filter: z.enum(['all', 'in_progress', 'failed']).default('all'),
+})
+
+export const positioningAnalysisRunListSchema = z
+  .object({
+    analysis_runs: z.array(
+      z.object({
+        analysis_run_id: uuidSchema,
+        created_at: z.iso.datetime(),
+        updated_at: z.iso.datetime(),
+        status: positioningAnalysisRunResponseSchema.shape.status,
+        recording_count: z.number().int().nonnegative(),
+        pipeline_ids: z.array(z.string()),
+        progress: positioningAnalysisRunDetailSchema.shape.progress,
+        video_progress: positioningRunVideoProgressSchema,
+      })
+    ),
+    in_progress_count: z.number().int().nonnegative(),
+    pagination: paginationMetadataSchema,
+  })
+  .openapi('PositioningAnalysisRunList')
+
+export type PositioningAnalysisRunListQuery = z.infer<typeof positioningAnalysisRunListQuerySchema>
