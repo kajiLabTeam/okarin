@@ -7,6 +7,7 @@ import { createPositioningAnalysisRun } from './create-positioning-analysis-run.
 const mocks = vi.hoisted(() => ({
   findKey: vi.fn(),
   findInOrg: vi.fn(),
+  listItems: vi.fn(),
   insertRun: vi.fn(),
   insertItems: vi.fn(),
   insertOutboxJobs: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock('../../services/analysis-runs/positioning-analysis-run-repository.js', (
   findPositioningRunByKey: mocks.findKey,
   findPositioningRunInOrganization: mocks.findInOrg,
   insertPositioningRun: mocks.insertRun,
+  listPositioningItems: mocks.listItems,
   insertPositioningItems: mocks.insertItems,
 }))
 
@@ -556,4 +558,85 @@ describe('createPositioningAnalysisRun', () => {
       expect(result.error.type).toBe('AUTH_DASHBOARD_FORBIDDEN')
     }
   })
+  it('失敗した組だけを再実行し、再試行を繰り返しても比較元runを引き継ぐ', async () => {
+    const rec2 = '66666666-6666-4666-8666-666666666666'
+    const rootId = '77777777-7777-4777-8777-777777777777'
+    const failed = [
+      {
+        id: '88888888-8888-4888-8888-888888888888',
+        recording_id: recordingId,
+        pipeline_id: 'pdr',
+        status: 'failed',
+      },
+      {
+        id: '99999999-9999-4999-8999-999999999999',
+        recording_id: rec2,
+        pipeline_id: 'pf',
+        status: 'failed',
+      },
+    ]
+    mocks.findInOrg.mockResolvedValue({ id: runId, comparison_run_id: rootId })
+    mocks.listItems.mockResolvedValue(failed)
+    mocks.findRecording.mockImplementation((id: string) =>
+      Promise.resolve({ id, floor_id: floorId })
+    )
+    mocks.resolvePipeline.mockImplementation((pipelineId: string, ids: string[]) =>
+      Promise.resolve({
+        ok: true,
+        value: {
+          pipeline: {
+            ...mockPipeline,
+            definition: { ...mockPipeline.definition, pipeline_id: pipelineId },
+          },
+          recordings: ids.map((id) => ({ recording_id: id, assets: [], bindings: {} })),
+        },
+      })
+    )
+    const result = await createPositioningAnalysisRun(managerActor, orgId, 'sparse-retry', {
+      recording_ids: [recordingId, rec2],
+      pipeline_ids: ['pdr', 'pf'],
+      parameters_by_pipeline: {},
+      retry_of_analysis_run_id: runId,
+      retry_failed_item_ids: failed.map((item) => item.id),
+    })
+    expect(result).toMatchObject({ ok: true, value: { item_count: 2 } })
+    expect(mocks.resolvePipeline.mock.calls).toEqual([
+      ['pdr', [recordingId]],
+      ['pf', [rec2]],
+    ])
+    expect(
+      mocks.insertItems.mock.calls[0][0].map(
+        (item: { recording_id: string; pipeline_id: string }) => [
+          item.recording_id,
+          item.pipeline_id,
+        ]
+      )
+    ).toEqual([
+      [recordingId, 'pdr'],
+      [rec2, 'pf'],
+    ])
+    expect(mocks.insertRun.mock.calls[0][0].comparison_run_id).toBe(rootId)
+  })
+
+  it.each(['completed', 'processing', 'missing'])(
+    '失敗済みの元run内のセル以外を再実行できない: %s',
+    async (state) => {
+      const id = '88888888-8888-4888-8888-888888888888'
+      mocks.findInOrg.mockResolvedValue({ id: runId })
+      mocks.listItems.mockResolvedValue(
+        state === 'missing'
+          ? []
+          : [{ id, recording_id: recordingId, pipeline_id: 'pdr', status: state }]
+      )
+      const result = await createPositioningAnalysisRun(managerActor, orgId, 'invalid-retry', {
+        recording_ids: [recordingId],
+        pipeline_ids: ['pdr'],
+        parameters_by_pipeline: {},
+        retry_of_analysis_run_id: runId,
+        retry_failed_item_ids: [id],
+      })
+      expect(result).toMatchObject({ ok: false, error: { type: 'RETRY_ITEMS_INVALID' } })
+      expect(mocks.insertRun).not.toHaveBeenCalled()
+    }
+  )
 })

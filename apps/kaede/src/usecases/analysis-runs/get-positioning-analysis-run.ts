@@ -29,6 +29,7 @@ export const getPositioningAnalysisRun = async (
     ok: true as const,
     value: {
       analysis_run_id: run.id,
+      ...(run.comparison_run_id ? { comparison_run_id: run.comparison_run_id } : {}),
       status,
       progress,
       ...(videos.length > 0

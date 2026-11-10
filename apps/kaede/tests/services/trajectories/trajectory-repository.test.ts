@@ -394,6 +394,65 @@ describe('trajectory repository', () => {
     })
   })
 
+  it('失敗分の再実行では元runの比較IDを一覧と詳細に返す', async () => {
+    const { floor, organization, recording } = await createRecordingFixture(db)
+    const root = await insertPositioningRun(
+      { organization_id: organization.id, idempotency_key: 'root', request_digest: 'root' },
+      db
+    )
+    const retry = await insertPositioningRun(
+      {
+        organization_id: organization.id,
+        idempotency_key: 'retry',
+        request_digest: 'retry',
+        retry_of_run_id: root.id,
+        comparison_run_id: root.id,
+      },
+      db
+    )
+    const trajectory = await insertTrajectory(
+      {
+        recording_id: recording.id,
+        floor_id: floor.id,
+        organization_id: organization.id,
+        status: 'completed',
+      },
+      db
+    )
+    await insertPositioningItems(
+      [
+        {
+          analysis_run_id: retry.id,
+          recording_id: recording.id,
+          pipeline_id: 'pdr',
+          pipeline_version: '1',
+          pipeline_digest: 'hash',
+          slot_bindings: {},
+          pipeline_snapshot: {},
+          parameters: {},
+          input_manifest: {},
+          status: 'completed',
+          result_trajectory_id: trajectory.id,
+        },
+      ],
+      db
+    )
+    const found = await findTrajectoryById(trajectory.id, db)
+    const list = await listTrajectoriesByOrganizationIdPaginated(
+      organization.id,
+      { limit: 10, cursor: null },
+      db
+    )
+    expect(found?.execution).toMatchObject({
+      analysis_run_id: retry.id,
+      comparison_run_id: root.id,
+    })
+    expect(list.rows[0].execution).toMatchObject({
+      analysis_run_id: retry.id,
+      comparison_run_id: root.id,
+    })
+  })
+
   it('legacy trajectory は互換メタデータを返す', async () => {
     const { floor, organization, recording } = await createRecordingFixture(db)
 

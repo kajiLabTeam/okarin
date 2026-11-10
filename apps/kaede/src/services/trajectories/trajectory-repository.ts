@@ -43,8 +43,10 @@ const activeTrajectoriesWithExecutionQuery = (executor: DbExecutor) =>
       'item.result_trajectory_id',
       'trajectories.id'
     )
+    .leftJoin('positioning_analysis_runs as run', 'run.id', 'item.analysis_run_id')
     .where('trajectories.deleted_at', 'is', null)
     .select([
+      'run.comparison_run_id',
       'trajectories.id',
       'trajectories.organization_id',
       'trajectories.recording_id',
@@ -69,6 +71,7 @@ const activeTrajectoriesWithExecutionQuery = (executor: DbExecutor) =>
 
 export const buildTrajectoryExecutionMetadata = (row: {
   created_at: Date
+  comparison_run_id?: string | null
   item_analysis_run_id: string | null
   item_id: string | null
   item_pipeline_id: string | null
@@ -90,6 +93,7 @@ export const buildTrajectoryExecutionMetadata = (row: {
 
     return {
       analysis_run_id: row.item_analysis_run_id,
+      ...(row.comparison_run_id ? { comparison_run_id: row.comparison_run_id } : {}),
       analysis_run_item_id: row.item_id,
       pipeline_id: row.item_pipeline_id,
       pipeline_version: row.item_pipeline_version,
@@ -125,6 +129,7 @@ const mapRowToTrajectoryWithExecution = (row: {
   created_at: Date
   updated_at: Date
   deleted_at: Date | null
+  comparison_run_id?: string | null
   item_analysis_run_id: string | null
   item_id: string | null
   item_pipeline_id: string | null

@@ -259,6 +259,7 @@ export const callbackResponseSchema = z
 
 export const trajectoryExecutionMetadataSchema = z
   .object({
+    comparison_run_id: uuidSchema.optional(),
     analysis_run_id: uuidSchema.nullable().openapi({
       description: '紐づく positioning_analysis_run の ID。legacy の場合は null',
     }),
