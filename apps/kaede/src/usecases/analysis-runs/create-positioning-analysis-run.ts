@@ -124,8 +124,8 @@ export const createPositioningAnalysisRun = async (
   if (!authorization.ok) return { ok: false, error: authorization.error }
   if (!key.trim() || key.length > 200)
     return { ok: false, error: { type: 'IDEMPOTENCY_KEY_INVALID', status: 400 } }
-  const itemCount =
-    body.retry_failed_item_ids?.length ?? body.recording_ids.length * body.pipeline_ids.length
+  const requestedItemIds = body.retry_failed_item_ids ?? body.retry_item_ids
+  const itemCount = requestedItemIds?.length ?? body.recording_ids.length * body.pipeline_ids.length
   const requestDigest = digest(body)
   const existing = await findPositioningRunByKey(organizationId, key)
   if (existing) {
@@ -146,13 +146,13 @@ export const createPositioningAnalysisRun = async (
   if (body.retry_of_analysis_run_id && !parent)
     return { ok: false, error: { type: 'RETRY_RUN_NOT_FOUND', status: 404 } }
   const failedIds = body.retry_failed_item_ids
-  const parentItems = failedIds && parent ? await listPositioningItems(parent.id) : []
-  const retryItems = parentItems.filter((item) => failedIds?.includes(item.id))
+  const parentItems = requestedItemIds && parent ? await listPositioningItems(parent.id) : []
+  const retryItems = parentItems.filter((item) => requestedItemIds?.includes(item.id))
   if (
-    failedIds &&
+    requestedItemIds &&
     (!parent ||
-      retryItems.length !== failedIds.length ||
-      retryItems.some((item) => item.status !== 'failed') ||
+      retryItems.length !== requestedItemIds.length ||
+      (failedIds && retryItems.some((item) => item.status !== 'failed')) ||
       body.recording_ids.some((id) => !retryItems.some((item) => item.recording_id === id)) ||
       body.pipeline_ids.some((id) => !retryItems.some((item) => item.pipeline_id === id)) ||
       retryItems.some(
@@ -190,7 +190,7 @@ export const createPositioningAnalysisRun = async (
   for (const pipelineId of body.pipeline_ids) {
     let resolved: Awaited<ReturnType<typeof resolvePipelineForExecution>>
     try {
-      const targetRecordingIds = failedIds
+      const targetRecordingIds = requestedItemIds
         ? retryItems
             .filter((item) => item.pipeline_id === pipelineId)
             .map((item) => item.recording_id)

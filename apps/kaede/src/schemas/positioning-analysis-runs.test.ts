@@ -69,3 +69,19 @@ it('再実行の200件上限は全組み合わせではなく指定した失敗�
     }).success
   ).toBe(true)
 })
+
+it('全件再実行の対象IDにも元runを要求し、失敗分指定との混在を拒否する', () => {
+  const body = { recording_ids: [id(1)], pipeline_ids: ['pdr'], retry_item_ids: [id(2)] }
+  expect(positioningAnalysisRunRequestSchema.safeParse(body).success).toBe(false)
+  expect(
+    positioningAnalysisRunRequestSchema.safeParse({ ...body, retry_of_analysis_run_id: id(3) })
+      .success
+  ).toBe(true)
+  expect(
+    positioningAnalysisRunRequestSchema.safeParse({
+      ...body,
+      retry_of_analysis_run_id: id(3),
+      retry_failed_item_ids: [id(2)],
+    }).success
+  ).toBe(false)
+})

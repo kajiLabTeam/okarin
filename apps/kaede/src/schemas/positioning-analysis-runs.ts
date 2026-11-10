@@ -9,6 +9,7 @@ export const positioningAnalysisRunRequestSchema = z
     parameters_by_pipeline: z.record(z.string(), z.record(z.string(), z.unknown())).default({}),
     retry_of_analysis_run_id: uuidSchema.optional(),
     retry_failed_item_ids: z.array(uuidSchema).min(1).max(200).optional(),
+    retry_item_ids: z.array(uuidSchema).min(1).max(200).optional(),
     ground_truth_csv: z.string().min(1).max(20_000_000).optional(),
   })
   .strict()
@@ -17,19 +18,21 @@ export const positioningAnalysisRunRequestSchema = z
       ctx.addIssue({ code: 'custom', message: 'recording_ids must be unique' })
     if (new Set(v.pipeline_ids).size !== v.pipeline_ids.length)
       ctx.addIssue({ code: 'custom', message: 'pipeline_ids must be unique' })
-    if ((v.retry_failed_item_ids?.length ?? v.recording_ids.length * v.pipeline_ids.length) > 200)
+    const retryIds = v.retry_failed_item_ids ?? v.retry_item_ids
+    if ((retryIds?.length ?? v.recording_ids.length * v.pipeline_ids.length) > 200)
       ctx.addIssue({
         code: 'custom',
         message: 'recording/pipeline combinations must not exceed 200',
       })
-    if (
-      v.retry_failed_item_ids &&
-      (!v.retry_of_analysis_run_id ||
-        new Set(v.retry_failed_item_ids).size !== v.retry_failed_item_ids.length)
-    )
+    if (retryIds && (!v.retry_of_analysis_run_id || new Set(retryIds).size !== retryIds.length))
       ctx.addIssue({
         code: 'custom',
-        message: 'retry_failed_item_ids requires a parent run and unique item IDs',
+        message: 'retry item IDs require a parent run and unique item IDs',
+      })
+    if (v.retry_failed_item_ids && v.retry_item_ids)
+      ctx.addIssue({
+        code: 'custom',
+        message: 'retry_failed_item_ids and retry_item_ids are mutually exclusive',
       })
     const extra = Object.keys(v.parameters_by_pipeline).filter(
       (key) => !v.pipeline_ids.includes(key)
