@@ -209,3 +209,23 @@ it('軌跡が完了して動画生成中の場合はcompletedと動画状態を�
     value: { status: 'completed', video_progress: { processing: 1, failed: 0 } },
   })
 })
+
+it('全件待機中でも既存の詳細APIと同じprocessingを返す', async () => {
+  mocks.findRun.mockResolvedValue({ id: runId, organization_id: orgId, status: 'accepted' })
+  mocks.listItems.mockResolvedValue([
+    {
+      id: 'item',
+      recording_id: 'recording',
+      pipeline_id: 'pdr',
+      status: 'queued',
+      result_trajectory_id: null,
+      pipeline_digest: 'a'.repeat(64),
+      pipeline_version: '1',
+      error: null,
+    },
+  ])
+  expect(await getPositioningAnalysisRun(managerActor, orgId, runId)).toMatchObject({
+    ok: true,
+    value: { status: 'processing', progress: { queued: 1 } },
+  })
+})
