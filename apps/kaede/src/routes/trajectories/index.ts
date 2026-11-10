@@ -10,6 +10,7 @@ import { registerGetTrajectoryResultRoute } from './get-trajectory-result.js'
 import { registerGetTrajectoryRoute } from './get-trajectory.js'
 import { registerIssueGroundTruthUploadUrlRoute } from './issue-ground-truth-upload-url.js'
 import { registerIssueManualResultUploadUrlRoute } from './issue-manual-result-upload-url.js'
+import { registerRetryParticleAnimationRoute } from './retry-particle-animation.js'
 import { registerRetryTrajectoryRoute } from './retry-trajectory.js'
 
 export const trajectoriesRoutes = new OpenAPIHono()
@@ -19,6 +20,7 @@ registerGetTrajectoryRoute(trajectoriesRoutes)
 registerGetTrajectoryResultRoute(trajectoriesRoutes)
 registerGetTrajectoryMapDataRoute(trajectoriesRoutes)
 registerBatchTrajectoryMapDataRoute(trajectoriesRoutes)
+registerRetryParticleAnimationRoute(trajectoriesRoutes)
 registerRetryTrajectoryRoute(trajectoriesRoutes)
 registerCloneAndReanalyzeRoute(trajectoriesRoutes)
 registerIssueManualResultUploadUrlRoute(trajectoriesRoutes)

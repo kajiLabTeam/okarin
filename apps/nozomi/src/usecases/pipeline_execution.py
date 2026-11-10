@@ -177,14 +177,29 @@ class HttpOutputWriter:
             raise
         except Exception as exc:
             raise PermanentComponentError(f"output upload failed: {exc}") from exc
+        manifest = self.write_artifacts(
+            trajectory.pop("_artifact_payloads", {}), artifact_uploads or {}
+        )
+        result: dict[str, Any] = {"digest": digest}
+        if "evaluation" in trajectory:
+            result["evaluation"] = trajectory["evaluation"]
+        if manifest:
+            result["output_manifest"] = {"schema_version": "1", "artifacts": manifest}
+        return result
+
+    def write_artifacts(
+        self,
+        payloads: dict[str, Any],
+        artifact_uploads: dict[str, OutputArtifactUpload],
+    ) -> dict[str, Any]:
         manifest: dict[str, Any] = {}
-        payloads = trajectory.pop("_artifact_payloads", {})
-        for name, target in (artifact_uploads or {}).items():
+        for name, target in artifact_uploads.items():
             payload = payloads.get(name)
             if not isinstance(payload, dict) or not isinstance(
                 payload.get("body"), bytes
             ):
                 continue
+            validate_outbound_url(target.upload_uri, UrlPurpose.STORAGE)
             body = payload["body"]
             artifact_digest = hashlib.sha256(body).hexdigest()
             try:
@@ -214,12 +229,7 @@ class HttpOutputWriter:
                 "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 "available": True,
             }
-        result: dict[str, Any] = {"digest": digest}
-        if "evaluation" in trajectory:
-            result["evaluation"] = trajectory["evaluation"]
-        if manifest:
-            result["output_manifest"] = {"schema_version": "1", "artifacts": manifest}
-        return result
+        return manifest
 
 
 class ExecutionRepository:
@@ -255,6 +265,64 @@ class ExecutionRepository:
                 )
                 """
             )
+
+            self._connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS artifact_sources (
+                    item_id TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    body BLOB NOT NULL,
+                    PRIMARY KEY (item_id, name)
+                )
+                """
+            )
+
+    def save_artifact_source(self, item_id: str, name: str, body: bytes) -> None:
+        with self._lock, self._connection:
+            self._connection.execute(
+                "INSERT OR REPLACE INTO artifact_sources (item_id, name, body) "
+                "VALUES (?, ?, ?)",
+                (item_id, name, body),
+            )
+
+    def delete_artifact_source(self, item_id: str, name: str) -> None:
+        with self._lock, self._connection:
+            self._connection.execute(
+                "DELETE FROM artifact_sources WHERE item_id = ? AND name = ?",
+                (item_id, name),
+            )
+
+    def begin_artifact_retry(
+        self, item_id: str, name: str
+    ) -> tuple[ExecutionEvent, bytes | None]:
+        """Reserve one video retry atomically; duplicate requests reuse its state."""
+        with self._lock:
+            record = self.get(item_id)
+            if record is None:
+                raise KeyError("execution_not_found")
+            event = record.event.model_copy(deep=True)
+            artifact = (
+                event.outputs.get("output_manifest", {}).get("artifacts", {}).get(name)
+            )
+            if event.status != ExecutionStatus.COMPLETED or artifact is None:
+                raise ValueError("artifact_not_retryable")
+            if artifact.get("generation_status") == "processing":
+                return event, None
+            if artifact.get("generation_status") != "failed":
+                raise ValueError("artifact_not_retryable")
+            source = self._connection.execute(
+                "SELECT body FROM artifact_sources WHERE item_id = ? AND name = ?",
+                (item_id, name),
+            ).fetchone()
+            if source is None:
+                raise ValueError("artifact_source_unavailable")
+            attempt = artifact.get("generation_attempt", 0) + 1
+            artifact.update(generation_status="processing", generation_attempt=attempt)
+            event = event.model_copy(
+                update={"event_id": artifact_event_id(item_id, attempt, "processing")}
+            )
+            self.put(item_id, ExecutionRecord(record.fingerprint, event))
+            return event, bytes(source["body"])
 
     @staticmethod
     def _record(row: sqlite3.Row) -> ExecutionRecord:
@@ -462,6 +530,45 @@ class ExecutionRepository:
                 delivery.status = "retrying"
                 delivery.next_attempt_at = 0
                 self.update_delivery(delivery)
+            # The trajectory is already usable; only the interrupted video fails.
+            # Keep the persisted source available for a user-requested video retry.
+            for row in rows:
+                record = self._record(row)
+                if record.event.status != ExecutionStatus.COMPLETED:
+                    continue
+                event = record.event.model_copy(deep=True)
+                artifacts = event.outputs.get("output_manifest", {}).get(
+                    "artifacts", {}
+                )
+                pending = [
+                    artifact
+                    for artifact in artifacts.values()
+                    if artifact.get("generation_status") == "processing"
+                ]
+                if not pending:
+                    continue
+                for artifact in pending:
+                    artifact["generation_status"] = "failed"
+                event = event.model_copy(
+                    update={
+                        "event_id": artifact_event_id(
+                            event.analysis_run_item_id,
+                            max(
+                                artifact.get("generation_attempt", 0)
+                                for artifact in pending
+                            ),
+                            "finished",
+                        )
+                    }
+                )
+                self.put(
+                    event.analysis_run_item_id,
+                    ExecutionRecord(record.fingerprint, event),
+                )
+                delivery = self.delivery(event)
+                delivery.status = "retrying"
+                delivery.next_attempt_at = 0
+                self.update_delivery(delivery)
             return len(interrupted)
 
 
@@ -507,6 +614,10 @@ def request_fingerprint(request: ExecutionRequest) -> str:
 
 def event_id(item_id: str, status: str) -> str:
     return hashlib.sha256(f"{item_id}:{status}".encode()).hexdigest()
+
+
+def artifact_event_id(item_id: str, attempt: int, phase: str) -> str:
+    return event_id(item_id, f"artifacts:{attempt}:{phase}")
 
 
 def send_callback(event: ExecutionEvent) -> None:

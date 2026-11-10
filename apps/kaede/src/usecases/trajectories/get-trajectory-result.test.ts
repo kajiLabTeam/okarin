@@ -101,6 +101,39 @@ describe('getTrajectoryResult', () => {
     })
   })
 
+  it('動画生成中でも軌跡URLを返し、未生成動画のURLは発行しない', async () => {
+    const trajectoryId = '22222222-2222-4222-8222-222222222222'
+    const pending = {
+      object_key: 'video.webm',
+      content_type: 'video/webm',
+      format: 'webm',
+      available: false,
+      generation_status: 'processing',
+    }
+    findTrajectoryByIdMock.mockResolvedValue({
+      id: trajectoryId,
+      organization_id: '11111111-1111-4111-8111-111111111111',
+      status: 'completed',
+    })
+    issueTrajectoryResultDownloadUrlMock.mockResolvedValue({
+      downloadUrl: 'https://storage.example.test/result.csv',
+      expiresAt: '2026-07-07T00:30:00.000Z',
+    })
+    findTrajectoryOutputManifestByIdMock.mockResolvedValue({
+      schema_version: '1',
+      artifacts: { particle_animation: pending },
+    })
+    const result = await getTrajectoryResult(managerActor, { trajectoryId })
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        download_url: 'https://storage.example.test/result.csv',
+        output_manifest: { artifacts: { particle_animation: pending } },
+      },
+    })
+    expect(issuePositioningAnalysisArtifactDownloadUrlMock).not.toHaveBeenCalled()
+  })
+
   it('completed trajectory の result download URL を返す', async () => {
     const trajectoryId = '22222222-2222-4222-8222-222222222222'
 

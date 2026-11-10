@@ -367,12 +367,15 @@ export const trajectoryResultResponseSchema = z
           z.string(),
           z.object({
             object_key: z.string(),
-            checksum_sha256: z.string(),
+            checksum_sha256: z.string().optional(),
             content_type: z.string(),
             format: z.string(),
             size_bytes: z.number().int().nonnegative().optional(),
             generated_at: z.iso.datetime().optional(),
             available: z.boolean().optional(),
+            generation_status: z.enum(['processing', 'failed']).optional(),
+            generation_attempt: z.number().int().nonnegative().optional(),
+            retry_available: z.boolean().optional(),
             download_url: z.url().optional(),
             expires_at: isoDatetimeSchema.optional(),
           })
