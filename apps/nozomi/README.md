@@ -32,6 +32,20 @@ $ HOST=0.0.0.0 PORT=8080 uv run start
 - 1入力の上限は既定で200 MiBです。`NOZOMI_MAX_INPUT_BYTES`で変更できます。
 - 実行予約とcallback配信待ちは`NOZOMI_EXECUTION_DB_PATH`のSQLiteへ保存します。Docker Composeでは永続volumeを割り当て、callbackが未達の場合は再起動後も指数バックオフで再送します。再起動で中断した実行は`execution_interrupted`へ収束し、失敗callbackを再送します。複数ホストへ水平分割する場合は共有DBへ移行してください。
 
+### 軌跡とパーティクルフィルター動画の完了タイミング
+
+軌跡CSV・評価結果などの保存後、動画のエンコードを待たずに`completed`を通知します。動画は計算済みの粒子履歴を使って同じバックグラウンドタスク内で生成し、アップロード後に別の`event_id`で`completed`を再通知します。2回目の通知には既存の成果物も含めるため、最初の通知が未達でも軌跡と動画を反映できます。
+
+生成中の動画はmanifest上で`available: false`、`generation_status: processing`とし、未生成なのでchecksumやダウンロードURLは付けません。完成するとchecksum付きの利用可能な成果物に置き換わります。mioは生成中だけ5秒間隔でmanifestを取得し、完成後に動画を自動表示します。
+
+動画の生成・アップロードに失敗した場合は動画だけを`generation_status: failed`にし、軌跡の`completed`は維持します。粒子履歴・地図・BLE補正などの描画用データは、圧縮したNPZ形式で実行DBの`artifact_sources`へ保存します。動画生成中にNozomiが再起動した場合は動画のみ失敗として通知し、軌跡と描画用データは維持します。動画のアップロードに成功した後は描画用データを削除します。
+
+mioの失敗した動画に表示される「動画を再生成」から、`POST /api/trajectories/{trajectoryId}/particle-animation/retry`を呼び出せます。Kaedeが組織の管理権限を検証し、新しいアップロードURLを発行してNozomiの`POST /internal/pipeline-executions/{analysis_run_item_id}/particle-animation/retry`へ渡します。軌跡計算は行わず、保存した描画用データから動画だけを再生成します。生成中の重複リクエストは同じ試行を返します。再生成の通知には`generation_attempt`を付け、古い試行の通知で新しい状態が上書きされないようにします。
+
+描画用データを保存できなかった場合や、導入前に失敗した動画は動画単体では再生成できません。manifestの`retry_available`が`true`でない場合はmioでその旨を表示します。新たに歩行データから解析してください。
+
+反映時は先にKaedeとmioを更新し、新しいmanifest形式を受け取れるようにしてからNozomiを更新してください。
+
 ### uvのセットアップ
 
 `uv venv`

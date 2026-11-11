@@ -6,11 +6,14 @@ import { errorResponseSchema, uuidSchema } from '../../schemas/common.js'
 import { organizationIdParamsSchema } from '../../schemas/organizations.js'
 import {
   positioningAnalysisRunDetailSchema,
+  positioningAnalysisRunListQuerySchema,
+  positioningAnalysisRunListSchema,
   positioningAnalysisRunRequestSchema,
   positioningAnalysisRunResponseSchema,
 } from '../../schemas/positioning-analysis-runs.js'
 import { createPositioningAnalysisRun } from '../../usecases/analysis-runs/create-positioning-analysis-run.js'
 import { getPositioningAnalysisRun } from '../../usecases/analysis-runs/get-positioning-analysis-run.js'
+import { listPositioningAnalysisRuns } from '../../usecases/analysis-runs/list-positioning-analysis-runs.js'
 const errors = {
   description: 'positioning analysis request failed',
   content: { 'application/json': { schema: errorResponseSchema } },
@@ -20,6 +23,33 @@ const errorBody = (error: { type: string }) => ({
   error_message: 'positioning analysis request failed',
 })
 export const registerPositioningAnalysisRunRoutes = (app: OpenAPIHono) => {
+  const list = createRoute({
+    method: 'get',
+    path: '/{organizationId}/positioning-analysis-runs',
+    tags: ['Organizations'],
+    description: '組織の測位解析履歴を取得する',
+    request: { params: organizationIdParamsSchema, query: positioningAnalysisRunListQuerySchema },
+    responses: {
+      200: {
+        description: '解析履歴',
+        content: { 'application/json': { schema: positioningAnalysisRunListSchema } },
+      },
+      400: errors,
+      403: errors,
+    },
+  })
+  app.openapi(list, async (c) => {
+    const result = await listPositioningAnalysisRuns(
+      requireRequestActor(c as RequestActorContext),
+      c.req.valid('param').organizationId,
+      c.req.valid('query')
+    )
+    if (result.ok) return c.json(result.value, 200)
+    return c.json(
+      errorBody(result.error),
+      result.error.type === 'PAGINATION_CURSOR_INVALID' ? 400 : 403
+    )
+  })
   const create = createRoute({
     method: 'post',
     path: '/{organizationId}/positioning-analysis-runs',

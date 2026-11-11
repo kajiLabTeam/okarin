@@ -51,6 +51,7 @@ export interface AnalysisRunTrajectories {
 }
 
 export interface PositioningAnalysisRuns {
+  comparison_run_id: Generated<string | null>
   id: Generated<string>
   organization_id: string
   status: Generated<string>

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field, field_validator
 
@@ -53,6 +53,10 @@ class OutputArtifactUpload(StrictModel):
     @classmethod
     def check_upload_uri(cls, value: str) -> str:
         return validate_outbound_url(value, UrlPurpose.STORAGE)
+
+
+class ArtifactRetryRequest(StrictModel):
+    output_artifacts: dict[str, OutputArtifactUpload]
 
 
 class GroundTruthInput(StrictModel):
@@ -118,3 +122,9 @@ class CallbackDeliveryResponse(StrictModel):
     attempts: int
     last_error: str | None = None
     next_attempt_at: float | None = None
+
+
+class ArtifactRetryAccepted(StrictModel):
+    analysis_run_item_id: str
+    generation_status: Literal["processing"] = "processing"
+    generation_attempt: int = Field(ge=0)

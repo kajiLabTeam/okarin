@@ -107,3 +107,57 @@ export const dispatchExecutionToNozomi = async (
 
   throw new FatalDispatchError(`Nozomi rejected request (${response.status}): ${errorBody}`)
 }
+
+export class ArtifactRetryError extends Error {
+  constructor(
+    readonly status: number,
+    message: string
+  ) {
+    super(message)
+    this.name = 'ArtifactRetryError'
+  }
+}
+
+export const retryParticleAnimationInNozomi = async (
+  itemId: string,
+  outputArtifacts: NonNullable<NozomiExecutionRequest['output_artifacts']>
+): Promise<{ generation_attempt: number }> => {
+  const config = getNozomiRuntimeConfig()
+  let response: Response
+  try {
+    response = await fetch(
+      `${config.internalEndpoint}/internal/pipeline-executions/${encodeURIComponent(itemId)}/particle-animation/retry`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ output_artifacts: outputArtifacts }),
+        signal: AbortSignal.timeout(config.requestTimeoutMs),
+      }
+    )
+  } catch (error) {
+    throw new ArtifactRetryError(502, `Nozomi connection failed: ${String(error)}`)
+  }
+  if (response.status !== 202) {
+    throw new ArtifactRetryError(
+      response.status === 404 || response.status === 409 ? 409 : 502,
+      'Video retry was not accepted'
+    )
+  }
+  let body: unknown
+  try {
+    body = await response.json()
+  } catch {
+    throw new ArtifactRetryError(502, 'Invalid video retry response')
+  }
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('generation_attempt' in body) ||
+    typeof body.generation_attempt !== 'number' ||
+    !Number.isSafeInteger(body.generation_attempt) ||
+    body.generation_attempt < 0
+  ) {
+    throw new ArtifactRetryError(502, 'Invalid video retry response')
+  }
+  return { generation_attempt: body.generation_attempt }
+}

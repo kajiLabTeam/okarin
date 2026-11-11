@@ -4,14 +4,23 @@ import { uuidSchema } from './common.js'
 export const outputArtifactManifestSchema = z
   .object({
     object_key: z.string().min(1),
-    checksum_sha256: z.string().regex(/^[a-f0-9]{64}$/i),
+    checksum_sha256: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/i)
+      .optional(),
     content_type: z.string().min(1),
     format: z.string().min(1),
     size_bytes: z.number().int().nonnegative().optional(),
     generated_at: z.string().min(1).optional(),
     available: z.boolean().optional(),
+    generation_status: z.enum(['processing', 'failed']).optional(),
+    generation_attempt: z.number().int().nonnegative().optional(),
+    retry_available: z.boolean().optional(),
   })
   .strict()
+  .refine((artifact) => artifact.available === false || artifact.checksum_sha256 !== undefined, {
+    message: 'available artifacts require a checksum',
+  })
 
 export const outputManifestSchema = z
   .object({

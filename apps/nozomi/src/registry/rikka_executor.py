@@ -4,15 +4,21 @@ import json
 import math
 import struct
 import tempfile
-from dataclasses import asdict, is_dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from io import BytesIO
 from pathlib import Path
 from typing import Any, cast
 
 import numpy as np
 import pandas as pd
+from pydantic import TypeAdapter
 from rikka.ble.pipeline import run_ble_ranging_input
-from rikka.common.lib.models import FloorMap, Landmark, TrajectoryResult
+from rikka.common.lib.models import (
+    FloorMap,
+    Landmark,
+    LandmarkCorrectionResult,
+    TrajectoryResult,
+)
 from rikka.common.lib.trajectory_evaluation import (
     evaluate_trajectory_csv,
     write_evaluation_failure,
@@ -245,6 +251,97 @@ def _write_trajectory_csv(trajectory: dict[str, Any], path: Path) -> None:
     dataframe.to_csv(path, index=False)
 
 
+@dataclass
+class ParticleAnimation:
+    """Keep the computed particles, without retaining temporary map paths."""
+
+    particles: np.ndarray[Any, Any]
+    trajectory: list[list[float]]
+    gx_mean: float
+    gz_mean: float
+    landmark: LandmarkCorrectionResult | None
+    floor_map_bytes: bytes
+    origin_px: tuple[int, int]
+    scale: float
+
+    def serialize(self) -> bytes:
+        metadata = {
+            "trajectory": self.trajectory,
+            "gx_mean": self.gx_mean,
+            "gz_mean": self.gz_mean,
+            "landmark": _jsonable(self.landmark),
+            "origin_px": self.origin_px,
+            "scale": self.scale,
+        }
+        buffer = BytesIO()
+        np.savez_compressed(
+            buffer,
+            particles=self.particles,
+            floor_map=np.frombuffer(self.floor_map_bytes, dtype=np.uint8),
+            metadata=np.asarray(json.dumps(_jsonable(metadata))),
+        )
+        return buffer.getvalue()
+
+    @classmethod
+    def deserialize(cls, body: bytes) -> ParticleAnimation:
+        with np.load(BytesIO(body), allow_pickle=False) as source:
+            metadata = json.loads(str(source["metadata"]))
+            landmark = metadata["landmark"]
+            return cls(
+                particles=source["particles"],
+                trajectory=metadata["trajectory"],
+                gx_mean=metadata["gx_mean"],
+                gz_mean=metadata["gz_mean"],
+                landmark=(
+                    None
+                    if landmark is None
+                    else TypeAdapter(LandmarkCorrectionResult).validate_python(landmark)
+                ),
+                floor_map_bytes=source["floor_map"].tobytes(),
+                origin_px=tuple(metadata["origin_px"]),
+                scale=metadata["scale"],
+            )
+
+    def render(self) -> dict[str, dict[str, bytes]]:
+        with tempfile.TemporaryDirectory(prefix="nozomi-animation-") as directory:
+            temporary = Path(directory)
+            floor_path = temporary / "floor-map.png"
+            floor_path.write_bytes(self.floor_map_bytes)
+            generated = cast(
+                Path | None,
+                save_particle_animation(
+                    self.particles,
+                    self.trajectory,
+                    gx_mean=self.gx_mean,
+                    gz_mean=self.gz_mean,
+                    floormap_path=str(floor_path),
+                    origin_px=self.origin_px,
+                    scale=self.scale,
+                    output_path=temporary / "particle-filter.webm",
+                    landmark=self.landmark,
+                ),
+            )
+            candidates = (
+                [Path(generated)]
+                if generated is not None
+                else list(temporary.glob("particle-filter.*"))
+            )
+            path = next(
+                (path for path in candidates if path.suffix in {".webm", ".mp4"}),
+                None,
+            )
+            if path is None:
+                raise PermanentComponentError(
+                    "particle animation WebM/MP4 could not be generated"
+                )
+            key = (
+                "particle_animation"
+                if path.suffix == ".webm"
+                else "particle_animation_mp4"
+            )
+            return {key: {"body": path.read_bytes()}}
+
+
 class RikkaComponentExecutor:
     """Adapter from Nozomi's component contract to Rikka's public pipelines."""
 
@@ -292,8 +389,7 @@ class RikkaComponentExecutor:
         with tempfile.TemporaryDirectory(prefix="nozomi-rikka-") as directory:
             temporary = Path(directory)
             floor_map: FloorMap | None = None
-            particle_animation_body: bytes | None = None
-            particle_animation_key: str | None = None
+            animation: ParticleAnimation | None = None
             if uses_particle or uses_ble:
                 floor_path = temporary / "floor-map.png"
                 floor_path.write_bytes(inputs["floor_map"])
@@ -381,51 +477,17 @@ class RikkaComponentExecutor:
                 and result.particle is not None
                 and "particle_animation" in parameters.get("_output_artifacts", {})
             ):
-                animation_path = temporary / "particle-filter.webm"
-                particle_settings = ParticleSettings(
-                    floormap_path=str(floor_path),
-                    origin_px=floor_map.origin_px if floor_map is not None else (0, 0),
-                    scale=floor_map.scale if floor_map is not None else 1.0,
-                    seed=(
-                        None
-                        if parameters.get("particle_seed") is None
-                        else int(parameters["particle_seed"])
-                    ),
-                    count=int(parameters.get("particle_count", 500)),
+                assert floor_map is not None
+                animation = ParticleAnimation(
+                    particles=np.asarray(result.particle.all_particles),
+                    trajectory=result.trajectory,
+                    gx_mean=result.prepared.gx_mean,
+                    gz_mean=result.prepared.gz_mean,
+                    landmark=result.landmark,
+                    floor_map_bytes=inputs["floor_map"],
+                    origin_px=floor_map.origin_px,
+                    scale=floor_map.scale,
                 )
-                generated_result = cast(
-                    Path | None,
-                    save_particle_animation(
-                        np.asarray(result.particle.all_particles),
-                        result.trajectory,
-                        gx_mean=result.prepared.gx_mean,
-                        gz_mean=result.prepared.gz_mean,
-                        floormap_path=particle_settings.floormap_path,
-                        origin_px=particle_settings.origin_px,
-                        scale=particle_settings.scale,
-                        output_path=animation_path,
-                        landmark=result.landmark,
-                    ),
-                )
-                if generated_result is not None:
-                    generated_path = Path(generated_result)
-                else:
-                    generated_candidates = tuple(temporary.glob("particle-filter.*"))
-                    if not generated_candidates:
-                        raise PermanentComponentError(
-                            "particle animation was not generated"
-                        )
-                    generated_path = generated_candidates[0]
-                if generated_path.suffix not in {".webm", ".mp4"}:
-                    raise PermanentComponentError(
-                        "particle animation WebM/MP4 could not be generated"
-                    )
-                particle_animation_key = (
-                    "particle_animation"
-                    if generated_path.suffix == ".webm"
-                    else "particle_animation_mp4"
-                )
-                particle_animation_body = generated_path.read_bytes()
 
         trajectory = _trajectory_payload(result, component.component_id, parameters)
         artifact_targets = parameters.get("_output_artifacts", {})
@@ -497,8 +559,8 @@ class RikkaComponentExecutor:
             payloads["diagnostics"] = {
                 "body": json.dumps(diagnostics, ensure_ascii=False).encode()
             }
-        if particle_animation_key is not None and particle_animation_body is not None:
-            payloads[particle_animation_key] = {"body": particle_animation_body}
+        if animation is not None:
+            trajectory["_deferred_artifacts"] = {"particle_animation": animation}
         if payloads:
             trajectory["_artifact_payloads"] = payloads
         return {"trajectory": trajectory}

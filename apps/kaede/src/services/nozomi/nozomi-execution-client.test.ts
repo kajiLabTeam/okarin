@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   dispatchExecutionToNozomi,
+  ArtifactRetryError,
+  retryParticleAnimationInNozomi,
   FatalDispatchError,
   RetriableDispatchError,
 } from './nozomi-execution-client.js'
@@ -98,4 +100,42 @@ describe('dispatchExecutionToNozomi', () => {
 
     await expect(dispatchExecutionToNozomi(sampleRequest)).rejects.toThrow(FatalDispatchError)
   })
+})
+
+describe('retryParticleAnimationInNozomi', () => {
+  it('新しい動画のアップロード先でNozomiへ再生成をリクエストする', async () => {
+    const fetch = vi
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(Response.json({ generation_attempt: 1 }, { status: 202 }))
+    await expect(retryParticleAnimationInNozomi('item', {})).resolves.toEqual({
+      generation_attempt: 1,
+    })
+    expect(fetch).toHaveBeenCalledWith(
+      'http://nozomi:8000/internal/pipeline-executions/item/particle-animation/retry',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ output_artifacts: {} }) })
+    )
+    fetch.mockRestore()
+  })
+  it.each([404, 409, 500])(
+    'Nozomiが%sを返したときに呼び出し側で処理できるエラーにする',
+    async (status) => {
+      const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(new Response('', { status }))
+      await expect(retryParticleAnimationInNozomi('item', {})).rejects.toMatchObject({
+        status: status === 500 ? 502 : 409,
+      })
+      fetch.mockRestore()
+    }
+  )
+  it.each([{}, { generation_attempt: -1 }, { generation_attempt: '1' }])(
+    '不正な受付応答を拒否する (%j)',
+    async (payload) => {
+      const fetch = vi
+        .spyOn(global, 'fetch')
+        .mockResolvedValue(Response.json(payload, { status: 202 }))
+      await expect(retryParticleAnimationInNozomi('item', {})).rejects.toBeInstanceOf(
+        ArtifactRetryError
+      )
+      fetch.mockRestore()
+    }
+  )
 })

@@ -1,12 +1,17 @@
+import logging
 import os
 import threading
+from collections.abc import Callable
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 
 from src.registry.catalog import initial_catalog
 from src.registry.registry import PipelineRegistry
-from src.registry.rikka_executor import RikkaComponentExecutor
+from src.registry.rikka_executor import ParticleAnimation, RikkaComponentExecutor
 from src.schemas.execution import (
+    ArtifactRetryAccepted,
+    ArtifactRetryRequest,
     CallbackDeliveryResponse,
     ErrorEnvelope,
     ErrorResponse,
@@ -14,12 +19,14 @@ from src.schemas.execution import (
     ExecutionEvent,
     ExecutionRequest,
     ExecutionStatus,
+    OutputArtifactUpload,
 )
 from src.usecases.pipeline_execution import (
     ExecutionRecord,
     ExecutionRepository,
     HttpInputLoader,
     HttpOutputWriter,
+    artifact_event_id,
     event_id,
     execute_pipeline,
     request_fingerprint,
@@ -27,6 +34,8 @@ from src.usecases.pipeline_execution import (
     send_callback_with_retry,
     validate_request,
 )
+
+logger = logging.getLogger(__name__)
 
 executions_router = APIRouter()
 execution_repository = ExecutionRepository(
@@ -80,6 +89,7 @@ def _deliver_callback_without_interrupting(event: ExecutionEvent) -> None:
 
 
 def _run_execution(request: ExecutionRequest) -> None:
+    deferred: dict[str, Callable[[], dict[str, Any]]] = {}
     snapshot = registry.resolve(request.pipeline_id)
     if snapshot is None:
         event = ExecutionEvent(
@@ -117,9 +127,43 @@ def _run_execution(request: ExecutionRequest) -> None:
                 snapshot, execution_request, executor, input_loader
             )
             if event.status == ExecutionStatus.COMPLETED:
+                animations = event.outputs.get("trajectory", {}).pop(
+                    "_deferred_artifacts", {}
+                )
+                deferred = {
+                    name: animation.render for name, animation in animations.items()
+                }
                 references = output_writer.write(
                     request.output_uri, event.outputs, request.output_artifacts
                 )
+                if deferred:
+                    artifacts = references.setdefault(
+                        "output_manifest", {"schema_version": "1", "artifacts": {}}
+                    )["artifacts"]
+                    for name in deferred:
+                        target = request.output_artifacts[name]
+                        retry_available = False
+                        try:
+                            execution_repository.save_artifact_source(
+                                request.analysis_run_item_id,
+                                name,
+                                animations[name].serialize(),
+                            )
+                            retry_available = True
+                        except Exception:
+                            logger.exception(
+                                "Could not persist video source: item_id=%s",
+                                request.analysis_run_item_id,
+                            )
+                        artifacts[name] = {
+                            "object_key": target.object_key,
+                            "content_type": target.content_type,
+                            "format": target.format,
+                            "available": False,
+                            "generation_status": "processing",
+                            "generation_attempt": 0,
+                            "retry_available": retry_available,
+                        }
                 event = event.model_copy(update={"outputs": references})
         except ValueError as exc:
             event = ExecutionEvent(
@@ -152,6 +196,73 @@ def _run_execution(request: ExecutionRequest) -> None:
             request.analysis_run_item_id,
             ExecutionRecord(request_fingerprint(request), event, 3, str(exc)),
         )
+
+    if event.status == ExecutionStatus.COMPLETED and deferred:
+        _finish_deferred_artifacts(
+            event, deferred, request.output_artifacts, request_fingerprint(request)
+        )
+
+
+def _finish_deferred_artifacts(
+    completed: ExecutionEvent,
+    deferred: dict[str, Callable[[], dict[str, Any]]],
+    artifact_uploads: dict[str, OutputArtifactUpload],
+    fingerprint: str,
+) -> None:
+    # Work from a copy so the persisted initial completion remains immutable.
+    outputs = completed.model_copy(deep=True).outputs
+    artifacts = outputs["output_manifest"]["artifacts"]
+    for name, render in deferred.items():
+        try:
+            manifest = output_writer.write_artifacts(render(), artifact_uploads)
+            if name not in manifest:
+                raise RuntimeError(f"deferred artifact {name} was not uploaded")
+            for artifact in manifest.values():
+                artifact["generation_attempt"] = artifacts[name].get(
+                    "generation_attempt", 0
+                )
+            artifacts.update(manifest)
+        except Exception:
+            logger.exception(
+                "Background artifact generation failed: item_id=%s artifact=%s",
+                completed.analysis_run_item_id,
+                name,
+            )
+            artifacts[name] = {
+                **artifacts[name],
+                "available": False,
+                "generation_status": "failed",
+            }
+
+    event = completed.model_copy(
+        update={
+            "event_id": artifact_event_id(
+                completed.analysis_run_item_id,
+                max(
+                    artifact.get("generation_attempt", 0)
+                    for artifact in artifacts.values()
+                ),
+                "finished",
+            ),
+            "outputs": outputs,
+        }
+    )
+    execution_repository.put(
+        completed.analysis_run_item_id,
+        ExecutionRecord(fingerprint, event),
+    )
+    for name in deferred:
+        if artifacts[name].get("available") is True:
+            try:
+                execution_repository.delete_artifact_source(
+                    completed.analysis_run_item_id, name
+                )
+            except Exception:
+                logger.exception(
+                    "Could not remove video source: item_id=%s",
+                    completed.analysis_run_item_id,
+                )
+    _deliver_callback_without_interrupting(event)
 
 
 @executions_router.post(
@@ -230,6 +341,81 @@ def start_execution(
     return ExecutionAccepted(
         analysis_run_item_id=request.analysis_run_item_id,
         status=ExecutionStatus.PROCESSING,
+    )
+
+
+@executions_router.post(
+    "/internal/pipeline-executions/{analysis_run_item_id}/particle-animation/retry",
+    response_model=ArtifactRetryAccepted,
+    status_code=202,
+    responses={404: {"model": ErrorEnvelope}, 409: {"model": ErrorEnvelope}},
+    tags=["executions"],
+    summary="保存済み粒子履歴から失敗した動画だけを再生成する",
+)
+def retry_particle_animation(
+    analysis_run_item_id: str,
+    request: ArtifactRetryRequest,
+    background_tasks: BackgroundTasks,
+) -> ArtifactRetryAccepted:
+    if set(request.output_artifacts) != {
+        "particle_animation",
+        "particle_animation_mp4",
+    }:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "invalid_artifact_targets",
+                "message": "WebM and MP4 upload targets are required",
+            },
+        )
+    if (
+        request.output_artifacts["particle_animation_mp4"].manifest_name
+        != "particle_animation"
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "invalid_artifact_targets",
+                "message": "MP4 target must use the particle_animation manifest name",
+            },
+        )
+    try:
+        event, source = execution_repository.begin_artifact_retry(
+            analysis_run_item_id, "particle_animation"
+        )
+    except KeyError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "execution_not_found", "message": "execution not found"},
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": str(exc),
+                "message": "Video cannot be retried; its source may be unavailable",
+            },
+        ) from exc
+    if source is not None:
+        record = execution_repository.get(analysis_run_item_id)
+        assert record is not None
+        background_tasks.add_task(_deliver_callback_without_interrupting, event)
+        background_tasks.add_task(
+            _finish_deferred_artifacts,
+            event,
+            {
+                "particle_animation": lambda: ParticleAnimation.deserialize(
+                    source
+                ).render()
+            },
+            request.output_artifacts,
+            record.fingerprint,
+        )
+    return ArtifactRetryAccepted(
+        analysis_run_item_id=analysis_run_item_id,
+        generation_attempt=event.outputs["output_manifest"]["artifacts"][
+            "particle_animation"
+        ].get("generation_attempt", 0),
     )
 
 

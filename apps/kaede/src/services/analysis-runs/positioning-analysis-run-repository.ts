@@ -1,5 +1,6 @@
 import { sql } from 'kysely'
 import type { Insertable, Selectable } from 'kysely'
+import type { PaginationOptions } from '../../schemas/pagination.js'
 import type { Json, PositioningAnalysisRunItems, PositioningAnalysisRuns } from '../db/generated.js'
 import { db } from '../db/index.js'
 import type { DbExecutor } from '../executor.js'
@@ -123,4 +124,68 @@ export const findTimedOutPositioningRunItems = (
 /** #262 may implement this port with an outbox insert in the same transaction. */
 export interface PositioningAnalysisDispatchPort {
   enqueue(runId: string, itemIds: string[], executor: DbExecutor): Promise<void>
+}
+
+export const listOrganizationPositioningRuns = async (
+  organizationId: string,
+  options: PaginationOptions & { filter: 'all' | 'in_progress' | 'failed' },
+  executor: DbExecutor = db
+) => {
+  const summary = executor
+    .selectFrom('positioning_analysis_runs as run')
+    .leftJoin('positioning_analysis_run_items as item', 'item.analysis_run_id', 'run.id')
+    .where('run.organization_id', '=', organizationId)
+    .groupBy('run.id')
+    .select([
+      'run.id',
+      'run.status',
+      'run.created_at',
+      'run.updated_at',
+      sql<string>`to_char(run.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`.as(
+        'cursor_created_at'
+      ),
+      sql<number>`count(item.id)::integer`.as('total'),
+      sql<number>`count(*) filter (where item.status = 'queued')::integer`.as('queued'),
+      sql<number>`count(*) filter (where item.status = 'processing')::integer`.as('processing'),
+      sql<number>`count(*) filter (where item.status = 'completed')::integer`.as('completed'),
+      sql<number>`count(*) filter (where item.status = 'failed')::integer`.as('failed'),
+      sql<number>`count(distinct item.recording_id)::integer`.as('recording_count'),
+      sql<
+        string[]
+      >`coalesce(array_agg(distinct item.pipeline_id order by item.pipeline_id) filter (where item.pipeline_id is not null), ARRAY[]::text[])`.as(
+        'pipeline_ids'
+      ),
+      sql<number>`count(*) filter (where item.output_manifest->'artifacts'->'particle_animation'->>'generation_status' = 'processing')::integer`.as(
+        'video_processing'
+      ),
+      sql<number>`count(*) filter (where item.output_manifest->'artifacts'->'particle_animation'->>'generation_status' = 'failed')::integer`.as(
+        'video_failed'
+      ),
+    ])
+    .as('summary')
+  const inProgress = sql<boolean>`(queued + processing > 0 or (total = 0 and status in ('accepted', 'processing')))`
+  let filtered = executor.selectFrom(summary)
+  if (options.filter === 'in_progress') filtered = filtered.where(inProgress)
+  if (options.filter === 'failed') filtered = filtered.where('failed', '>', 0)
+  let rowsQuery = filtered
+    .selectAll()
+    .orderBy('created_at', 'desc')
+    .orderBy('id', 'desc')
+    .limit(options.limit + 1)
+  const cursor = options.cursor
+  if (cursor) {
+    rowsQuery = rowsQuery.where(
+      sql<boolean>`(created_at, id) < (${cursor.createdAt}::timestamptz, ${cursor.id}::uuid)`
+    )
+  }
+  const [rows, count, active] = await Promise.all([
+    rowsQuery.execute(),
+    filtered.select(sql<number>`count(*)::integer`.as('count')).executeTakeFirstOrThrow(),
+    executor
+      .selectFrom(summary)
+      .where(inProgress)
+      .select(sql<number>`count(*)::integer`.as('count'))
+      .executeTakeFirstOrThrow(),
+  ])
+  return { rows, totalCount: count.count, inProgressCount: active.count }
 }

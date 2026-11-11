@@ -3,12 +3,15 @@ import type { Json } from '../db/generated.js'
 
 export interface OutputArtifactManifest {
   object_key: string
-  checksum_sha256: string
+  checksum_sha256?: string
   content_type: string
   format: string
   size_bytes?: number
   generated_at?: string
   available?: boolean
+  generation_status?: 'processing' | 'failed'
+  generation_attempt?: number
+  retry_available?: boolean
 }
 
 export interface OutputManifest {
@@ -43,13 +46,23 @@ export const parseOutputManifest = (value: unknown): OutputManifest => {
 export const mergeOutputManifest = (
   current: unknown,
   patch: Record<string, OutputArtifactManifest>
-): OutputManifest => ({
-  schema_version: '1',
-  artifacts: {
-    ...parseOutputManifest(current).artifacts,
-    ...patch,
-  },
-})
+): OutputManifest => {
+  const artifacts = { ...parseOutputManifest(current).artifacts }
+  for (const [name, artifact] of Object.entries(patch)) {
+    // Completion callbacks may be retried after the video update has arrived.
+    const previous = artifacts[name]
+    if (
+      Object.hasOwn(artifacts, name) &&
+      ((artifact.generation_attempt ?? 0) < (previous.generation_attempt ?? 0) ||
+        ((artifact.generation_attempt ?? 0) === (previous.generation_attempt ?? 0) &&
+          artifact.generation_status === 'processing' &&
+          previous.generation_status !== 'processing'))
+    )
+      continue
+    artifacts[name] = artifact
+  }
+  return { schema_version: '1', artifacts }
+}
 
 export const outputArtifactsFromCallback = (
   outputs: unknown

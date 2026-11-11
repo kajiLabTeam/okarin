@@ -9,6 +9,7 @@ import {
   findPositioningRunInOrganization,
   insertPositioningItems,
   insertPositioningRun,
+  listPositioningItems,
 } from '../../services/analysis-runs/positioning-analysis-run-repository.js'
 import { db } from '../../services/db/index.js'
 import { findFloorById } from '../../services/floors/index.js'
@@ -123,6 +124,8 @@ export const createPositioningAnalysisRun = async (
   if (!authorization.ok) return { ok: false, error: authorization.error }
   if (!key.trim() || key.length > 200)
     return { ok: false, error: { type: 'IDEMPOTENCY_KEY_INVALID', status: 400 } }
+  const requestedItemIds = body.retry_failed_item_ids ?? body.retry_item_ids
+  const itemCount = requestedItemIds?.length ?? body.recording_ids.length * body.pipeline_ids.length
   const requestDigest = digest(body)
   const existing = await findPositioningRunByKey(organizationId, key)
   if (existing) {
@@ -133,15 +136,32 @@ export const createPositioningAnalysisRun = async (
       value: {
         analysis_run_id: existing.id,
         status: 'accepted',
-        item_count: body.recording_ids.length * body.pipeline_ids.length,
+        item_count: itemCount,
       },
     }
   }
-  if (
-    body.retry_of_analysis_run_id &&
-    !(await findPositioningRunInOrganization(organizationId, body.retry_of_analysis_run_id))
-  )
+  const parent = body.retry_of_analysis_run_id
+    ? await findPositioningRunInOrganization(organizationId, body.retry_of_analysis_run_id)
+    : undefined
+  if (body.retry_of_analysis_run_id && !parent)
     return { ok: false, error: { type: 'RETRY_RUN_NOT_FOUND', status: 404 } }
+  const failedIds = body.retry_failed_item_ids
+  const parentItems = requestedItemIds && parent ? await listPositioningItems(parent.id) : []
+  const retryItems = parentItems.filter((item) => requestedItemIds?.includes(item.id))
+  if (
+    requestedItemIds &&
+    (!parent ||
+      retryItems.length !== requestedItemIds.length ||
+      (failedIds && retryItems.some((item) => item.status !== 'failed')) ||
+      body.recording_ids.some((id) => !retryItems.some((item) => item.recording_id === id)) ||
+      body.pipeline_ids.some((id) => !retryItems.some((item) => item.pipeline_id === id)) ||
+      retryItems.some(
+        (item) =>
+          !body.recording_ids.includes(item.recording_id) ||
+          !body.pipeline_ids.includes(item.pipeline_id)
+      ))
+  )
+    return { ok: false, error: { type: 'RETRY_ITEMS_INVALID', status: 409 } }
   const recordings = [] as {
     id: string
     floor_id: string
@@ -170,7 +190,12 @@ export const createPositioningAnalysisRun = async (
   for (const pipelineId of body.pipeline_ids) {
     let resolved: Awaited<ReturnType<typeof resolvePipelineForExecution>>
     try {
-      resolved = await resolvePipelineForExecution(pipelineId, body.recording_ids)
+      const targetRecordingIds = requestedItemIds
+        ? retryItems
+            .filter((item) => item.pipeline_id === pipelineId)
+            .map((item) => item.recording_id)
+        : body.recording_ids
+      resolved = await resolvePipelineForExecution(pipelineId, targetRecordingIds)
     } catch (error) {
       if (error instanceof NozomiPipelineError && error.code === 'PIPELINE_NOT_FOUND')
         return {
@@ -236,6 +261,7 @@ export const createPositioningAnalysisRun = async (
           idempotency_key: key,
           request_digest: requestDigest,
           retry_of_run_id: body.retry_of_analysis_run_id ?? null,
+          comparison_run_id: failedIds && parent ? (parent.comparison_run_id ?? parent.id) : null,
         },
         transaction
       )
@@ -304,7 +330,7 @@ export const createPositioningAnalysisRun = async (
       value: {
         analysis_run_id: result.id,
         status: 'accepted',
-        item_count: body.recording_ids.length * body.pipeline_ids.length,
+        item_count: itemCount,
       },
     }
   } catch (error) {
@@ -316,7 +342,7 @@ export const createPositioningAnalysisRun = async (
           value: {
             analysis_run_id: retry.id,
             status: 'accepted',
-            item_count: body.recording_ids.length * body.pipeline_ids.length,
+            item_count: itemCount,
           },
         }
     }

@@ -587,3 +587,206 @@ def test_rikka_executor_rejects_duplicate_or_out_of_map_beacons(
             },
             {"origin_x": 32, "origin_y": 32, "floor_scale": 0.05},
         )
+
+
+@pytest.mark.parametrize("failure", [None, "render", "upload", "callback"])
+def test_trajectory_is_completed_before_background_video(
+    monkeypatch: Any, failure: str | None
+) -> None:
+    from src.schemas.execution import OutputArtifactUpload
+
+    snapshot = make_snapshot("pdr")
+    snapshot = snapshot.model_copy(
+        update={
+            "availability": snapshot.availability.model_copy(update={"available": True})
+        }
+    )
+    request = make_request(snapshot).model_copy(
+        update={
+            "output_artifacts": {
+                "particle_animation": OutputArtifactUpload(
+                    upload_uri="http://seaweedfs:8333/video.webm",
+                    object_key="video.webm",
+                    content_type="video/webm",
+                    format="webm",
+                )
+            }
+        }
+    )
+    repository = ExecutionRepository()
+    calls: list[str] = []
+    callbacks: list[ExecutionEvent] = []
+
+    def callback(_repository: Any, event: ExecutionEvent) -> None:
+        calls.append("callback")
+        callbacks.append(event.model_copy(deep=True))
+        if failure == "callback":
+            raise RuntimeError("Kaede unavailable")
+
+    def render() -> dict[str, Any]:
+        calls.append("render")
+        assert callbacks[0].status == ExecutionStatus.COMPLETED
+        assert callbacks[0].outputs["digest"] == "csv-digest"
+        assert (
+            callbacks[0].outputs["output_manifest"]["artifacts"]["particle_animation"][
+                "generation_status"
+            ]
+            == "processing"
+        )
+        record = repository.get(request.analysis_run_item_id)
+        assert record is not None and record.event.status == ExecutionStatus.COMPLETED
+        if failure == "render":
+            raise RuntimeError("ffmpeg failed")
+        return {"particle_animation": {"body": b"video"}}
+
+    def write(*args: Any) -> dict[str, Any]:
+        calls.append("csv-upload")
+        assert "_deferred_artifacts" not in args[1]["trajectory"]
+        return {"digest": "csv-digest"}
+
+    def write_artifacts(*args: Any) -> dict[str, Any]:
+        calls.append("video-upload")
+        if failure == "upload":
+            raise RuntimeError("storage unavailable")
+        return {"particle_animation": {"available": True, "object_key": "video.webm"}}
+
+    monkeypatch.setattr(execution_routes, "execution_repository", repository)
+    monkeypatch.setattr(execution_routes.registry, "resolve", lambda _id: snapshot)
+    monkeypatch.setattr(execution_routes, "validate_request", lambda *_args: None)
+    monkeypatch.setattr(
+        execution_routes,
+        "execute_pipeline",
+        lambda *_args: ExecutionEvent(
+            event_id="trajectory-completed",
+            analysis_run_item_id=request.analysis_run_item_id,
+            status=ExecutionStatus.COMPLETED,
+            outputs={
+                "trajectory": {
+                    "_deferred_artifacts": {
+                        "particle_animation": SimpleNamespace(
+                            render=render, serialize=lambda: b"source"
+                        )
+                    }
+                }
+            },
+        ),
+    )
+    monkeypatch.setattr(execution_routes.output_writer, "write", write)
+    monkeypatch.setattr(
+        execution_routes.output_writer, "write_artifacts", write_artifacts
+    )
+    monkeypatch.setattr(execution_routes, "send_callback_with_retry", callback)
+
+    execution_routes._run_execution(request)
+
+    assert calls[:3] == ["csv-upload", "callback", "render"]
+    assert len(callbacks) == 2
+    assert callbacks[0].event_id != callbacks[1].event_id
+    assert callbacks[1].status == ExecutionStatus.COMPLETED
+    video = callbacks[1].outputs["output_manifest"]["artifacts"]["particle_animation"]
+    if failure in {"render", "upload"}:
+        assert video["generation_status"] == "failed"
+        assert video["available"] is False
+    else:
+        assert video["available"] is True
+    assert callbacks[1].outputs["digest"] == "csv-digest"
+    # Initial callback is immutable even when the completed artifact is updated.
+    assert (
+        callbacks[0].outputs["output_manifest"]["artifacts"]["particle_animation"][
+            "generation_status"
+        ]
+        == "processing"
+    )
+    record = repository.get(request.analysis_run_item_id)
+    assert record is not None and record.event == callbacks[1]
+
+
+def test_restart_keeps_trajectory_completed_and_ends_video_polling(
+    tmp_path: Path,
+) -> None:
+    from src.usecases.pipeline_execution import ExecutionRecord
+
+    database = str(tmp_path / "executions.sqlite3")
+    repository = ExecutionRepository(database)
+    event = ExecutionEvent(
+        event_id="trajectory-completed",
+        analysis_run_item_id="video-item",
+        status=ExecutionStatus.COMPLETED,
+        outputs={
+            "digest": "saved-csv",
+            "output_manifest": {
+                "schema_version": "1",
+                "artifacts": {
+                    "particle_animation": {
+                        "available": False,
+                        "generation_status": "processing",
+                    }
+                },
+            },
+        },
+    )
+    repository.put("video-item", ExecutionRecord("fingerprint", event))
+    repository.close()
+    restored = ExecutionRepository(database)
+    assert restored.recover_interrupted_executions() == 0
+    record = restored.get("video-item")
+    assert record is not None and record.event.status == ExecutionStatus.COMPLETED
+    assert record.event.outputs["digest"] == "saved-csv"
+    assert (
+        record.event.outputs["output_manifest"]["artifacts"]["particle_animation"][
+            "generation_status"
+        ]
+        == "failed"
+    )
+    pending = restored.pending_callbacks(now=1)
+    assert len(pending) == 1
+    assert pending[0].event == record.event
+    # A second recovery does not create any additional event.
+    assert restored.recover_interrupted_executions() == 0
+    assert len(restored.pending_callbacks(now=1)) == 1
+
+
+def test_particle_animation_is_deferred_and_preserves_map_after_cleanup(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    acce, gyro = _sample_sensor_bytes()
+    map_path = tmp_path / "map.png"
+    mpimg.imsave(map_path, np.ones((1024, 1024)), cmap="gray", vmin=0, vmax=1)
+    generated: list[Path] = []
+
+    def fake_save(*args: Any, **kwargs: Any) -> Path:
+        assert Path(kwargs["floormap_path"]).read_bytes() == map_path.read_bytes()
+        assert len(args[0]) > 0
+        output = Path(kwargs["output_path"]).with_suffix(".mp4")
+        output.write_bytes(b"mp4-video")
+        generated.append(output)
+        return output
+
+    monkeypatch.setattr(
+        "src.registry.rikka_executor.save_particle_animation", fake_save
+    )
+    outputs = RikkaComponentExecutor().execute(
+        _component("pdr-particle-filter"),
+        {
+            "acce": acce,
+            "gyro": gyro,
+            "metadata": _sample_metadata_bytes(),
+            "floor_map": map_path.read_bytes(),
+        },
+        {
+            "origin_x": 512,
+            "origin_y": 512,
+            "floor_scale": 0.05,
+            "particle_count": 32,
+            "particle_seed": 1,
+            "_output_artifacts": {"particle_animation": {}},
+        },
+    )
+    assert not generated
+    assert outputs["trajectory"]["step_count"] > 0
+    payloads = outputs["trajectory"]["_deferred_artifacts"][
+        "particle_animation"
+    ].render()
+    assert payloads == {"particle_animation_mp4": {"body": b"mp4-video"}}
+    assert len(generated) == 1
+    assert not generated[0].exists()
