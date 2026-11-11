@@ -3,17 +3,22 @@ from __future__ import annotations
 import asyncio
 import json
 import math
+from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
 import matplotlib.image as mpimg
 import numpy as np
+import pandas as pd
 import pytest
 from fastapi import BackgroundTasks
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
-from rikka.common.lib.models import TrajectoryResult
+from rikka.cli import commands as rikka_commands
+from rikka.common.lib.models import Landmark, TrajectoryResult
+from rikka.common.lib.sensors import ACC_COLUMNS, GYRO_COLUMNS
+from rikka.plot import pipeline as plot_pipeline
 
 from src.registry.catalog import initial_catalog
 from src.registry.rikka_executor import (
@@ -557,6 +562,85 @@ def test_rikka_executor_runs_real_particle_filter_with_ble(tmp_path: Path) -> No
     trajectory = outputs["trajectory"]
     assert trajectory["component_id"] == "rikka-pdr-particle-filter-ble"
     assert trajectory["step_count"] > 0
+
+
+@pytest.mark.parametrize("measured", [False, True])
+@pytest.mark.parametrize("uses_particle", [False, True])
+def test_ble_executor_matches_cli(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    measured: bool,
+    uses_particle: bool,
+) -> None:
+    acce, gyro = _sample_sensor_bytes()
+    map_path = tmp_path / "map.png"
+    mpimg.imsave(map_path, np.ones((1024, 1024)), cmap="gray", vmin=0, vmax=1)
+    ble_path = tmp_path / "ble.csv"
+    # 単発の強いRSSIは合成データでは検出し、実測条件では除外する。
+    ble_path.write_text("timestamp_s,beacon_id,rssi_dbm\n10.0,beacon-1,-50\n")
+    metadata: dict[str, Any] = {"recording_start_wall_time_ms": 0}
+    if measured:
+        metadata["ble"] = {"configuration": {"beacons": []}}
+    metadata_bytes = json.dumps(metadata).encode()
+    (tmp_path / "metadata.json").write_bytes(metadata_bytes)
+    landmark = Landmark(beacon_id="beacon-1", pixel_x=512, pixel_y=512)
+    pipeline_id = "pdr-particle-filter-ble" if uses_particle else "pdr-ble"
+    parameters: dict[str, Any] = {
+        "origin_x": 512,
+        "origin_y": 512,
+        "floor_scale": 0.05,
+        "initial_direction": 90.0,
+        "user_height_m": 1.68,
+    }
+    if uses_particle:
+        parameters.update(particle_seed=1, particle_count=32)
+    actual = RikkaComponentExecutor().execute(
+        _component(pipeline_id),
+        {
+            "acce": acce,
+            "gyro": gyro,
+            "metadata": metadata_bytes,
+            "ble": ble_path.read_bytes(),
+            "floor_map": map_path.read_bytes(),
+            "beacon_layout": json.dumps(
+                {"beacons": [{"beacon_id": "beacon-1", "pixel_x": 512, "pixel_y": 512}]}
+            ).encode(),
+        },
+        parameters,
+    )["trajectory"]
+    cli_results: list[TrajectoryResult] = []
+
+    def capture_result(result: TrajectoryResult, output_dir: Path) -> pd.DataFrame:
+        cli_results.append(result)
+        return pd.DataFrame()
+
+    monkeypatch.setattr(plot_pipeline, "create_output_dir", lambda: tmp_path)
+    monkeypatch.setattr(plot_pipeline, "write_outputs", capture_result)
+    monkeypatch.setattr(plot_pipeline, "render", lambda *args: None)
+    rikka_commands.run(
+        df_acc=pd.read_csv(BytesIO(acce)).rename(columns=ACC_COLUMNS),
+        df_gyro=pd.read_csv(BytesIO(gyro)).rename(columns=GYRO_COLUMNS),
+        plot=False,
+        save_animation=False,
+        use_particle_filter=uses_particle,
+        floormap_path=map_path,
+        origin_px=(512, 512),
+        scale=0.05,
+        initial_direction=90.0,
+        height_m=1.68,
+        particle_seed=1,
+        particle_count=32,
+        pf_landmark_mode="ranging",
+        ble_landmark=True,
+        ble_data_path=ble_path,
+        ble_landmarks=(landmark,),
+    )
+    expected = _trajectory_payload(
+        cli_results[0], _component(pipeline_id).component_id, parameters
+    )
+    assert actual == expected
+    if not uses_particle:
+        assert actual["landmark_correction_count"] == (0 if measured else 1)
 
 
 def test_rikka_executor_rejects_duplicate_or_out_of_map_beacons(

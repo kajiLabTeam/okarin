@@ -416,6 +416,8 @@ class RikkaComponentExecutor:
             if uses_ble:
                 ble_path = temporary / "ble.csv"
                 ble_path.write_bytes(inputs["ble"])
+                # CLI と同様に、BLE と同じ場所の metadata から検出条件を判定する。
+                (temporary / "metadata.json").write_bytes(inputs["metadata"])
                 landmark_settings = BleLandmarkSettings(
                     enabled=True,
                     data_path=ble_path,

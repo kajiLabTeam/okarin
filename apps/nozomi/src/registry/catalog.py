@@ -99,7 +99,7 @@ def _pipeline(
     return PipelineDefinition(
         pipeline_id=pipeline_id,
         display_name=display_name,
-        definition_version="1.1.0",
+        definition_version=("1.2.0" if pipeline_id.endswith("-ble") else "1.1.0"),
         components=(component,),
         input_slots=inputs,
         outputs=(
