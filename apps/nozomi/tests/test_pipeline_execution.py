@@ -3,10 +3,12 @@ from __future__ import annotations
 import asyncio
 import json
 import math
+from email.message import Message
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
+from urllib.error import HTTPError
 
 import matplotlib.image as mpimg
 import numpy as np
@@ -34,7 +36,9 @@ from src.schemas.execution import (
 )
 from src.schemas.pipeline import ComponentContract
 from src.server import app
+from src.usecases import pipeline_execution
 from src.usecases.pipeline_execution import (
+    CallbackHTTPError,
     ExecutionRepository,
     PermanentComponentError,
     TemporaryComponentError,
@@ -874,3 +878,79 @@ def test_particle_animation_is_deferred_and_preserves_map_after_cleanup(
     assert payloads == {"particle_animation_mp4": {"body": b"mp4-video"}}
     assert len(generated) == 1
     assert not generated[0].exists()
+
+
+@pytest.mark.parametrize(
+    ("status", "body", "permanent"),
+    [
+        (404, '{"error_code":"RUN_ITEM_NOT_FOUND"}', True),
+        (404, '{"error_code":"OTHER_ERROR"}', False),
+        (404, "<html>not found</html>", False),
+        (404, "[]", False),
+        (500, '{"error_code":"RUN_ITEM_NOT_FOUND"}', False),
+        (503, '{"error_code":"INTERNAL_ERROR"}', False),
+    ],
+)
+def test_callback_http_failure_classification(
+    monkeypatch: pytest.MonkeyPatch, status: int, body: str, permanent: bool
+) -> None:
+    event = ExecutionEvent(
+        event_id="evt-http",
+        analysis_run_item_id="item-http",
+        status=ExecutionStatus.COMPLETED,
+    )
+
+    def reject(*args: Any, **kwargs: Any) -> None:
+        raise HTTPError(
+            "http://kaede:8080/callback",
+            status,
+            "rejected",
+            Message(),
+            BytesIO(body.encode()),
+        )
+
+    monkeypatch.setattr(
+        pipeline_execution, "build_opener", lambda *args: SimpleNamespace(open=reject)
+    )
+    repo = ExecutionRepository()
+    with pytest.raises(CallbackHTTPError):
+        send_callback_with_retry(repo, event, sender=pipeline_execution.send_callback)
+    delivery = repo.deliveries_for(event.analysis_run_item_id)[0]
+    assert delivery.status == ("failed" if permanent else "retrying")
+    assert delivery.attempts == (1 if permanent else 3)
+    assert (delivery.next_attempt_at is None) == permanent
+
+
+def test_orphan_callback_stops_existing_retries_after_restart(tmp_path: Path) -> None:
+    path = str(tmp_path / "orphan.sqlite3")
+    repo = ExecutionRepository(path)
+    event = ExecutionEvent(
+        event_id="evt-orphan",
+        analysis_run_item_id="orphan",
+        status=ExecutionStatus.COMPLETED,
+    )
+
+    def unavailable(event: ExecutionEvent) -> None:
+        raise RuntimeError("connection unavailable")
+
+    with pytest.raises(RuntimeError):
+        send_callback_with_retry(repo, event, sender=unavailable)
+    delivery = repo.deliveries_for("orphan")[0]
+    assert delivery.next_attempt_at is not None
+
+    def missing(event: ExecutionEvent) -> None:
+        raise CallbackHTTPError(404, '{"error_code":"RUN_ITEM_NOT_FOUND"}')
+
+    assert (
+        retry_pending_callbacks(repo, sender=missing, now=delivery.next_attempt_at + 1)
+        == 1
+    )
+    repo.close()
+    restored = ExecutionRepository(path)
+    stopped = restored.deliveries_for("orphan")[0]
+    assert stopped.status == "failed"
+    assert stopped.attempts == 4
+    assert stopped.next_attempt_at is None
+    assert "RUN_ITEM_NOT_FOUND" in (stopped.last_error or "")
+    assert retry_pending_callbacks(restored, sender=missing, now=float("inf")) == 0
+    restored.close()

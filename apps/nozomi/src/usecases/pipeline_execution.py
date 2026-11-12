@@ -17,6 +17,7 @@ from typing import Any, Protocol, cast
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
+from src.execution_timing import execution_context, timed_stage
 from src.network_policy import (
     UrlPurpose,
     configured_callback_url,
@@ -620,6 +621,23 @@ def artifact_event_id(item_id: str, attempt: int, phase: str) -> str:
     return event_id(item_id, f"artifacts:{attempt}:{phase}")
 
 
+class CallbackHTTPError(RuntimeError):
+    def __init__(self, status: int, body: str) -> None:
+        super().__init__(f"callback returned HTTP {status}: {body[:500]}")
+        self.status = status
+        try:
+            payload = json.loads(body)
+        except ValueError, TypeError:
+            payload = None
+        self.error_code = (
+            payload.get("error_code") if isinstance(payload, dict) else None
+        )
+
+    @property
+    def permanent(self) -> bool:
+        return self.status == 404 and self.error_code == "RUN_ITEM_NOT_FOUND"
+
+
 def send_callback(event: ExecutionEvent) -> None:
     url = configured_callback_url()
     headers = {"content-type": "application/json"}
@@ -643,9 +661,7 @@ def send_callback(event: ExecutionEvent) -> None:
                     event.event_id,
                     event.analysis_run_item_id,
                 )
-                raise RuntimeError(
-                    f"callback returned HTTP {response.status}: {response_body[:500]}"
-                )
+                raise CallbackHTTPError(response.status, response_body)
             logger.info(
                 "Nozomi callback delivered: status=%s event_id=%s item_id=%s",
                 response.status,
@@ -663,9 +679,7 @@ def send_callback(event: ExecutionEvent) -> None:
             event.event_id,
             event.analysis_run_item_id,
         )
-        raise RuntimeError(
-            f"callback returned HTTP {error.code}: {response_body[:500]}"
-        ) from error
+        raise CallbackHTTPError(error.code, response_body) from error
     except URLError as error:
         logger.error(
             "Nozomi callback connection error: url=%s reason=%s event_id=%s item_id=%s",
@@ -705,6 +719,18 @@ def send_callback_with_retry(
             last_error = exc
             delivery.status = "failed"
             delivery.last_error = str(exc)
+            if isinstance(exc, CallbackHTTPError) and exc.permanent:
+                delivery.next_attempt_at = None
+                repository.update_delivery(delivery)
+                logger.warning(
+                    "Nozomi callback retries stopped: event_id=%s item_id=%s "
+                    "status=%s error_code=%s",
+                    event.event_id,
+                    event.analysis_run_item_id,
+                    exc.status,
+                    exc.error_code,
+                )
+                raise
             repository.update_delivery(delivery)
     if last_error is not None:
         delivery.status = "retrying"
@@ -823,17 +849,18 @@ def execute_pipeline(
     executor: ComponentExecutor,
     input_loader: Any = None,
 ) -> ExecutionEvent:
-    values: dict[tuple[str, str], Any] = {
-        (item.slot_id, "input"): (
-            input_loader.load(item) if input_loader is not None else item
+    with timed_stage("input_download", item_id=request.analysis_run_item_id):
+        values: dict[tuple[str, str], Any] = {
+            (item.slot_id, "input"): (
+                input_loader.load(item) if input_loader is not None else item
+            )
+            for item in request.inputs
+        }
+        ground_truth_csv = (
+            input_loader.load(request.ground_truth)
+            if request.ground_truth is not None and input_loader is not None
+            else None
         )
-        for item in request.inputs
-    }
-    ground_truth_csv = (
-        input_loader.load(request.ground_truth)
-        if request.ground_truth is not None and input_loader is not None
-        else None
-    )
     by_target = {
         (b.target_component_instance, b.target_slot_id): b for b in request.bindings
     }
@@ -857,7 +884,13 @@ def execute_pipeline(
                 # 通常入力契約を変更せず、正解軌跡を評価専用入力として渡す。
                 component_inputs["_ground_truth_csv"] = ground_truth_csv
 
-            outputs = executor.execute(component, component_inputs, request.parameters)
+            with (
+                execution_context(request.analysis_run_item_id),
+                timed_stage("component", component_id=component.component_id),
+            ):
+                outputs = executor.execute(
+                    component, component_inputs, request.parameters
+                )
             for slot in component.output_slots:
                 if slot.slot_id not in outputs:
                     raise PermanentComponentError(

@@ -1,11 +1,13 @@
 import logging
 import os
 import threading
+import time
 from collections.abc import Callable
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 
+from src.execution_timing import timed_stage
 from src.registry.catalog import initial_catalog
 from src.registry.registry import PipelineRegistry
 from src.registry.rikka_executor import ParticleAnimation, RikkaComponentExecutor
@@ -89,6 +91,7 @@ def _deliver_callback_without_interrupting(event: ExecutionEvent) -> None:
 
 
 def _run_execution(request: ExecutionRequest) -> None:
+    started = time.perf_counter()
     deferred: dict[str, Callable[[], dict[str, Any]]] = {}
     snapshot = registry.resolve(request.pipeline_id)
     if snapshot is None:
@@ -123,9 +126,10 @@ def _run_execution(request: ExecutionRequest) -> None:
                     }
                 }
             )
-            event = execute_pipeline(
-                snapshot, execution_request, executor, input_loader
-            )
+            with timed_stage("pipeline", item_id=request.analysis_run_item_id):
+                event = execute_pipeline(
+                    snapshot, execution_request, executor, input_loader
+                )
             if event.status == ExecutionStatus.COMPLETED:
                 animations = event.outputs.get("trajectory", {}).pop(
                     "_deferred_artifacts", {}
@@ -133,9 +137,12 @@ def _run_execution(request: ExecutionRequest) -> None:
                 deferred = {
                     name: animation.render for name, animation in animations.items()
                 }
-                references = output_writer.write(
-                    request.output_uri, event.outputs, request.output_artifacts
-                )
+                with timed_stage(
+                    "trajectory_upload", item_id=request.analysis_run_item_id
+                ):
+                    references = output_writer.write(
+                        request.output_uri, event.outputs, request.output_artifacts
+                    )
                 if deferred:
                     artifacts = references.setdefault(
                         "output_manifest", {"schema_version": "1", "artifacts": {}}
@@ -144,11 +151,23 @@ def _run_execution(request: ExecutionRequest) -> None:
                         target = request.output_artifacts[name]
                         retry_available = False
                         try:
-                            execution_repository.save_artifact_source(
-                                request.analysis_run_item_id,
-                                name,
-                                animations[name].serialize(),
-                            )
+                            with timed_stage(
+                                "animation_source_serialize",
+                                item_id=request.analysis_run_item_id,
+                            ):
+                                source = animations[name].serialize()
+                            try:
+                                with timed_stage(
+                                    "animation_source_save",
+                                    item_id=request.analysis_run_item_id,
+                                ):
+                                    execution_repository.save_artifact_source(
+                                        request.analysis_run_item_id,
+                                        name,
+                                        source,
+                                    )
+                            finally:
+                                del source
                             retry_available = True
                         except Exception:
                             logger.exception(
@@ -182,21 +201,30 @@ def _run_execution(request: ExecutionRequest) -> None:
                 ),
             )
 
-    execution_repository.put(
-        request.analysis_run_item_id,
-        ExecutionRecord(request_fingerprint(request), event),
-    )
-    try:
-        send_callback_with_retry(
-            execution_repository,
-            event,
+    with timed_stage("trajectory_event_save", item_id=request.analysis_run_item_id):
+        execution_repository.put(
+            request.analysis_run_item_id,
+            ExecutionRecord(request_fingerprint(request), event),
         )
+    try:
+        with timed_stage("trajectory_callback", item_id=request.analysis_run_item_id):
+            send_callback_with_retry(
+                execution_repository,
+                event,
+            )
     except Exception as exc:
         execution_repository.put(
             request.analysis_run_item_id,
             ExecutionRecord(request_fingerprint(request), event, 3, str(exc)),
         )
 
+    logging.getLogger("uvicorn.error.nozomi.timing").info(
+        "Nozomi trajectory publication finished: item_id=%s status=%s "
+        "duration_seconds=%.6f",
+        request.analysis_run_item_id,
+        event.status.value,
+        time.perf_counter() - started,
+    )
     if event.status == ExecutionStatus.COMPLETED and deferred:
         _finish_deferred_artifacts(
             event, deferred, request.output_artifacts, request_fingerprint(request)
@@ -214,7 +242,14 @@ def _finish_deferred_artifacts(
     artifacts = outputs["output_manifest"]["artifacts"]
     for name, render in deferred.items():
         try:
-            manifest = output_writer.write_artifacts(render(), artifact_uploads)
+            with timed_stage(
+                "animation_render", item_id=completed.analysis_run_item_id
+            ):
+                payloads = render()
+            with timed_stage(
+                "animation_upload", item_id=completed.analysis_run_item_id
+            ):
+                manifest = output_writer.write_artifacts(payloads, artifact_uploads)
             if name not in manifest:
                 raise RuntimeError(f"deferred artifact {name} was not uploaded")
             for artifact in manifest.values():
