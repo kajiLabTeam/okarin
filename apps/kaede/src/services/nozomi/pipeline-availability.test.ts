@@ -17,6 +17,7 @@ const {
   listBeaconsMock,
   listRecordingAssetsMock,
   putBeaconLayoutMock,
+  putMetadataMock,
   resolvePipelineMock,
 } = vi.hoisted(() => ({
   findFloorMock: vi.fn(),
@@ -39,6 +40,7 @@ const {
   listBeaconsMock: vi.fn(),
   listRecordingAssetsMock: vi.fn(),
   putBeaconLayoutMock: vi.fn(),
+  putMetadataMock: vi.fn(),
   resolvePipelineMock: vi.fn(),
 }))
 
@@ -63,6 +65,7 @@ vi.mock('../storage/index.js', () => ({
   getFloorMapObjectBytes: getFloorMapBytesMock,
   getObjectBytes: getObjectBytesMock,
   putBeaconLayoutObject: putBeaconLayoutMock,
+  putRecordingMetadataSnapshotObject: putMetadataMock,
 }))
 
 const assetContract = (dataType: AssetContract['data_type'], format = 'csv') => ({
@@ -295,7 +298,14 @@ describe('pipeline availability', () => {
   it.each(['legacy', 'typed'])(
     '%sの実行にbindするmetadataから計測時の配置を取得する',
     async (kind) => {
-      resolvePipelineMock.mockResolvedValue(particleFilterPipeline())
+      const pipeline = particleFilterPipeline()
+      pipeline.definition.input_slots.push({
+        slot_id: 'metadata',
+        required: true,
+        max_assets: 1,
+        accepted_contracts: [assetContract('metadata', 'json')],
+      })
+      resolvePipelineMock.mockResolvedValue(pipeline)
       findRecordingMock.mockResolvedValue({
         id: 'recording-1',
         upload_targets: ['metadata'],
@@ -325,6 +335,11 @@ describe('pipeline availability', () => {
           })
         )
       )
+      putMetadataMock.mockImplementationOnce(() => {
+        // 保存直後に元のキーが上書きされても、配置は取得済みの内容から生成する。
+        getObjectBytesMock.mockResolvedValue(new TextEncoder().encode('{"changed":true}'))
+        return Promise.resolve()
+      })
 
       const result = await resolvePipelineForExecution('pdr-particle-filter', ['recording-1'])
       expect(result).toMatchObject({
@@ -341,6 +356,19 @@ describe('pipeline availability', () => {
           : 'organizations/org-1/recordings/recording-1/raw/metadata.json'
       )
       expect(listBeaconsMock).not.toHaveBeenCalled()
+      expect(getObjectBytesMock).toHaveBeenCalledTimes(1)
+      if (!result.ok) throw new Error('Expected successful input binding')
+      const resolved = result.value.recordings[0]
+      const boundMetadata = resolved.assets.find(
+        (asset) => asset.data_asset_id === resolved.bindings.metadata
+      )
+      expect(boundMetadata).toMatchObject({
+        object_key: putMetadataMock.mock.calls[0][0] as string,
+        checksum_sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+      })
+      expect(boundMetadata?.object_key).toContain(
+        `/metadata-snapshots/${boundMetadata?.checksum_sha256}.json`
+      )
       expect(
         JSON.parse(new TextDecoder().decode(putBeaconLayoutMock.mock.calls[0][1] as Uint8Array))
       ).toEqual({
@@ -348,6 +376,79 @@ describe('pipeline availability', () => {
       })
     }
   )
+
+  it('1件のmetadata読み込み障害でも他の計測の利用可否を返す', async () => {
+    const entry = catalogEntry()
+    entry.input_slots.push({
+      slot_id: 'metadata',
+      required: true,
+      max_assets: 1,
+      accepted_contracts: [assetContract('metadata', 'json')],
+    })
+    getCatalogMock.mockResolvedValue([entry])
+    findRecordingMock.mockImplementation((id: string) =>
+      Promise.resolve({
+        id,
+        upload_targets: ['metadata'],
+        floor_id: 'floor-1',
+        organization_id: 'org-1',
+      })
+    )
+    listRecordingAssetsMock.mockResolvedValue([asset('acce-1', 'acce')])
+    findFloorMock.mockResolvedValue({ floor_id: 'floor-1', image_object_path: 'floor/map.png' })
+    getFloorMapBytesMock.mockResolvedValue(new Uint8Array([1, 2, 3]))
+    getObjectBytesMock.mockRejectedValueOnce(new Error('metadata not found'))
+    const result = await listPipelineAvailability(['missing', 'ready'])
+    expect(result.pipelines[0].recordings).toMatchObject([
+      {
+        recording_id: 'missing',
+        available: false,
+        issues: [{ slot_id: 'metadata', code: 'MISSING_INPUT' }],
+      },
+      { recording_id: 'ready', available: true, issues: [] },
+    ])
+  })
+
+  it('固定先への保存障害ではBLEだけ利用不可にし、通常PDRの入力は維持する', async () => {
+    const pdr = catalogEntry()
+    pdr.input_slots.push({
+      slot_id: 'metadata',
+      required: true,
+      max_assets: 1,
+      accepted_contracts: [assetContract('metadata', 'json')],
+    })
+    const ble = {
+      ...pdr,
+      pipeline_id: 'pdr-ble',
+      input_slots: [
+        ...pdr.input_slots,
+        {
+          slot_id: 'beacon_layout',
+          required: true,
+          max_assets: 1,
+          accepted_contracts: [assetContract('resource.beacon_layout', 'json')],
+        },
+      ],
+    }
+    getCatalogMock.mockResolvedValue([pdr, ble])
+    findRecordingMock.mockResolvedValue({
+      id: 'recording-1',
+      upload_targets: ['metadata'],
+      floor_id: 'floor-1',
+      organization_id: 'org-1',
+    })
+    listRecordingAssetsMock.mockResolvedValue([asset('acce-1', 'acce')])
+    findFloorMock.mockResolvedValue({ floor_id: 'floor-1', image_object_path: 'floor/map.png' })
+    getFloorMapBytesMock.mockResolvedValue(new Uint8Array([1, 2, 3]))
+    putMetadataMock.mockRejectedValueOnce(new Error('snapshot storage unavailable'))
+    const result = await listPipelineAvailability(['recording-1'])
+    expect(result.pipelines[0].recordings[0]).toMatchObject({ available: true, issues: [] })
+    expect(result.pipelines[1].recordings[0]).toMatchObject({
+      available: false,
+      issues: [{ slot_id: 'beacon_layout', code: 'RESOURCE_NOT_AVAILABLE' }],
+    })
+    expect(listBeaconsMock).not.toHaveBeenCalled()
+  })
 
   it('空の計測時配置ではBLE入力を利用不可にし、現在のDBで補完しない', async () => {
     resolvePipelineMock.mockResolvedValue(particleFilterPipeline())
@@ -498,7 +599,9 @@ describe('pipeline availability', () => {
         {
           data_asset_id: 'legacy:legacy-recording:metadata',
           data_type: 'metadata',
-          object_key: 'organizations/org-1/recordings/legacy-recording/raw/metadata.json',
+          object_key: expect.stringMatching(
+            /^organizations\/org-1\/recordings\/legacy-recording\/metadata-snapshots\/[a-f0-9]{64}\.json$/
+          ),
         },
       ],
     },
@@ -517,7 +620,9 @@ describe('pipeline availability', () => {
         {
           data_asset_id: 'legacy:asset-recording:metadata',
           data_type: 'metadata',
-          object_key: 'organizations/org-1/recordings/asset-recording/raw/metadata.json',
+          object_key: expect.stringMatching(
+            /^organizations\/org-1\/recordings\/asset-recording\/metadata-snapshots\/[a-f0-9]{64}\.json$/
+          ),
         },
       ],
     },

@@ -13,6 +13,7 @@ export {
   validateMetadataObject,
   putFloorMapObject,
   putBeaconLayoutObject,
+  putRecordingMetadataSnapshotObject,
 } from './object-store.js'
 export {
   buildFloorMapObjectKey,

@@ -2,7 +2,8 @@ import { z } from 'zod'
 import { createHash } from 'node:crypto'
 import { beaconLayout, listBeacons } from '../beacons/index.js'
 import { findFloorDetailById } from '../floors/index.js'
-import { getFloorMapObjectBytes, getObjectBytes, putBeaconLayoutObject } from '../storage/index.js'
+import { getFloorMapObjectBytes, putBeaconLayoutObject } from '../storage/index.js'
+import type { RecordingMetadataSnapshot } from './recording-metadata-snapshot.js'
 
 export interface PipelineResourceAsset {
   data_asset_id: string
@@ -35,23 +36,13 @@ const beaconSnapshotSchema = z.object({
 /** 計測時の配置を優先し、配置のない旧metadataだけ現在のDBへフォールバックする。 */
 const resolveBeaconLayout = async (
   floorId: string,
-  metadataAssets: PipelineResourceAsset[]
+  metadataInput: RecordingMetadataSnapshot
 ): Promise<string | undefined> => {
-  if (metadataAssets.length > 0) {
-    const [asset] = metadataAssets
-    if (
-      metadataAssets.length !== 1 ||
-      asset.validation_status !== 'valid' ||
-      asset.format !== 'json' ||
-      asset.schema_version !== '1' ||
-      !asset.object_key
-    )
-      return undefined
-    // 読み込み障害は現在の配置で隠さず、解析要求自体を失敗させる。
-    const bytes = await getObjectBytes(asset.object_key)
+  if (metadataInput.status === 'unavailable') return undefined
+  if (metadataInput.status === 'ready') {
     let document: unknown
     try {
-      document = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
+      document = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(metadataInput.bytes))
     } catch {
       return undefined
     }
@@ -89,7 +80,7 @@ export const resolveFloorResources = async (
     floor_id: string
     organization_id: string
   },
-  metadataAssets: PipelineResourceAsset[] = []
+  metadata: RecordingMetadataSnapshot = { status: 'absent' }
 ): Promise<PipelineResourceAsset[]> => {
   const floor = await findFloorDetailById(recording.floor_id, {
     organizationIds: [recording.organization_id],
@@ -100,7 +91,7 @@ export const resolveFloorResources = async (
     floor.image_object_path.toLowerCase().endsWith('.png')
       ? getFloorMapObjectBytes(floor.image_object_path)
       : Promise.resolve(undefined),
-    resolveBeaconLayout(floor.floor_id, metadataAssets),
+    resolveBeaconLayout(floor.floor_id, metadata),
   ])
   const resources: PipelineResourceAsset[] = []
 
