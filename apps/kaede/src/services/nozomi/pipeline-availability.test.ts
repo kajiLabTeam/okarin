@@ -13,6 +13,7 @@ const {
   beaconLayoutMock,
   getCatalogMock,
   getFloorMapBytesMock,
+  getObjectBytesMock,
   listBeaconsMock,
   listRecordingAssetsMock,
   putBeaconLayoutMock,
@@ -33,6 +34,7 @@ const {
     })
   ),
   getFloorMapBytesMock: vi.fn(),
+  getObjectBytesMock: vi.fn(),
   getCatalogMock: vi.fn(),
   listBeaconsMock: vi.fn(),
   listRecordingAssetsMock: vi.fn(),
@@ -59,6 +61,7 @@ vi.mock('../storage/index.js', () => ({
   buildRecordingRawObjectKey: (organizationId: string, recordingId: string, target: string) =>
     `organizations/${organizationId}/recordings/${recordingId}/raw/${target === 'metadata' ? 'metadata.json' : `${target}.csv`}`,
   getFloorMapObjectBytes: getFloorMapBytesMock,
+  getObjectBytes: getObjectBytesMock,
   putBeaconLayoutObject: putBeaconLayoutMock,
 }))
 
@@ -208,6 +211,7 @@ describe('pipeline availability', () => {
     vi.clearAllMocks()
     listRecordingAssetsMock.mockResolvedValue([])
     listBeaconsMock.mockResolvedValue([])
+    getObjectBytesMock.mockResolvedValue(new TextEncoder().encode('{}'))
   })
 
   it('recordingのfloor_idからPNGのfloor map resourceを解決する', async () => {
@@ -286,6 +290,99 @@ describe('pipeline availability', () => {
       new TextDecoder().decode(putBeaconLayoutMock.mock.calls[0][1] as Uint8Array)
     ) as { beacons: { beacon_id: string }[] }
     expect(layout.beacons.map((beacon) => beacon.beacon_id)).toEqual(['beacon-1', 'beacon-2'])
+  })
+
+  it.each(['legacy', 'typed'])(
+    '%sの実行にbindするmetadataから計測時の配置を取得する',
+    async (kind) => {
+      resolvePipelineMock.mockResolvedValue(particleFilterPipeline())
+      findRecordingMock.mockResolvedValue({
+        id: 'recording-1',
+        upload_targets: ['metadata'],
+        floor_id: 'floor-1',
+        organization_id: 'org-1',
+      })
+      const metadata = {
+        ...asset('metadata-typed', 'metadata', 'json'),
+        object_key: 'assets/metadata.json',
+      }
+      listRecordingAssetsMock.mockResolvedValue([
+        asset('acce-1', 'acce'),
+        ...(kind === 'typed' ? [metadata] : []),
+      ])
+      findFloorMock.mockResolvedValue({ floor_id: 'floor-1', image_object_path: 'floor/map.png' })
+      getFloorMapBytesMock.mockResolvedValue(new Uint8Array([1, 2, 3]))
+      getObjectBytesMock.mockResolvedValue(
+        new TextEncoder().encode(
+          JSON.stringify({
+            ble: {
+              configuration: {
+                beacons: [
+                  { beacon_id: 'recorded-beacon', pixel_x: 1022.5, pixel_y: 1239, enabled: true },
+                ],
+              },
+            },
+          })
+        )
+      )
+
+      const result = await resolvePipelineForExecution('pdr-particle-filter', ['recording-1'])
+      expect(result).toMatchObject({
+        ok: true,
+        value: {
+          recordings: [
+            { bindings: { beacon_layout: expect.stringContaining('beacon-layout:') }, issues: [] },
+          ],
+        },
+      })
+      expect(getObjectBytesMock).toHaveBeenCalledWith(
+        kind === 'typed'
+          ? 'assets/metadata.json'
+          : 'organizations/org-1/recordings/recording-1/raw/metadata.json'
+      )
+      expect(listBeaconsMock).not.toHaveBeenCalled()
+      expect(
+        JSON.parse(new TextDecoder().decode(putBeaconLayoutMock.mock.calls[0][1] as Uint8Array))
+      ).toEqual({
+        beacons: [{ beacon_id: 'recorded-beacon', pixel_x: 1022.5, pixel_y: 1239 }],
+      })
+    }
+  )
+
+  it('空の計測時配置ではBLE入力を利用不可にし、現在のDBで補完しない', async () => {
+    resolvePipelineMock.mockResolvedValue(particleFilterPipeline())
+    findRecordingMock.mockResolvedValue({
+      id: 'recording-1',
+      upload_targets: ['metadata'],
+      floor_id: 'floor-1',
+      organization_id: 'org-1',
+    })
+    listRecordingAssetsMock.mockResolvedValue([asset('acce-1', 'acce')])
+    findFloorMock.mockResolvedValue({ floor_id: 'floor-1', image_object_path: 'floor/map.png' })
+    getFloorMapBytesMock.mockResolvedValue(new Uint8Array([1, 2, 3]))
+    getObjectBytesMock.mockResolvedValue(
+      new TextEncoder().encode(
+        JSON.stringify({
+          ble: { configuration: { beacons: [] } },
+        })
+      )
+    )
+    listBeaconsMock.mockResolvedValue([{ id: 'current-beacon', pixel_x: 1, pixel_y: 2 }])
+    await expect(
+      resolvePipelineForExecution('pdr-particle-filter', ['recording-1'])
+    ).resolves.toMatchObject({
+      ok: false,
+      error: {
+        type: 'PIPELINE_INPUT_UNAVAILABLE',
+        recordings: [
+          {
+            recording_id: 'recording-1',
+            issues: [{ slot_id: 'beacon_layout', code: 'RESOURCE_NOT_AVAILABLE' }],
+          },
+        ],
+      },
+    })
+    expect(listBeaconsMock).not.toHaveBeenCalled()
   })
 
   it('floor mapとbeacon layoutを同じrecordingの実行bindingへ渡す', async () => {

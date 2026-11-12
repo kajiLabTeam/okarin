@@ -66,8 +66,12 @@ export const recordingAssetProvider: PipelineResourceProvider = {
         }
       })
 
-    const resources = await resolveFloorResources(recording)
-    return [...assets, ...legacyAssets, ...resources]
+    const recordingAssets = [...assets, ...legacyAssets]
+    const resources = await resolveFloorResources(
+      recording,
+      recordingAssets.filter((asset) => asset.data_type === 'metadata')
+    )
+    return [...recordingAssets, ...resources]
   },
 }
 
