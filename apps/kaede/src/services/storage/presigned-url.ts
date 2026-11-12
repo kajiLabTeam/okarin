@@ -192,6 +192,21 @@ export const issueFloorMapDownloadUrl = async (objectKey: string, now: Date = ne
   }
 }
 
+export const issueRecordingFileDownloadUrl = async (objectKey: string, now: Date = new Date()) => {
+  const { config, presignClient } = getS3Context()
+  const downloadUrl = await getSignedUrl(
+    presignClient,
+    new GetObjectCommand({ Bucket: config.bucket, Key: objectKey }),
+    { expiresIn: config.recordingRawDownloadUrlTtlSeconds }
+  )
+  return {
+    downloadUrl,
+    expiresAt: new Date(
+      now.getTime() + config.recordingRawDownloadUrlTtlSeconds * 1000
+    ).toISOString(),
+  }
+}
+
 export const issueRecordingRawDownloadUrls = async (
   organizationId: string,
   recordingId: string,
