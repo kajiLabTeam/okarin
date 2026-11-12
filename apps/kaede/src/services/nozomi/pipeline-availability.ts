@@ -7,6 +7,7 @@ import { getCachedPipelineCatalog } from './pipeline-catalog-cache.js'
 import { resolveActivePipeline } from './pipeline-client.js'
 import { resolveFloorResources } from './pipeline-resource-resolver.js'
 import type { PipelineResourceAsset } from './pipeline-resource-resolver.js'
+import { snapshotRecordingMetadata } from './recording-metadata-snapshot.js'
 
 interface Asset extends PipelineResourceAsset {
   data_asset_id: string
@@ -66,8 +67,9 @@ export const recordingAssetProvider: PipelineResourceProvider = {
         }
       })
 
-    const resources = await resolveFloorResources(recording)
-    return [...assets, ...legacyAssets, ...resources]
+    const snapshot = await snapshotRecordingMetadata(recording, [...assets, ...legacyAssets])
+    const resources = await resolveFloorResources(recording, snapshot.metadata)
+    return [...snapshot.assets, ...resources]
   },
 }
 

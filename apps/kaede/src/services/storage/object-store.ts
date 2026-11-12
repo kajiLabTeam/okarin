@@ -35,7 +35,7 @@ export const putFloorMapObject = async (
   )
 }
 
-export const putBeaconLayoutObject = async (objectKey: string, body: Uint8Array) => {
+const putJsonObject = async (objectKey: string, body: Uint8Array) => {
   const { config, internalClient } = getS3Context()
 
   await internalClient.send(
@@ -47,6 +47,9 @@ export const putBeaconLayoutObject = async (objectKey: string, body: Uint8Array)
     })
   )
 }
+
+export const putBeaconLayoutObject = putJsonObject
+export const putRecordingMetadataSnapshotObject = putJsonObject
 
 export const deleteFloorMapObject = async (objectKey: string) => {
   const { config, internalClient } = getS3Context()
