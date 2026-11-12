@@ -29,6 +29,7 @@ const downloadUrlsSchema = z
     metadata: z.url().optional().openapi({ description: '収録メタデータのダウンロード URL' }),
     pressure: z.url().optional().openapi({ description: '気圧センサデータのダウンロード URL' }),
     wifi: z.url().optional().openapi({ description: 'Wi-Fi スキャンデータのダウンロード URL' }),
+    ble: z.url().optional().openapi({ description: 'BLEビーコンデータのダウンロード URL' }),
   })
   .openapi('RecordingDownloadUrls')
 
@@ -272,6 +273,14 @@ export const recordingDetailResponseSchema = z
   })
   .openapi('RecordingDetailResponse')
 
+const recordingDownloadFileSchema = z
+  .object({
+    data_type: z.string(),
+    file_name: z.string(),
+    download_url: z.url(),
+  })
+  .openapi('RecordingDownloadFile')
+
 export const recordingRawDownloadResponseSchema = z
   .object({
     recording_id: uuidSchema.openapi({
@@ -279,6 +288,10 @@ export const recordingRawDownloadResponseSchema = z
     }),
     download_urls: downloadUrlsSchema.openapi({
       description: 'アップロード対象ごとの署名付きダウンロード URL',
+    }),
+    files: z.array(recordingDownloadFileSchema).optional().openapi({
+      description:
+        '宣言済み raw と関連付けられた asset のうち存在するファイル。同じ保存先への参照は重複を除く',
     }),
     expires_at: isoDatetimeSchema.openapi({
       description: 'download_urls の有効期限',

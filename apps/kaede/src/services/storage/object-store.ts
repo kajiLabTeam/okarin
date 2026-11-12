@@ -451,7 +451,7 @@ export const getTrajectoryAnalyzedResultObjectText = async (
   }
 }
 
-const doesObjectExist = async (objectKey: string) => {
+export const doesObjectExist = async (objectKey: string) => {
   const { config, internalClient } = getS3Context()
   try {
     await internalClient.send(new HeadObjectCommand({ Bucket: config.bucket, Key: objectKey }))

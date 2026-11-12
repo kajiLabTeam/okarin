@@ -1,5 +1,6 @@
 export {
   deleteFloorMapObject,
+  doesObjectExist,
   doesAnalysisTrajectoryCsvObjectExist,
   doesTrajectoryAnalyzedResultObjectExist,
   getTrajectoryAnalyzedResultObjectText,
@@ -30,6 +31,7 @@ export {
   issueInternalAnalysisTrajectoryUploadUrl,
   issueInternalTrajectoryResultUploadUrl,
   issueRecordingRawDownloadUrls,
+  issueRecordingFileDownloadUrl,
   issueRecordingUploadUrls,
   issueDataAssetUploadUrl,
   issueTrajectoryResultDownloadUrl,

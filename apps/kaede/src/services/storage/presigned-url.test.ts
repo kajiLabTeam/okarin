@@ -14,6 +14,7 @@ import {
   issueInternalAnalysisTrajectoryDownloadUrl,
   issueInternalAnalysisTrajectoryUploadUrl,
   issueRecordingRawDownloadUrls,
+  issueRecordingFileDownloadUrl,
   issueRecordingUploadUrls,
   issueTrajectoryResultDownloadUrl,
   resetS3ClientForTests,
@@ -54,6 +55,17 @@ describe('storage presigned url service', () => {
       trajectoryResultUploadUrlTtlSeconds: 86400,
     })
   }
+
+  it('assetの保存済みキーに対して公開用URLをrawと同じ有効期限で発行する', async () => {
+    mockStorageConfig()
+    const key = 'organizations/org/recordings/rec/assets/asset/primary.csv'
+    const result = await issueRecordingFileDownloadUrl(key, new Date('2026-08-04T00:00:00.000Z'))
+    const url = new URL(result.downloadUrl)
+    expect(url.origin).toBe('http://127.0.0.1:8333')
+    expect(url.pathname).toBe(`/okarin-local/${key}`)
+    expect(url.searchParams.get('X-Amz-Expires')).toBe('900')
+    expect(result.expiresAt).toBe('2026-08-04T00:15:00.000Z')
+  })
 
   it('analysis artifact key をrun単位の保存規約どおりに組み立てる', () => {
     expect(

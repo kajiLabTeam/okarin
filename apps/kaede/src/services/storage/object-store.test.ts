@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { validateDataAssetObject } from './object-store.js'
+import { doesObjectExist, validateDataAssetObject } from './object-store.js'
 
 const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
 
@@ -152,5 +152,22 @@ describe('validateDataAssetObject', () => {
 
     expect(result.valid).toBe(true)
     expect(result.sampleCount).toBe(2)
+  })
+})
+
+describe('doesObjectExist', () => {
+  it('存在確認だけを行う', async () => {
+    sendMock.mockResolvedValue({})
+    await expect(doesObjectExist('asset.csv')).resolves.toBe(true)
+    expect(sendMock.mock.calls[0][0].constructor.name).toBe('HeadObjectCommand')
+  })
+  it.each(['NotFound', 'NoSuchKey'])('%sは欠損として扱う', async (name) => {
+    sendMock.mockRejectedValue({ name })
+    await expect(doesObjectExist('missing.csv')).resolves.toBe(false)
+  })
+  it('通信・権限エラーは呼び出し元に返す', async () => {
+    const error = new Error('AccessDenied')
+    sendMock.mockRejectedValue(error)
+    await expect(doesObjectExist('asset.csv')).rejects.toBe(error)
   })
 })
