@@ -35,6 +35,7 @@ from rikka.particle.pipeline import run_particle
 from rikka.pdr.pipeline import run_pdr
 from rikka.plot.lib.animation import save_particle_animation
 
+from src.execution_timing import timed_stage
 from src.registry.catalog import initial_catalog
 from src.schemas.pipeline import ComponentContract
 from src.usecases.pipeline_execution import PermanentComponentError
@@ -441,12 +442,13 @@ class RikkaComponentExecutor:
                     else BleLandmarkSettings(enabled=False)
                 ),
             )
-            pdr_result = run_pdr(
-                pdr_settings,
-                df_acc=acce,
-                df_gyro=gyro,
-                floormap=(floor_map if uses_ble and not uses_particle else None),
-            )
+            with timed_stage("pdr", component_id=component.component_id):
+                pdr_result = run_pdr(
+                    pdr_settings,
+                    df_acc=acce,
+                    df_gyro=gyro,
+                    floormap=(floor_map if uses_ble and not uses_particle else None),
+                )
 
             result = pdr_result
             if uses_particle:
@@ -463,16 +465,19 @@ class RikkaComponentExecutor:
                     count=int(parameters.get("particle_count", 500)),
                     landmark_mode="ranging" if uses_ble else "hybrid",
                 )
-                result = run_particle(
-                    pdr_result.prepared,
-                    floor_map,
-                    particle_settings,
-                    detections=(None if ranging is None else ranging.detections),
-                    ranging_observations=(
-                        None if ranging is None else ranging.observations
-                    ),
-                    landmark_settings=(landmark_settings if uses_ble else None),
-                )
+                with timed_stage(
+                    "particle_filter", component_id=component.component_id
+                ):
+                    result = run_particle(
+                        pdr_result.prepared,
+                        floor_map,
+                        particle_settings,
+                        detections=(None if ranging is None else ranging.detections),
+                        ranging_observations=(
+                            None if ranging is None else ranging.observations
+                        ),
+                        landmark_settings=(landmark_settings if uses_ble else None),
+                    )
 
             if (
                 uses_particle

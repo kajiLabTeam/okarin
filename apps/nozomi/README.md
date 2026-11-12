@@ -87,3 +87,28 @@ uv run ruff check --fix .
 ```sh
 uv run mypy .
 ```
+
+### callback再送と処理時間の確認
+
+callbackが`404`かつJSONの`error_code: RUN_ITEM_NOT_FOUND`を返した場合は、対象の解析アイテムが存在しないため、その通知の再送を停止します。配信履歴はSQLiteに`status: failed`、`next_attempt_at: null`で残します。既存の再送待ち通知も、反映後の次回送信でこの応答を受けると停止します。通信エラー・5xx・別の404は従来どおり再送します。解析結果や動画用データは削除しません。
+
+標準起動では、サーバーのINFOログに`Nozomi stage started/finished`を出力します。`item_id`で絞ると、同時実行中でも各処理を追えます。終了ログの`duration_seconds`は単調時計による実経過時間、`outcome`はその処理区間で例外が出たかどうかです（解析そのものの成否は`status`で確認します）。
+
+| stage | 計測範囲 |
+| --- | --- |
+| input_download | 全入力と正解軌跡の取得・検証 |
+| component | コンポーネント全体（前処理・計算・評価など） |
+| pdr | RikkaのPDR計算 |
+| particle_filter | RikkaのPF計算 |
+| pipeline | 入力取得から全コンポーネント終了まで |
+| trajectory_upload | 軌跡CSV・同期成果物の生成とアップロード |
+| animation_source_serialize | 動画用データのNPZ圧縮 |
+| animation_source_save | 動画用データのSQLite保存（ロック待ちを含む） |
+| trajectory_event_save | 完了・失敗イベントのSQLite保存 |
+| trajectory_callback | 初回結果通知（失敗時の即時再試行を含む） |
+| animation_render | 動画の描画・エンコード（再生成時は復元も含む） |
+| animation_upload | 動画のアップロード・manifest生成 |
+
+`Nozomi trajectory publication finished`は、バックグラウンド実行開始から初回結果の通知試行終了までの合計です。通知が失敗した場合も出力するため、mioへの反映時刻を保証するログではありません。後続の動画処理時間は含みません。
+
+区間には親子関係があり、`pipeline`の中に`input_download`と`component`、`component`の中に`pdr`と`particle_filter`が含まれます。全区間を単純に足さないでください。CPU使用量や受付からバックグラウンド開始までの待機時間は計測しません。過去の実行の内訳は復元できないため、反映後に同一条件で再計測してください。
