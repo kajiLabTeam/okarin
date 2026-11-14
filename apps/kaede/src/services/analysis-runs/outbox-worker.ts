@@ -120,17 +120,22 @@ export const processOutboxJob = async (
     const rawInputManifest =
       typeof item.input_manifest === 'string'
         ? (JSON.parse(item.input_manifest) as Record<string, unknown>)
-        : (item.input_manifest as Record<string, unknown>)
+        : (structuredClone(item.input_manifest) as Record<string, unknown>)
     const rawPipelineSnapshot =
       typeof item.pipeline_snapshot === 'string'
-        ? (JSON.parse(item.pipeline_snapshot) as { bindings?: NozomiExecutionSlotBinding[] })
-        : (item.pipeline_snapshot as { bindings?: NozomiExecutionSlotBinding[] })
+        ? (JSON.parse(item.pipeline_snapshot) as {
+            bindings?: NozomiExecutionSlotBinding[]
+          })
+        : (item.pipeline_snapshot as {
+            bindings?: NozomiExecutionSlotBinding[]
+          })
     const rawParameters =
       typeof item.parameters === 'string'
         ? (JSON.parse(item.parameters) as Record<string, unknown>)
         : (item.parameters as Record<string, unknown>)
 
     const inputs: NozomiExecutionInputManifest[] = []
+    let resolvedInputDigests = false
     const rawGroundTruth = rawInputManifest.__ground_truth__
     const groundTruth =
       rawGroundTruth && !Array.isArray(rawGroundTruth)
@@ -157,6 +162,10 @@ export const processOutboxJob = async (
           createHash('sha256')
             .update(await getObjectBytes(asset.object_key))
             .digest('hex')
+        if (asset.checksum_sha256 == null) {
+          asset.checksum_sha256 = assetDigest
+          resolvedInputDigests = true
+        }
         inputs.push({
           slot_id,
           contract: {
@@ -291,7 +300,15 @@ export const processOutboxJob = async (
       ...(groundTruthRequest ? { ground_truth: groundTruthRequest } : {}),
     }
 
-    await updatePositioningRunItemState(item.id, { status: 'processing' }, executor)
+    // legacy入力も、Nozomiへ送るdigestを配送前に永続化して再実行へ引き継ぐ。
+    await updatePositioningRunItemState(
+      item.id,
+      {
+        status: 'processing',
+        ...(resolvedInputDigests ? { input_manifest: rawInputManifest } : {}),
+      },
+      executor
+    )
     await updatePositioningRunStatus(run.id, 'processing', executor)
 
     await dispatchExecutionToNozomi(request)
