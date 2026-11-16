@@ -78,8 +78,10 @@ import {
 
 describe('outbox-worker', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
-    mocks.issueAssetDownloadUrl.mockResolvedValue({ downloadUrl: 'http://s3/asset.csv' })
+    vi.resetAllMocks()
+    mocks.issueAssetDownloadUrl.mockResolvedValue({
+      downloadUrl: 'http://s3/asset.csv',
+    })
     mocks.issueItemResultUploadUrl.mockResolvedValue({
       uploadUrl: 'http://s3/trajectories/item-1/analyzed/result.csv',
     })
@@ -261,6 +263,24 @@ describe('outbox-worker', () => {
       await processOutboxJob(mockJob)
 
       expect(mocks.getObjectBytes).toHaveBeenCalledWith('orgs/1/rec/1/raw/imu.csv')
+      expect(mocks.updateItemState).toHaveBeenCalledWith(
+        'item-1',
+        {
+          status: 'processing',
+          input_manifest: {
+            imu: [
+              {
+                ...mockItem.input_manifest.imu[0],
+                checksum_sha256: createHash('sha256').update('metadata').digest('hex'),
+              },
+            ],
+          },
+        },
+        expect.anything()
+      )
+      expect(mocks.updateItemState.mock.invocationCallOrder[0]).toBeLessThan(
+        mocks.dispatchToNozomi.mock.invocationCallOrder[0]
+      )
       expect(mocks.dispatchToNozomi).toHaveBeenCalledWith(
         expect.objectContaining({
           inputs: [
@@ -269,6 +289,63 @@ describe('outbox-worker', () => {
             }),
           ],
         })
+      )
+    })
+
+    it('配送をやり直しても確定済みlegacy digestを再計算せず、最初の入力条件を維持する', async () => {
+      const originalDigest = createHash('sha256').update('first').digest('hex')
+      const item = {
+        ...mockItem,
+        input_manifest: {
+          imu: [
+            {
+              ...mockItem.input_manifest.imu[0],
+              checksum_sha256: null as string | null,
+            },
+          ],
+        },
+      }
+      mocks.findItemById.mockImplementation(() => Promise.resolve(item))
+      mocks.findRunById.mockResolvedValue(mockRun)
+      mocks.getObjectBytes.mockResolvedValue(new TextEncoder().encode('first'))
+      mocks.updateItemState.mockImplementation((_id, updates) => {
+        if (updates.input_manifest) item.input_manifest = updates.input_manifest
+        return Promise.resolve()
+      })
+      mocks.dispatchToNozomi.mockRejectedValueOnce(new RetriableDispatchError('offline'))
+      await processOutboxJob(mockJob)
+      expect(item.input_manifest.imu[0].checksum_sha256).toBe(originalDigest)
+      mocks.getObjectBytes.mockResolvedValue(new TextEncoder().encode('changed'))
+      mocks.dispatchToNozomi.mockResolvedValue({
+        analysis_run_item_id: 'item-1',
+        status: 'processing',
+      })
+      await processOutboxJob({ ...mockJob, attempts: 2 })
+      expect(mocks.getObjectBytes).toHaveBeenCalledOnce()
+      expect(mocks.dispatchToNozomi).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          inputs: [expect.objectContaining({ digest: originalDigest })],
+        })
+      )
+    })
+
+    it('legacy digestの保存に失敗した場合はNozomiへ配送しない', async () => {
+      mocks.findItemById.mockResolvedValue({
+        ...mockItem,
+        input_manifest: {
+          imu: [{ ...mockItem.input_manifest.imu[0], checksum_sha256: null }],
+        },
+      })
+      mocks.findRunById.mockResolvedValue(mockRun)
+      mocks.getObjectBytes.mockResolvedValue(new TextEncoder().encode('first'))
+      mocks.updateItemState.mockRejectedValueOnce(new Error('database unavailable'))
+      await processOutboxJob(mockJob)
+      expect(mocks.dispatchToNozomi).not.toHaveBeenCalled()
+      expect(mocks.failJob).toHaveBeenCalledWith(
+        'job-1',
+        'database unavailable',
+        expect.any(Date),
+        expect.anything()
       )
     })
 

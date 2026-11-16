@@ -11,6 +11,7 @@ import {
   insertPositioningRun,
   listPositioningItems,
 } from '../../services/analysis-runs/positioning-analysis-run-repository.js'
+import type { PositioningRunItem } from '../../services/analysis-runs/positioning-analysis-run-repository.js'
 import { db } from '../../services/db/index.js'
 import { findFloorById } from '../../services/floors/index.js'
 import { resolvePipelineForExecution } from '../../services/nozomi/pipeline-availability.js'
@@ -111,32 +112,98 @@ const parametersMatchSchema = (value: unknown, schema: Record<string, unknown>):
   })
 }
 
+/** 保存済みの解析条件だけを再利用し、現在の資源・既定値で補完しない。 */
+const retrySnapshot = (item: PositioningRunItem) => {
+  const object = (value: unknown): Record<string, unknown> => {
+    const parsed: unknown = typeof value === 'string' ? JSON.parse(value) : value
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+      throw new Error('Invalid saved snapshot')
+    return parsed as Record<string, unknown>
+  }
+  const slotBindings = object(item.slot_bindings)
+  const pipelineSnapshot = object(item.pipeline_snapshot)
+  const parameters = object(item.parameters)
+  const inputManifest = object(item.input_manifest)
+  if (
+    pipelineSnapshot.pipeline_id !== item.pipeline_id ||
+    pipelineSnapshot.definition_version !== item.pipeline_version ||
+    !/^[a-f0-9]{64}$/.test(item.pipeline_digest) ||
+    Object.keys(slotBindings).length === 0
+  )
+    throw new Error('Incomplete saved snapshot')
+  // hashのなかった旧入力を現在の内容で確定すると、元の解析条件が変わってしまう。
+  for (const [slot, value] of Object.entries(inputManifest)) {
+    const assets = slot === '__ground_truth__' ? [value] : value
+    if (!Array.isArray(assets) || assets.length === 0) throw new Error('Invalid saved inputs')
+    for (const value of assets) {
+      const asset = object(value)
+      if (
+        typeof asset.object_key !== 'string' ||
+        !asset.object_key ||
+        typeof asset.checksum_sha256 !== 'string' ||
+        !/^[a-f0-9]{64}$/.test(asset.checksum_sha256)
+      )
+        throw new Error('Saved input digest unavailable')
+    }
+  }
+  for (const slot of Object.keys(slotBindings)) {
+    if (!Array.isArray(inputManifest[slot]) || inputManifest[slot].length === 0)
+      throw new Error('Saved bound input unavailable')
+  }
+  return {
+    recording_id: item.recording_id,
+    pipeline_id: item.pipeline_id,
+    slot_bindings: slotBindings,
+    pipeline_snapshot: pipelineSnapshot,
+    pipeline_digest: item.pipeline_digest,
+    pipeline_version: item.pipeline_version,
+    parameters,
+    input_manifest: inputManifest,
+  }
+}
+
 export const createPositioningAnalysisRun = async (
   actor: RequestActor,
   organizationId: string,
   key: string,
   body: PositioningAnalysisRunRequest
 ): Promise<
-  | { ok: true; value: { analysis_run_id: string; status: 'accepted'; item_count: number } }
+  | {
+      ok: true
+      value: {
+        analysis_run_id: string
+        status: 'accepted'
+        item_count: number
+      }
+    }
   | { ok: false; error: Failure }
 > => {
   const authorization = requireOrganizationManager(actor, organizationId)
   if (!authorization.ok) return { ok: false, error: authorization.error }
   if (!key.trim() || key.length > 200)
-    return { ok: false, error: { type: 'IDEMPOTENCY_KEY_INVALID', status: 400 } }
+    return {
+      ok: false,
+      error: { type: 'IDEMPOTENCY_KEY_INVALID', status: 400 },
+    }
   const requestedItemIds = body.retry_failed_item_ids ?? body.retry_item_ids
-  const itemCount = requestedItemIds?.length ?? body.recording_ids.length * body.pipeline_ids.length
+  let itemCount = requestedItemIds?.length ?? body.recording_ids.length * body.pipeline_ids.length
   const requestDigest = digest(body)
   const existing = await findPositioningRunByKey(organizationId, key)
   if (existing) {
     if (existing.request_digest !== requestDigest)
-      return { ok: false, error: { type: 'IDEMPOTENCY_CONFLICT', status: 409 } }
+      return {
+        ok: false,
+        error: { type: 'IDEMPOTENCY_CONFLICT', status: 409 },
+      }
     return {
       ok: true,
       value: {
         analysis_run_id: existing.id,
         status: 'accepted',
-        item_count: itemCount,
+        item_count:
+          body.retry_of_analysis_run_id && !requestedItemIds
+            ? (await listPositioningItems(existing.id)).length
+            : itemCount,
       },
     }
   }
@@ -146,12 +213,29 @@ export const createPositioningAnalysisRun = async (
   if (body.retry_of_analysis_run_id && !parent)
     return { ok: false, error: { type: 'RETRY_RUN_NOT_FOUND', status: 404 } }
   const failedIds = body.retry_failed_item_ids
-  const parentItems = requestedItemIds && parent ? await listPositioningItems(parent.id) : []
-  const retryItems = parentItems.filter((item) => requestedItemIds?.includes(item.id))
   if (
-    requestedItemIds &&
+    parent &&
+    (Object.values(body.parameters_by_pipeline).some(
+      (parameters) => Object.keys(parameters).length > 0
+    ) ||
+      body.ground_truth_csv !== undefined)
+  )
+    return {
+      ok: false,
+      error: { type: 'RETRY_CONDITIONS_OVERRIDE', status: 409 },
+    }
+  const parentItems = parent ? await listPositioningItems(parent.id) : []
+  const retryItems = parentItems.filter((item) =>
+    requestedItemIds
+      ? requestedItemIds.includes(item.id)
+      : body.recording_ids.includes(item.recording_id) &&
+        body.pipeline_ids.includes(item.pipeline_id)
+  )
+  if (
+    (parent || requestedItemIds) &&
     (!parent ||
-      retryItems.length !== requestedItemIds.length ||
+      retryItems.length === 0 ||
+      (requestedItemIds && retryItems.length !== requestedItemIds.length) ||
       (failedIds && retryItems.some((item) => item.status !== 'failed')) ||
       body.recording_ids.some((id) => !retryItems.some((item) => item.recording_id === id)) ||
       body.pipeline_ids.some((id) => !retryItems.some((item) => item.pipeline_id === id)) ||
@@ -162,6 +246,18 @@ export const createPositioningAnalysisRun = async (
       ))
   )
     return { ok: false, error: { type: 'RETRY_ITEMS_INVALID', status: 409 } }
+  let retrySnapshots: ReturnType<typeof retrySnapshot>[] = []
+  if (parent) {
+    itemCount = retryItems.length
+    try {
+      retrySnapshots = retryItems.map(retrySnapshot)
+    } catch {
+      return {
+        ok: false,
+        error: { type: 'RETRY_SNAPSHOT_UNAVAILABLE', status: 409 },
+      }
+    }
+  }
   const recordings = [] as {
     id: string
     floor_id: string
@@ -180,31 +276,39 @@ export const createPositioningAnalysisRun = async (
       constraints: recording.constraints,
     })
   }
-  if (new Set(recordings.map((recording) => recording.floor_id)).size > 1)
-    return { ok: false, error: { type: 'RECORDING_SCOPE_INVALID', status: 409 } }
-  const floor = await findFloorById(recordings[0].floor_id)
+  if (!parent && new Set(recordings.map((recording) => recording.floor_id)).size > 1)
+    return {
+      ok: false,
+      error: { type: 'RECORDING_SCOPE_INVALID', status: 409 },
+    }
+  const floor = parent ? undefined : await findFloorById(recordings[0].floor_id)
   const resolutions = [] as {
     pipeline: Pipeline
-    recordings: (ResolvedPipelineRecording & { parameters: Record<string, unknown> })[]
+    recordings: (ResolvedPipelineRecording & {
+      parameters: Record<string, unknown>
+    })[]
   }[]
-  for (const pipelineId of body.pipeline_ids) {
+  for (const pipelineId of parent ? [] : body.pipeline_ids) {
     let resolved: Awaited<ReturnType<typeof resolvePipelineForExecution>>
     try {
-      const targetRecordingIds = requestedItemIds
-        ? retryItems
-            .filter((item) => item.pipeline_id === pipelineId)
-            .map((item) => item.recording_id)
-        : body.recording_ids
-      resolved = await resolvePipelineForExecution(pipelineId, targetRecordingIds)
+      resolved = await resolvePipelineForExecution(pipelineId, body.recording_ids)
     } catch (error) {
       if (error instanceof NozomiPipelineError && error.code === 'PIPELINE_NOT_FOUND')
         return {
           ok: false,
-          error: { type: 'PIPELINE_NOT_FOUND', status: 404, message: String(error) },
+          error: {
+            type: 'PIPELINE_NOT_FOUND',
+            status: 404,
+            message: String(error),
+          },
         }
       return {
         ok: false,
-        error: { type: 'NOZOMI_UNAVAILABLE', status: 502, message: String(error) },
+        error: {
+          type: 'NOZOMI_UNAVAILABLE',
+          status: 502,
+          message: String(error),
+        },
       }
     }
     if (!resolved.ok) return { ok: false, error: { type: resolved.error.type, status: 409 } }
@@ -278,39 +382,46 @@ export const createPositioningAnalysisRun = async (
             format: 'csv',
           }
         : undefined
-      const items = resolutions.flatMap(({ pipeline, recordings }) =>
-        recordings.map(({ recording_id, bindings, assets, parameters }) => ({
-          analysis_run_id: run.id,
-          recording_id,
-          pipeline_id: pipeline.definition.pipeline_id,
-          status: 'queued',
-          slot_bindings: bindings,
-          pipeline_snapshot: pipeline.definition,
-          pipeline_digest: pipeline.digest,
-          pipeline_version: pipeline.definition.definition_version,
-          parameters,
-          input_manifest: {
-            ...Object.fromEntries(
-              Object.entries(bindings).map(([slot_id, assetId]) => [
-                slot_id,
-                assets
-                  .filter((asset) => asset.data_asset_id === assetId)
-                  .map((asset) => ({
-                    data_asset_id: asset.data_asset_id,
-                    data_asset_object_id: asset.data_asset_object_id,
-                    object_key: asset.object_key,
-                    checksum_sha256: asset.checksum_sha256,
-                    data_type: asset.data_type,
-                    schema_version: asset.schema_version,
-                    format: asset.format,
-                  })),
-              ])
-            ),
-            ...(groundTruthManifest ? { __ground_truth__: groundTruthManifest } : {}),
-          },
-          error: null,
-        }))
-      )
+      const items = parent
+        ? retrySnapshots.map((snapshot) => ({
+            ...snapshot,
+            analysis_run_id: run.id,
+            status: 'queued',
+            error: null,
+          }))
+        : resolutions.flatMap(({ pipeline, recordings }) =>
+            recordings.map(({ recording_id, bindings, assets, parameters }) => ({
+              analysis_run_id: run.id,
+              recording_id,
+              pipeline_id: pipeline.definition.pipeline_id,
+              status: 'queued',
+              slot_bindings: bindings,
+              pipeline_snapshot: pipeline.definition,
+              pipeline_digest: pipeline.digest,
+              pipeline_version: pipeline.definition.definition_version,
+              parameters,
+              input_manifest: {
+                ...Object.fromEntries(
+                  Object.entries(bindings).map(([slot_id, assetId]) => [
+                    slot_id,
+                    assets
+                      .filter((asset) => asset.data_asset_id === assetId)
+                      .map((asset) => ({
+                        data_asset_id: asset.data_asset_id,
+                        data_asset_object_id: asset.data_asset_object_id,
+                        object_key: asset.object_key,
+                        checksum_sha256: asset.checksum_sha256,
+                        data_type: asset.data_type,
+                        schema_version: asset.schema_version,
+                        format: asset.format,
+                      })),
+                  ])
+                ),
+                ...(groundTruthManifest ? { __ground_truth__: groundTruthManifest } : {}),
+              },
+              error: null,
+            }))
+          )
       const insertedItems = await insertPositioningItems(items, transaction)
       await insertOutboxJobs(
         insertedItems.map((item) => ({

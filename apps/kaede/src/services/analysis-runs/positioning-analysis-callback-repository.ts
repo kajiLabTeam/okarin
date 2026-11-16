@@ -51,6 +51,7 @@ export const updatePositioningRunItemState = (
   updates: {
     status: 'queued' | 'processing' | 'completed' | 'failed'
     result_trajectory_id?: string | null
+    input_manifest?: Record<string, unknown>
     error?: unknown
   },
   executor: DbExecutor = db
@@ -59,6 +60,9 @@ export const updatePositioningRunItemState = (
     .updateTable('positioning_analysis_run_items')
     .set({
       status: updates.status,
+      ...(updates.input_manifest === undefined
+        ? {}
+        : { input_manifest: json(updates.input_manifest) }),
       result_trajectory_id: updates.result_trajectory_id ?? null,
       error: updates.error == null ? null : json(updates.error),
       updated_at: new Date(),
