@@ -34,6 +34,33 @@ pnpm migrate:legacy-recordings --execute
 
 Sentry を使う場合は `SENTRY_DSN` を設定してください。必要に応じて `SENTRY_TRACES_SAMPLE_RATE` と `SENTRY_SEND_DEFAULT_PII` も使えます。
 
+## BLE再解析のビーコン配置
+
+解析に使用するmetadataの`ble.configuration.beacons`がある場合、計測時の配置を
+`resource.beacon_layout`へ変換して使用します。現在のフロア管理で移動・無効化・削除しても、
+過去の計測の配置には反映しません。typed metadata assetと旧`raw/metadata.json`の両方に対応します。
+
+- 計測時に`enabled=false`だったビーコンは除外します。現在のDBの有効・無効は参照しません。
+- metadata自体や`ble.configuration`がない旧データだけ、従来どおり現在の配置を使います。
+  この場合、計測当時の配置を再現できる保証はありません。
+- 空・全台無効・不正・別フロア・重複IDの配置を、現在のDB設定で補完しません。
+  配置が必要なBLE解析は`RESOURCE_NOT_AVAILABLE`となります。
+- metadataが一意に選べない、無効、形式やschemaが未対応の場合も現在の配置へ戻しません。
+  読み込み・照合障害は該当metadataを利用不可にし、他の計測の一覧取得を妨げません。
+  固定先への保存だけが失敗した場合はBLE用配置を利用不可にし、非BLEは元metadataのキーと
+  取得済み内容のチェックサムで続行できます。障害箇所はrecording IDとともにサーバーログへ記録します。
+
+配置はbeacon_id順に正規化し、内容のSHA-256をobject keyとチェックサムに使用します。
+解析runのinput manifestにそのobject keyとチェックサムを保存します。
+配置の抽出に使ったmetadata自体もSHA-256付きの専用キーに保存し、解析に同じ内容を渡します。
+typed metadataの既存チェックサムも読み取り時に照合します。元のmetadataが後から上書きされても、
+そのrunのmetadataとビーコン配置が別の世代になることを防ぎます。
+新規生成・再実行する解析が対象で、既存の軌跡・動画は変更しません。
+
+この対応で固定するのはビーコン配置です。地図画像・縮尺・開始条件は既存の解決処理を使います。
+軌跡全体の一致には、エンジンのコミット・解析パラメーター・PFの乱数seedもそろえる必要があります。
+再実行時の地図・縮尺・開始条件が変わると、計測当時と同じビーコン配置でも結果は変わり得ます。
+
 ## Database
 
 `kaede` の DB アクセスは `Kysely` を使い、型定義は実 DB スキーマから codegen する。
