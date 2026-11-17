@@ -14,6 +14,34 @@ pnpm install
 pnpm run dev
 ```
 
+## 組織承認後のGoogleログイン
+
+`OIDC_ENABLED=true` の環境では、組織作成申請の承認時にGoogleプロバイダーを登録し、
+OIDCを有効化して作成者の既存Google Identityをowner Membershipへ紐づけます。
+作成者はGoogleで組織に再認証した後、その組織へアクセスできます。
+Hosted Domain制限は自動継承せず、参加には引き続き招待または既存Membershipが必要です。
+OIDCが環境で無効の場合、または作成者にGoogle Identityがない場合は従来の設定を維持します。
+
+この修正より前に承認した組織は、対象DBとOIDC環境変数を設定して以下を実行します。
+既定では確認のみです。認証Policyが初期値、プロバイダー未登録、申請者がactive ownerの
+組織だけを対象とし、変更済みの設定は上書きしません。
+
+```sh
+pnpm initialize:organization-oidc second-org
+pnpm initialize:organization-oidc second-org --execute
+```
+
+デプロイ済みkaedeコンテナ内では、同じ引数でコンパイル済みCLIを実行できます。
+
+```sh
+node dist/cli/initialize-approved-organization-oidc.js second-org
+node dist/cli/initialize-approved-organization-oidc.js second-org --execute
+```
+
+処理全体は単一トランザクションで、監査イベントも保存します。適用後の再実行は変更せず
+`auth_policy_already_configured` で終了します。別Userに属するGoogle Identityとの競合は
+エラーにしてロールバックし、email一致によるUser統合は行いません。
+
 ## Legacy recordings の data-assets 移行
 
 旧 `recordings.raw/<organization_id>/<recording_id>/` オブジェクトを、既存の raw オブジェクトを変更せずに `data_assets` と関連テーブルへ登録する one-shot 移行です。`acce` と `gyro` の CSV のみが対象で、欠損・不正なオブジェクトと catalog 非対応 target は JSON の `missing_items` / `items` に一覧化されます。

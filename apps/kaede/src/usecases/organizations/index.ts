@@ -53,6 +53,7 @@ import type {
   Organization,
   OrganizationCreationRequest,
 } from '../../services/organizations/index.js'
+import { initializeOwnerOidc } from '../../services/organizations/initialize-owner-oidc.js'
 import { insertPedestrian } from '../../services/pedestrians/index.js'
 import { listRecordingsByOrganizationIdPaginated } from '../../services/recordings/index.js'
 import type { TrajectoryWithExecution } from '../../services/trajectories/index.js'
@@ -922,6 +923,8 @@ export const approveOrganizationCreationRequestForAdminSession = async (
       },
       trx
     )
+
+    await initializeOwnerOidc(organization.id, requester.id, admin.value.userId, trx)
 
     const updatedRequest = await updateOrganizationCreationRequest(
       request.id,
