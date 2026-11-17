@@ -95,7 +95,7 @@ describe('organization creation request usecase', () => {
     })
   })
 
-  it('active member cannot create organization creation request', async () => {
+  it('active member can request a second organization and become its owner on approval', async () => {
     const organization = await db
       .insertInto('organizations')
       .values({ name: 'Existing Organization' })
@@ -120,12 +120,121 @@ describe('organization creation request usecase', () => {
       db
     )
 
-    expect(result).toEqual({
-      ok: false,
-      error: {
-        type: 'ORGANIZATION_CREATION_REQUEST_REQUIRES_PENDING_USER',
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        requester_user_id: member.user.id,
+        requested_organization_name: 'New Organization',
+        requested_slug: 'new-org',
+        status: 'pending',
       },
     })
+    if (!result.ok) {
+      return
+    }
+
+    const duplicate = await createOrganizationCreationRequestForSession(
+      member.sessionToken,
+      { organization_name: 'Another Organization' },
+      db
+    )
+    expect(duplicate).toEqual({
+      ok: false,
+      error: { type: 'ORGANIZATION_CREATION_REQUEST_ALREADY_PENDING' },
+    })
+
+    const admin = await createUserWithSession({
+      email: 'admin@example.com',
+      globalRole: 'admin',
+    })
+    const approved = await approveOrganizationCreationRequestForAdminSession(
+      admin.sessionToken,
+      result.value.request_id,
+      { slug: 'new-org' },
+      now,
+      db
+    )
+    expect(approved).toMatchObject({ ok: true, value: { status: 'approved' } })
+    if (!approved.ok) {
+      return
+    }
+
+    const memberships = await db
+      .selectFrom('organization_memberships')
+      .select(['organization_id', 'role'])
+      .where('user_id', '=', member.user.id)
+      .execute()
+    expect(memberships).toHaveLength(2)
+    expect(memberships).toEqual(
+      expect.arrayContaining([
+        { organization_id: organization.id, role: 'member' },
+        { organization_id: approved.value.created_organization_id, role: 'owner' },
+      ])
+    )
+
+    const nextRequest = await createOrganizationCreationRequestForSession(
+      member.sessionToken,
+      { organization_name: 'Third Organization' },
+      db
+    )
+    expect(nextRequest).toMatchObject({ ok: true, value: { status: 'pending' } })
+  })
+
+  it('platform admin still cannot submit an organization creation request', async () => {
+    const admin = await createUserWithSession({ email: 'admin@example.com', globalRole: 'admin' })
+
+    const result = await createOrganizationCreationRequestForSession(
+      admin.sessionToken,
+      { organization_name: 'New Organization' },
+      db
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: { type: 'ORGANIZATION_CREATION_REQUEST_REQUIRES_PENDING_USER' },
+    })
+  })
+
+  it('only platform admin can approve and a disabled requester cannot be approved', async () => {
+    const requester = await createUserWithSession({ email: 'requester@example.com' })
+    const admin = await createUserWithSession({ email: 'admin@example.com', globalRole: 'admin' })
+    const created = await createOrganizationCreationRequestForSession(
+      requester.sessionToken,
+      { organization_name: 'New Organization' },
+      db
+    )
+    expect(created.ok).toBe(true)
+    if (!created.ok) {
+      return
+    }
+
+    const unauthorized = await approveOrganizationCreationRequestForAdminSession(
+      requester.sessionToken,
+      created.value.request_id,
+      { slug: 'new-org' },
+      now,
+      db
+    )
+    expect(unauthorized).toEqual({ ok: false, error: { type: 'AUTH_FORBIDDEN' } })
+
+    await db
+      .updateTable('users')
+      .set({ status: 'disabled' })
+      .where('id', '=', requester.user.id)
+      .execute()
+    const disabled = await approveOrganizationCreationRequestForAdminSession(
+      admin.sessionToken,
+      created.value.request_id,
+      { slug: 'new-org' },
+      now,
+      db
+    )
+    expect(disabled).toEqual({
+      ok: false,
+      error: { type: 'ORGANIZATION_CREATION_REQUEST_REQUIRES_PENDING_USER' },
+    })
+    const organizations = await db.selectFrom('organizations').select('id').execute()
+    expect(organizations).toHaveLength(0)
   })
 
   it('platform admin can approve request and create organization with owner membership', async () => {

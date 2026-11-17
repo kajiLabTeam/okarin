@@ -65,7 +65,6 @@ import {
   insertOrganizationMembership,
   insertUser,
   listOrganizationUsers,
-  listUserOrganizationMemberships,
   upsertOrganizationMembership,
 } from '../../services/users/index.js'
 import type { OrganizationUserRow } from '../../services/users/index.js'
@@ -763,15 +762,6 @@ export const createOrganizationCreationRequestForSession = async (
     }
   }
 
-  const memberships = await listUserOrganizationMemberships(actor.value.userId, executor)
-
-  if (memberships.length > 0) {
-    return {
-      ok: false,
-      error: { type: 'ORGANIZATION_CREATION_REQUEST_REQUIRES_PENDING_USER' },
-    }
-  }
-
   const pendingRequest = await findPendingOrganizationCreationRequestByRequester(
     actor.value.userId,
     executor
@@ -898,15 +888,6 @@ export const approveOrganizationCreationRequestForAdminSession = async (
     const requester = await findUserById(request.requester_user_id, trx)
 
     if (requester?.status !== 'active' || requester.global_role === 'admin') {
-      return {
-        ok: false,
-        error: { type: 'ORGANIZATION_CREATION_REQUEST_REQUIRES_PENDING_USER' },
-      } satisfies OrganizationResult<OrganizationCreationRequestResponse>
-    }
-
-    const memberships = await listUserOrganizationMemberships(requester.id, trx)
-
-    if (memberships.length > 0) {
       return {
         ok: false,
         error: { type: 'ORGANIZATION_CREATION_REQUEST_REQUIRES_PENDING_USER' },
