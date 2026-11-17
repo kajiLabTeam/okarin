@@ -53,6 +53,7 @@ import type {
   Organization,
   OrganizationCreationRequest,
 } from '../../services/organizations/index.js'
+import { initializeOwnerOidc } from '../../services/organizations/initialize-owner-oidc.js'
 import { insertPedestrian } from '../../services/pedestrians/index.js'
 import { listRecordingsByOrganizationIdPaginated } from '../../services/recordings/index.js'
 import type { TrajectoryWithExecution } from '../../services/trajectories/index.js'
@@ -65,7 +66,6 @@ import {
   insertOrganizationMembership,
   insertUser,
   listOrganizationUsers,
-  listUserOrganizationMemberships,
   upsertOrganizationMembership,
 } from '../../services/users/index.js'
 import type { OrganizationUserRow } from '../../services/users/index.js'
@@ -763,15 +763,6 @@ export const createOrganizationCreationRequestForSession = async (
     }
   }
 
-  const memberships = await listUserOrganizationMemberships(actor.value.userId, executor)
-
-  if (memberships.length > 0) {
-    return {
-      ok: false,
-      error: { type: 'ORGANIZATION_CREATION_REQUEST_REQUIRES_PENDING_USER' },
-    }
-  }
-
   const pendingRequest = await findPendingOrganizationCreationRequestByRequester(
     actor.value.userId,
     executor
@@ -904,15 +895,6 @@ export const approveOrganizationCreationRequestForAdminSession = async (
       } satisfies OrganizationResult<OrganizationCreationRequestResponse>
     }
 
-    const memberships = await listUserOrganizationMemberships(requester.id, trx)
-
-    if (memberships.length > 0) {
-      return {
-        ok: false,
-        error: { type: 'ORGANIZATION_CREATION_REQUEST_REQUIRES_PENDING_USER' },
-      } satisfies OrganizationResult<OrganizationCreationRequestResponse>
-    }
-
     const slug = payload.slug.trim()
     const existingOrganization = await findOrganizationBySlug(slug, trx)
 
@@ -941,6 +923,8 @@ export const approveOrganizationCreationRequestForAdminSession = async (
       },
       trx
     )
+
+    await initializeOwnerOidc(organization.id, requester.id, admin.value.userId, trx)
 
     const updatedRequest = await updateOrganizationCreationRequest(
       request.id,
