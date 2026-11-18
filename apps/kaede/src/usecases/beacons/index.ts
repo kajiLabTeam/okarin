@@ -17,6 +17,7 @@ import {
   updateBeacon,
 } from '../../services/beacons/index.js'
 import type { Beacon } from '../../services/beacons/index.js'
+import { findMapRevision, listRevisionBeacons } from '../../services/floor-maps/revisions.js'
 import { findFloorById } from '../../services/floors/index.js'
 import {
   requireDashboardWriteAccess,
@@ -92,13 +93,16 @@ export const listOrganizationBeacons = async (
 export const getRecordingBeaconConfig = async (
   actor: RequestActor,
   organizationId: string,
-  floorId: string
+  floorId: string,
+  revisionId?: string
 ) => {
   const auth = requireOrganizationMember(actor, organizationId)
   if (!auth.ok) return { ok: false, error: auth.error } as const
   if (!(await getFloor(organizationId, floorId)))
     return { ok: false, error: { type: 'FLOOR_NOT_FOUND', floorId } as const }
-  const rows = await listBeacons(floorId, false)
+  if (revisionId && !(await findMapRevision(floorId, organizationId, revisionId)))
+    return { ok: false, error: { type: 'FLOOR_NOT_FOUND', floorId } as const }
+  const rows = await listRevisionBeacons(floorId, organizationId, revisionId)
   return {
     ok: true,
     value: { configuration_version: configurationVersion(rows), beacons: rows.map(response) },

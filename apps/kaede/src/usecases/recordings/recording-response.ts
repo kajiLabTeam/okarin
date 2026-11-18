@@ -11,6 +11,7 @@ export const toRecordingDetailResponse = (
   recording_id: recording.id,
   pedestrian_id: recording.pedestrian_id,
   floor_id: recording.floor_id,
+  floor_map_revision_id: recording.floor_map_revision_id,
   organization_id: recording.organization_id,
   upload_status: recording.upload_status as RecordingDetailResponse['upload_status'],
   upload_targets: recording.upload_targets as RecordingDetailResponse['upload_targets'],

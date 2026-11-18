@@ -212,7 +212,6 @@ def test_legacy_metadata_offset_and_timestamp_origin(monkeypatch: Any) -> None:
     from rikka import legacy_analysis
 
     calls = []
-    monkeypatch.setattr(legacy_analysis, "INITIAL_DIRECTION", 123.0)
 
     def execute(
         method_id: str, inputs: dict[str, bytes], parameters: dict[str, Any]
@@ -242,7 +241,7 @@ def test_legacy_metadata_offset_and_timestamp_origin(monkeypatch: Any) -> None:
         {},
     )
     assert pd.read_csv(BytesIO(calls[0][1]["acce"]))["t"].tolist() == [2.0, 2.02]
-    assert calls[0][2] == {"initial_direction": 123.0}
+    assert calls[0][2] == {"initial_direction": 90.0}
     assert result == (
         b"step_index,rikka_timestamp_s,rikka_x,rikka_y,x,y\n"
         b"0,,0.0,0.0,0.0,0.0\n"

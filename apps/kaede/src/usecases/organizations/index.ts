@@ -505,6 +505,7 @@ const toOrganizationTrajectoryResponse = (
   trajectory_id: trajectory.id,
   recording_id: trajectory.recording_id,
   floor_id: trajectory.floor_id,
+  floor_map_revision_id: trajectory.floor_map_revision_id,
   organization_id: trajectory.organization_id,
   status: trajectory.status as OrganizationTrajectoriesResponse['trajectories'][number]['status'],
   created_at: trajectory.created_at.toISOString(),

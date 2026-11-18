@@ -177,6 +177,7 @@ export const getTrajectoryMapData = async (
     value: {
       trajectory_id: trajectory.id,
       floor_id: trajectory.floor_id,
+      floor_map_revision_id: trajectory.floor_map_revision_id,
       data_type: 'analyzed',
       points: parsed.points,
     },

@@ -1,4 +1,4 @@
-import { createRoute } from '@hono/zod-openapi'
+import { createRoute, z } from '@hono/zod-openapi'
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { requireRequestActor } from '../../middleware/request-actor-context.js'
 import type { RequestActorHonoEnv } from '../../middleware/request-actor-context.js'
@@ -30,6 +30,7 @@ export const registerGetFloorRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => 
     description: 'floor の基本情報を building 情報とあわせて返す',
     request: {
       params: floorIdParamsSchema,
+      query: z.object({ revision_id: z.uuid().optional() }),
     },
     responses: {
       200: {
@@ -54,7 +55,10 @@ export const registerGetFloorRoute = (app: OpenAPIHono<RequestActorHonoEnv>) => 
   app.openapi(route, async (c) => {
     const params = c.req.valid('param')
     const actor = requireRequestActor(c)
-    const result = await getFloor(actor, params)
+    const result = await getFloor(actor, {
+      ...params,
+      revisionId: c.req.valid('query').revision_id,
+    })
 
     if (!result.ok) {
       const error = toGetFloorErrorResponse(result.error)

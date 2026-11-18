@@ -67,3 +67,9 @@ make up ENV=local
 - `8333` は S3 API のため、ブラウザで直接開くと `Access Denied` になる
 - `8888` は Filer UI 用ポート
 - `9333` は SeaweedFS の管理情報確認用ポート
+
+## 地図の版（#192）
+
+新しい画像は `organizations/{organization_id}/floors/{floor_id}/revisions/{object_revision_id}/map.{png|svg}` に保存する。
+旧キーは初期版の参照として保持し、地図更新・フロア非表示で削除しない。縮尺だけの変更は画像を共有するため、版単位の画像削除も行わない。
+DB登録に失敗した新規アップロードだけを後片付けの対象とする。

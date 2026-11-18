@@ -36,6 +36,7 @@ export interface AnalysisRuns {
   error_code: string | null
   finished_at: Timestamp | null
   floor_id: string
+  floor_map_revision_id: string | null
   id: Generated<string>
   organization_id: string
   parameters: Json
@@ -48,62 +49,6 @@ export interface AnalysisRunTrajectories {
   analysis_run_id: string
   seq: number
   trajectory_id: string
-}
-
-export interface PositioningAnalysisRuns {
-  comparison_run_id: Generated<string | null>
-  id: Generated<string>
-  organization_id: string
-  status: Generated<string>
-  idempotency_key: string
-  request_digest: string
-  retry_of_run_id: string | null
-  created_at: Generated<Timestamp>
-  updated_at: Generated<Timestamp>
-}
-
-export interface PositioningAnalysisRunItems {
-  id: Generated<string>
-  analysis_run_id: string
-  recording_id: string
-  pipeline_id: string
-  status: Generated<string>
-  slot_bindings: Json
-  pipeline_snapshot: Json
-  pipeline_digest: string
-  pipeline_version: string
-  parameters: Json
-  input_manifest: Json
-  output_manifest: Json
-  result_trajectory_id: string | null
-  error: Json | null
-  created_at: Generated<Timestamp>
-  updated_at: Generated<Timestamp>
-}
-
-export interface PositioningAnalysisCallbacks {
-  id: Generated<string>
-  event_id: string
-  analysis_run_item_id: string
-  status: string
-  payload: Json
-  received_at: Generated<Timestamp>
-  processed_at: Timestamp | null
-}
-
-export interface OutboxJobs {
-  attempts: Generated<number>
-  created_at: Generated<Timestamp>
-  id: Generated<string>
-  job_type: string
-  last_error: string | null
-  lease_token: string | null
-  leased_until: Timestamp | null
-  max_attempts: Generated<number>
-  payload: Json
-  run_at: Generated<Timestamp>
-  status: Generated<string>
-  updated_at: Generated<Timestamp>
 }
 
 export interface ApplicationDataMigrations {
@@ -156,16 +101,6 @@ export interface AuthIdentities {
   user_id: string
 }
 
-export interface Buildings {
-  created_at: Generated<Timestamp>
-  id: Generated<string>
-  latitude: number | null
-  longitude: number | null
-  name: string
-  organization_id: string
-  updated_at: Generated<Timestamp>
-}
-
 export interface Beacons {
   created_at: Generated<Timestamp>
   deleted_at: Timestamp | null
@@ -182,12 +117,65 @@ export interface Beacons {
   updated_at: Generated<Timestamp>
 }
 
+export interface Buildings {
+  created_at: Generated<Timestamp>
+  id: Generated<string>
+  latitude: number | null
+  longitude: number | null
+  name: string
+  organization_id: string
+  updated_at: Generated<Timestamp>
+}
+
+export interface DataAssetObjects {
+  byte_size: Int8 | null
+  checksum_sha256: string | null
+  content_type: string
+  created_at: Generated<Timestamp>
+  data_asset_id: string
+  format: string
+  id: Generated<string>
+  object_key: string
+  object_role: Generated<string>
+}
+
+export interface DataAssets {
+  created_at: Generated<Timestamp>
+  data_type: string
+  ended_at: Timestamp | null
+  id: Generated<string>
+  metadata: Generated<Json>
+  organization_id: string
+  sample_count: number | null
+  schema_version: string
+  started_at: Timestamp | null
+  updated_at: Generated<Timestamp>
+  validation_error: Json | null
+  validation_status: Generated<string>
+}
+
+export interface FloorMapRevisions {
+  archived_beacons: Json | null
+  beacons_need_review: Generated<boolean>
+  created_at: Generated<Timestamp>
+  floor_id: string
+  id: Generated<string>
+  image_object_path: string
+  map_height_px: number | null
+  map_width_px: number | null
+  organization_id: string
+  revision: number
+  scale: number | null
+}
+
 export interface Floors {
   building_id: string
   created_at: Generated<Timestamp>
+  current_map_revision_id: string | null
   deleted_at: Timestamp | null
   id: Generated<string>
   image_object_path: string
+  initial_map_revision_id: string | null
   level: number
   map_height_px: number | null
   map_width_px: number | null
@@ -195,6 +183,20 @@ export interface Floors {
   organization_id: string
   scale: number | null
   updated_at: Generated<Timestamp>
+}
+
+export interface MobileSessionExchangeCodes {
+  code_challenge: string | null
+  code_hash: string
+  consumed_at: Timestamp | null
+  created_at: Generated<Timestamp>
+  expires_at: Timestamp
+  id: Generated<string>
+  intent: string
+  oidc_transaction_id: string | null
+  organization_id: string | null
+  session_id: string
+  user_id: string
 }
 
 export interface OidcIdentities {
@@ -211,10 +213,14 @@ export interface OidcIdentities {
 export interface OidcLoginTransactions {
   consumed_at: Timestamp | null
   created_at: Generated<Timestamp>
+  expected_user_id: string | null
   expires_at: Timestamp
   id: Generated<string>
   intent: string
   invite_id: string | null
+  mobile_code_challenge: string | null
+  mobile_code_challenge_method: string | null
+  mobile_redirect_uri: string | null
   nonce: string
   organization_id: string
   organization_oidc_provider_id: string
@@ -222,24 +228,6 @@ export interface OidcLoginTransactions {
   return_to: string
   session_id: string | null
   state_hash: string
-  expected_user_id: string | null
-  mobile_redirect_uri: string | null
-  mobile_code_challenge: string | null
-  mobile_code_challenge_method: string | null
-}
-
-export interface MobileSessionExchangeCodes {
-  code_challenge: string | null
-  code_hash: string
-  consumed_at: Timestamp | null
-  created_at: Generated<Timestamp>
-  expires_at: Timestamp
-  id: Generated<string>
-  intent: string
-  oidc_transaction_id: string | null
-  organization_id: string | null
-  session_id: string
-  user_id: string
 }
 
 export interface OrganizationAuthSettings {
@@ -365,6 +353,21 @@ export interface Organizations {
   updated_at: Generated<Timestamp>
 }
 
+export interface OutboxJobs {
+  attempts: Generated<number>
+  created_at: Generated<Timestamp>
+  id: Generated<string>
+  job_type: string
+  last_error: string | null
+  lease_token: string | null
+  leased_until: Timestamp | null
+  max_attempts: Generated<number>
+  payload: Json
+  run_at: Generated<Timestamp>
+  status: Generated<string>
+  updated_at: Generated<Timestamp>
+}
+
 export interface Pedestrians {
   attributes: Generated<Json>
   created_at: Generated<Timestamp>
@@ -378,45 +381,45 @@ export interface Pedestrians {
   user_id: string | null
 }
 
-export interface Recordings {
-  constraints: Generated<Json>
-  created_at: Generated<Timestamp>
-  deleted_at: Timestamp | null
-  floor_id: string
+export interface PositioningAnalysisCallbacks {
+  analysis_run_item_id: string
+  event_id: string
   id: Generated<string>
-  organization_id: string
-  pedestrian_id: string
-  updated_at: Generated<Timestamp>
-  upload_status: Generated<string>
-  upload_targets: string[]
-  upload_failure: Json | null
+  payload: Json
+  processed_at: Timestamp | null
+  received_at: Generated<Timestamp>
+  status: string
 }
 
-export interface DataAssets {
+export interface PositioningAnalysisRunItems {
+  analysis_run_id: string
   created_at: Generated<Timestamp>
-  data_type: string
-  ended_at: Timestamp | null
+  error: Json | null
   id: Generated<string>
-  metadata: Generated<Json>
-  organization_id: string
-  sample_count: number | null
-  schema_version: string
-  started_at: Timestamp | null
+  input_manifest: Json
+  output_manifest: Generated<Json>
+  parameters: Generated<Json>
+  pipeline_digest: string
+  pipeline_id: string
+  pipeline_snapshot: Json
+  pipeline_version: string
+  recording_id: string
+  result_trajectory_id: string | null
+  slot_bindings: Json
+  status: Generated<string>
   updated_at: Generated<Timestamp>
-  validation_error: Json | null
-  validation_status: Generated<string>
 }
 
-export interface DataAssetObjects {
-  byte_size: number | null
-  checksum_sha256: string | null
-  content_type: string
+export interface PositioningAnalysisRuns {
+  comparison_run_id: string | null
   created_at: Generated<Timestamp>
-  data_asset_id: string
-  format: string
   id: Generated<string>
-  object_key: string
-  object_role: Generated<string>
+  idempotency_key: string
+  organization_id: string
+  request_digest: string
+  retry_of_run_id: string | null
+  status: Generated<string>
+  updated_at: Generated<Timestamp>
 }
 
 export interface RecordingDataAssets {
@@ -426,6 +429,21 @@ export interface RecordingDataAssets {
   data_type: string
   organization_id: string
   recording_id: string
+}
+
+export interface Recordings {
+  constraints: Generated<Json>
+  created_at: Generated<Timestamp>
+  deleted_at: Timestamp | null
+  floor_id: string
+  floor_map_revision_id: string
+  id: Generated<string>
+  organization_id: string
+  pedestrian_id: string
+  updated_at: Generated<Timestamp>
+  upload_failure: Json | null
+  upload_status: Generated<string>
+  upload_targets: string[]
 }
 
 export interface SessionMembershipAuthentications {
@@ -462,6 +480,7 @@ export interface Trajectories {
   error_message: string | null
   failed_at: Timestamp | null
   floor_id: string
+  floor_map_revision_id: string
   id: Generated<string>
   organization_id: string
   recording_id: string
@@ -508,10 +527,6 @@ export interface Users {
 }
 
 export interface DB {
-  outbox_jobs: OutboxJobs
-  positioning_analysis_callbacks: PositioningAnalysisCallbacks
-  positioning_analysis_run_items: PositioningAnalysisRunItems
-  positioning_analysis_runs: PositioningAnalysisRuns
   analysis_run_trajectories: AnalysisRunTrajectories
   analysis_runs: AnalysisRuns
   application_data_migrations: ApplicationDataMigrations
@@ -522,10 +537,11 @@ export interface DB {
   buildings: Buildings
   data_asset_objects: DataAssetObjects
   data_assets: DataAssets
+  floor_map_revisions: FloorMapRevisions
   floors: Floors
+  mobile_session_exchange_codes: MobileSessionExchangeCodes
   oidc_identities: OidcIdentities
   oidc_login_transactions: OidcLoginTransactions
-  mobile_session_exchange_codes: MobileSessionExchangeCodes
   organization_auth_settings: OrganizationAuthSettings
   organization_creation_requests: OrganizationCreationRequests
   organization_invite_redemptions: OrganizationInviteRedemptions
@@ -536,9 +552,13 @@ export interface DB {
   organization_memberships: OrganizationMemberships
   organization_oidc_providers: OrganizationOidcProviders
   organizations: Organizations
+  outbox_jobs: OutboxJobs
   pedestrians: Pedestrians
-  recordings: Recordings
+  positioning_analysis_callbacks: PositioningAnalysisCallbacks
+  positioning_analysis_run_items: PositioningAnalysisRunItems
+  positioning_analysis_runs: PositioningAnalysisRuns
   recording_data_assets: RecordingDataAssets
+  recordings: Recordings
   session_membership_authentications: SessionMembershipAuthentications
   sessions: Sessions
   trajectories: Trajectories

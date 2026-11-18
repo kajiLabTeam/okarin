@@ -183,6 +183,7 @@ const analysisRunSummarySchema = z.object({
   analysis_type: z.string(),
   status: analysisRunStatusSchema,
   floor_id: uuidSchema,
+  floor_map_revision_id: uuidSchema.nullable().optional(),
   parameters: stayHeatmapParametersSchema,
   definition_version: z.string(),
   trajectory_counts: trajectoryCountsSchema,

@@ -10,6 +10,7 @@ import {
   loadDataTypeDefinition,
 } from '../../services/data-assets/index.js'
 import { db } from '../../services/db/index.js'
+import { findMapRevision } from '../../services/floor-maps/revisions.js'
 import { findFloorById } from '../../services/floors/index.js'
 import { findPedestrianById } from '../../services/pedestrians/index.js'
 import { insertRecording } from '../../services/recordings/index.js'
@@ -22,6 +23,7 @@ import type { AuthorizationError } from '../authorization.js'
 import { requireRecordingAccess } from '../authorization.js'
 
 export type InitRecordingError =
+  | { type: 'FLOOR_MAP_REVISION_NOT_FOUND' }
   | AuthorizationError
   | {
       type: 'RESOURCE_NOT_FOUND'
@@ -53,6 +55,7 @@ export type InitRecordingResult =
       ok: true
       value: {
         recording_id: string
+        floor_map_revision_id?: string
         organization_id: string
         upload_status: 'accepted' | 'ready' | 'failed'
         upload_urls: {
@@ -167,6 +170,13 @@ export const initRecording = async (
     return authorization satisfies InitRecordingResult
   }
 
+  if (
+    payload.floor_map_revision_id &&
+    !(await findMapRevision(payload.floor_id, floor.organization_id, payload.floor_map_revision_id))
+  ) {
+    return { ok: false, error: { type: 'FLOOR_MAP_REVISION_NOT_FOUND' } }
+  }
+
   if (payload.assets) {
     for (const asset of payload.assets) {
       if (!(await loadDataTypeDefinition(asset.data_type, asset.schema_version, asset.format))) {
@@ -205,6 +215,9 @@ export const initRecording = async (
         {
           pedestrian_id: payload.pedestrian_id,
           floor_id: payload.floor_id,
+          ...(payload.floor_map_revision_id
+            ? { floor_map_revision_id: payload.floor_map_revision_id }
+            : {}),
           organization_id: pedestrian.organization_id,
           upload_targets: uploadTargets,
           constraints: payload.constraints ?? [],
@@ -275,6 +288,9 @@ export const initRecording = async (
     recording = await insertRecording({
       pedestrian_id: payload.pedestrian_id,
       floor_id: payload.floor_id,
+      ...(payload.floor_map_revision_id
+        ? { floor_map_revision_id: payload.floor_map_revision_id }
+        : {}),
       organization_id: pedestrian.organization_id,
       upload_targets: uploadTargets,
       constraints: payload.constraints ?? [],
@@ -308,6 +324,7 @@ export const initRecording = async (
     ok: true,
     value: {
       recording_id: recording.id,
+      floor_map_revision_id: recording.floor_map_revision_id,
       organization_id: recording.organization_id,
       upload_status: recordingUploadStatusSchema.parse(recording.upload_status),
       upload_urls: uploadUrls,

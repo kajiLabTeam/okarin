@@ -59,7 +59,7 @@ export type CreateFloorResult =
       error: AuthorizationError
     }
 
-const validateFloorMapImage = (
+export const validateFloorMapImage = (
   upload: FloorMapImageUpload
 ):
   | {
@@ -145,7 +145,8 @@ export const createFloor = async (
   const imageObjectPath = buildFloorMapObjectKey(
     building.organization_id,
     floorId,
-    mapImageExtension
+    mapImageExtension,
+    randomUUID()
   )
   await putFloorMapObject(imageObjectPath, mapImageExtension, mapImage.bytes)
   let floor: Awaited<ReturnType<typeof insertFloor>>
@@ -182,6 +183,9 @@ export const createFloor = async (
     ok: true,
     value: {
       floor_id: floor.id,
+      current_map_revision_id: floor.current_map_revision_id,
+      initial_map_revision_id: floor.initial_map_revision_id,
+      floor_map_revision_id: floor.current_map_revision_id ?? undefined,
       building_id: building.id,
       organization_id: building.organization_id,
       building_name: building.name,

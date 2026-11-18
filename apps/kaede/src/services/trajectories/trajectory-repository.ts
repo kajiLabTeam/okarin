@@ -14,7 +14,8 @@ import { buildPositioningAnalysisArtifactPrefix } from '../storage/presigned-url
 type DbExecutor = Kysely<DB> | Transaction<DB>
 export type Trajectory = Selectable<Trajectories>
 type NewTrajectory = Insertable<Trajectories>
-type NewTrajectoryInput = Omit<NewTrajectory, 'constraints'> & {
+type NewTrajectoryInput = Omit<NewTrajectory, 'constraints' | 'floor_map_revision_id'> & {
+  floor_map_revision_id?: string
   constraints?: TrajectoryConstraints
 }
 type TrajectoryUpdate = Updateable<Trajectories>
@@ -51,6 +52,7 @@ const activeTrajectoriesWithExecutionQuery = (executor: DbExecutor) =>
       'trajectories.organization_id',
       'trajectories.recording_id',
       'trajectories.floor_id',
+      'trajectories.floor_map_revision_id',
       'trajectories.status',
       'trajectories.constraints',
       'trajectories.error_code',
@@ -121,6 +123,7 @@ const mapRowToTrajectoryWithExecution = (row: {
   organization_id: string
   recording_id: string
   floor_id: string
+  floor_map_revision_id: string
   status: string
   constraints: unknown
   error_code: string | null
@@ -143,6 +146,7 @@ const mapRowToTrajectoryWithExecution = (row: {
   organization_id: row.organization_id,
   recording_id: row.recording_id,
   floor_id: row.floor_id,
+  floor_map_revision_id: row.floor_map_revision_id,
   status: row.status,
   constraints: row.constraints as Trajectory['constraints'],
   error_code: row.error_code,
@@ -275,12 +279,21 @@ export const insertTrajectory = async (
   newTrajectory: NewTrajectoryInput,
   executor: DbExecutor = db
 ): Promise<Trajectory> => {
-  const values: NewTrajectory =
+  const values =
     newTrajectory.constraints === undefined
       ? newTrajectory
       : { ...newTrajectory, constraints: JSON.stringify(newTrajectory.constraints) }
 
-  return executor.insertInto('trajectories').values(values).returningAll().executeTakeFirstOrThrow()
+  return executor
+    .insertInto('trajectories')
+    .values({
+      ...values,
+      floor_map_revision_id:
+        newTrajectory.floor_map_revision_id ??
+        sql<string>`(select floor_map_revision_id from recordings where id = ${newTrajectory.recording_id})`,
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow()
 }
 
 export const updateTrajectory = async (

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { createHash } from 'node:crypto'
-import { beaconLayout, listBeacons } from '../beacons/index.js'
-import { findFloorDetailById } from '../floors/index.js'
+import { beaconLayout } from '../beacons/index.js'
+import { findMapRevision, listRevisionBeacons } from '../floor-maps/revisions.js'
 import { getFloorMapObjectBytes, putBeaconLayoutObject } from '../storage/index.js'
 import type { RecordingMetadataSnapshot } from './recording-metadata-snapshot.js'
 
@@ -13,6 +13,10 @@ export interface PipelineResourceAsset {
   validation_status: string
   object_key?: string
   checksum_sha256?: string | null
+  floor_map_revision_id?: string
+  scale?: number | null
+  map_width_px?: number | null
+  map_height_px?: number | null
 }
 
 const metadataSchema = z.object({
@@ -36,7 +40,8 @@ const beaconSnapshotSchema = z.object({
 /** 計測時の配置を優先し、配置のない旧metadataだけ現在のDBへフォールバックする。 */
 const resolveBeaconLayout = async (
   floorId: string,
-  metadataInput: RecordingMetadataSnapshot
+  metadataInput: RecordingMetadataSnapshot,
+  revision?: { id: string; organization_id: string }
 ): Promise<string | undefined> => {
   if (metadataInput.status === 'unavailable') return undefined
   if (metadataInput.status === 'ready') {
@@ -70,7 +75,9 @@ const resolveBeaconLayout = async (
       return rows.length > 0 ? JSON.stringify({ beacons: rows }) : undefined
     }
   }
-  const beacons = await listBeacons(floorId)
+  const beacons = revision
+    ? await listRevisionBeacons(floorId, revision.organization_id, revision.id)
+    : []
   return beacons.length > 0 ? beaconLayout(beacons) : undefined
 }
 
@@ -78,34 +85,51 @@ const resolveBeaconLayout = async (
 export const resolveFloorResources = async (
   recording: {
     floor_id: string
+    floor_map_revision_id?: string
     organization_id: string
   },
   metadata: RecordingMetadataSnapshot = { status: 'absent' }
 ): Promise<PipelineResourceAsset[]> => {
-  const floor = await findFloorDetailById(recording.floor_id, {
-    organizationIds: [recording.organization_id],
-  })
+  const revision = await findMapRevision(
+    recording.floor_id,
+    recording.organization_id,
+    recording.floor_map_revision_id
+  )
+  const floor = revision ? { ...revision, floor_id: revision.floor_id } : undefined
   if (!floor) return []
 
   const [mapBytes, layout] = await Promise.all([
-    floor.image_object_path.toLowerCase().endsWith('.png')
-      ? getFloorMapObjectBytes(floor.image_object_path)
-      : Promise.resolve(undefined),
-    resolveBeaconLayout(floor.floor_id, metadata),
+    getFloorMapObjectBytes(floor.image_object_path),
+    resolveBeaconLayout(floor.floor_id, metadata, floor),
   ])
   const resources: PipelineResourceAsset[] = []
 
   if (mapBytes && mapBytes.byteLength > 0) {
     resources.push({
-      data_asset_id: `resource:${floor.floor_id}:floor-map`,
+      data_asset_id: `resource:${floor.id}:floor-map`,
       data_type: 'resource.floor_map',
       schema_version: '1',
-      format: 'png',
+      format: floor.image_object_path.endsWith('.svg') ? 'svg' : 'png',
+      floor_map_revision_id: floor.id,
+      scale: floor.scale,
+      map_width_px: floor.map_width_px,
+      map_height_px: floor.map_height_px,
       validation_status: 'valid',
       object_key: floor.image_object_path,
       checksum_sha256: createHash('sha256').update(mapBytes).digest('hex'),
     })
   }
+
+  if (!mapBytes || mapBytes.byteLength === 0)
+    resources.push({
+      data_asset_id: `resource:${floor.id}:floor-map`,
+      data_type: 'resource.floor_map',
+      schema_version: '1',
+      format: floor.image_object_path.endsWith('.svg') ? 'svg' : 'png',
+      validation_status: 'invalid',
+      floor_map_revision_id: floor.id,
+      object_key: floor.image_object_path,
+    })
 
   if (layout !== undefined) {
     const layoutBytes = new TextEncoder().encode(layout)

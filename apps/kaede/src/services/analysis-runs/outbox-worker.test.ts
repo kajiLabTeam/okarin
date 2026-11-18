@@ -16,6 +16,7 @@ vi.mock('../../config/runtime.js', () => ({
 }))
 
 const mocks = vi.hoisted(() => ({
+  failTrajectory: vi.fn(),
   claimJobs: vi.fn(),
   completeJob: vi.fn(),
   failJob: vi.fn(),
@@ -63,6 +64,8 @@ vi.mock('../storage/presigned-url.js', () => ({
   issueInternalDataAssetDownloadUrl: mocks.issueAssetDownloadUrl,
   issueInternalTrajectoryResultUploadUrl: mocks.issueItemResultUploadUrl,
 }))
+vi.mock('../trajectories/index.js', () => ({ markTrajectoryFailed: mocks.failTrajectory }))
+
 vi.mock('../storage/object-store.js', () => ({
   getObjectBytes: mocks.getObjectBytes,
 }))
@@ -205,6 +208,29 @@ describe('outbox-worker', () => {
       organization_id: 'org-1',
       status: 'accepted',
     }
+
+    it('旧APIの互換モードを同じitem IDで一度配送し、地図履歴は入力slotとして送らない', async () => {
+      mocks.findItemById.mockResolvedValue({
+        ...mockItem,
+        result_trajectory_id: 'item-1',
+        input_manifest: {
+          ...mockItem.input_manifest,
+          __legacy_trajectory__: { version: 1 },
+          __floor_map__: [{ object_key: 'v1.png', checksum_sha256: 'map-digest' }],
+        },
+      })
+      mocks.findRunById.mockResolvedValue(mockRun)
+      mocks.dispatchToNozomi.mockResolvedValue({ status: 'processing' })
+      await processOutboxJob(mockJob)
+      expect(mocks.dispatchToNozomi).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          analysis_run_item_id: 'item-1',
+          legacy_trajectory: true,
+          inputs: [expect.objectContaining({ slot_id: 'imu' })],
+        })
+      )
+      expect(mocks.completeJob).toHaveBeenCalledOnce()
+    })
 
     it('Nozomiへの配送が成功した場合、ジョブを完了にしステータスをprocessingにする', async () => {
       mocks.findItemById.mockResolvedValue(mockItem)

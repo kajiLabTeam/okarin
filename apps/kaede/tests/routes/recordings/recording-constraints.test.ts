@@ -38,6 +38,7 @@ describe('recording constraints API', () => {
     expect(response.status).toBe(200)
     expect(recordingConstraintsResponseSchema.parse(await response.json())).toEqual({
       recording_id: recordingId,
+      floor_map_revision_id: expect.any(String),
       constraints,
     })
   })

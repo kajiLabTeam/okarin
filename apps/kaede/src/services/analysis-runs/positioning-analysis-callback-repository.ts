@@ -63,7 +63,9 @@ export const updatePositioningRunItemState = (
       ...(updates.input_manifest === undefined
         ? {}
         : { input_manifest: json(updates.input_manifest) }),
-      result_trajectory_id: updates.result_trajectory_id ?? null,
+      ...(updates.result_trajectory_id === undefined
+        ? {}
+        : { result_trajectory_id: updates.result_trajectory_id }),
       error: updates.error == null ? null : json(updates.error),
       updated_at: new Date(),
     })

@@ -8,7 +8,7 @@ import type { DbExecutor } from '../executor.js'
 export type PositioningRun = Selectable<PositioningAnalysisRuns>
 export type PositioningRunItem = Selectable<PositioningAnalysisRunItems>
 type NewRun = Omit<Insertable<PositioningAnalysisRuns>, 'id'>
-type NewItem = Omit<Insertable<PositioningAnalysisRunItems>, 'id'>
+type NewItem = Insertable<PositioningAnalysisRunItems>
 const json = (value: unknown) => JSON.stringify(value) as Json
 
 export const findPositioningRunByKey = (

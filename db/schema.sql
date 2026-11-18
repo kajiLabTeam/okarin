@@ -1,7 +1,11 @@
+--
+-- PostgreSQL database dump
+--
+
 \restrict dbmate
 
 -- Dumped from database version 17.10
--- Dumped by pg_dump version 18.4
+-- Dumped by pg_dump version 17.10
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -16,6 +20,68 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
+-- Name: public; Type: SCHEMA; Schema: -; Owner: -
+--
+
+-- *not* creating schema, since initdb creates it
+
+
+--
+-- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON SCHEMA public IS '';
+
+
+--
+-- Name: default_recording_map_revision(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.default_recording_map_revision() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF NEW.floor_map_revision_id IS NULL THEN
+    SELECT initial_map_revision_id INTO NEW.floor_map_revision_id FROM floors WHERE id = NEW.floor_id;
+  END IF;
+  RETURN NEW;
+END $$;
+
+
+--
+-- Name: default_trajectory_map_revision(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.default_trajectory_map_revision() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF NEW.floor_map_revision_id IS NULL THEN
+    SELECT floor_map_revision_id INTO NEW.floor_map_revision_id FROM recordings WHERE id = NEW.recording_id;
+  END IF;
+  RETURN NEW;
+END $$;
+
+
+--
+-- Name: protect_floor_map_revision(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.protect_floor_map_revision() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF (NEW.id, NEW.floor_id, NEW.organization_id, NEW.revision, NEW.image_object_path, NEW.scale, NEW.created_at)
+     IS DISTINCT FROM (OLD.id, OLD.floor_id, OLD.organization_id, OLD.revision, OLD.image_object_path, OLD.scale, OLD.created_at)
+     OR (OLD.map_width_px IS NOT NULL AND (NEW.map_width_px, NEW.map_height_px) IS DISTINCT FROM (OLD.map_width_px, OLD.map_height_px))
+     OR (OLD.archived_beacons IS NOT NULL AND NEW.archived_beacons IS DISTINCT FROM OLD.archived_beacons) THEN
+    RAISE EXCEPTION 'floor map revision is immutable';
+  END IF;
+  RETURN NEW;
+END $$;
+
+
+--
 -- Name: set_updated_at(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -27,6 +93,33 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+
+--
+-- Name: version_floor_map(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.version_floor_map() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE revision_id uuid; next_revision integer;
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    IF (NEW.image_object_path, NEW.scale) IS NOT DISTINCT FROM (OLD.image_object_path, OLD.scale) THEN
+      RETURN NEW;
+    END IF;
+    UPDATE floor_map_revisions SET archived_beacons = COALESCE((SELECT jsonb_agg(to_jsonb(b)) FROM beacons b WHERE b.floor_id = OLD.id AND b.deleted_at IS NULL), '[]'::jsonb) WHERE id = OLD.current_map_revision_id;
+    SELECT COALESCE(max(revision), 0) + 1 INTO next_revision FROM floor_map_revisions WHERE floor_id = NEW.id;
+  ELSE
+    next_revision := 1;
+  END IF;
+  INSERT INTO floor_map_revisions (floor_id, organization_id, revision, image_object_path, map_width_px, map_height_px, scale, beacons_need_review)
+  VALUES (NEW.id, NEW.organization_id, next_revision, NEW.image_object_path, NEW.map_width_px, NEW.map_height_px, NEW.scale,
+    CASE WHEN TG_OP = 'UPDATE' THEN CASE WHEN NEW.image_object_path IS DISTINCT FROM OLD.image_object_path THEN true ELSE (SELECT beacons_need_review FROM floor_map_revisions WHERE id = OLD.current_map_revision_id) END ELSE false END)
+  RETURNING id INTO revision_id;
+  UPDATE floors SET current_map_revision_id = revision_id, initial_map_revision_id = COALESCE(initial_map_revision_id, revision_id) WHERE id = NEW.id;
+  RETURN NEW;
+END $$;
 
 
 SET default_tablespace = '';
@@ -63,6 +156,7 @@ CREATE TABLE public.analysis_runs (
     finished_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    floor_map_revision_id uuid,
     CONSTRAINT analysis_runs_analysis_type_nonempty_chk CHECK ((length(btrim(analysis_type)) > 0)),
     CONSTRAINT analysis_runs_definition_version_nonempty_chk CHECK ((length(btrim(definition_version)) > 0)),
     CONSTRAINT analysis_runs_parameters_object_chk CHECK ((jsonb_typeof(parameters) = 'object'::text)),
@@ -72,7 +166,7 @@ CREATE TABLE public.analysis_runs (
 
 
 --
--- Name: audit_events; Type: TABLE; Schema: public; Owner: -
+-- Name: application_data_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.application_data_migrations (
@@ -83,9 +177,9 @@ CREATE TABLE public.application_data_migrations (
 );
 
 
-ALTER TABLE ONLY public.application_data_migrations
-    ADD CONSTRAINT application_data_migrations_pkey PRIMARY KEY (name);
-
+--
+-- Name: audit_events; Type: TABLE; Schema: public; Owner: -
+--
 
 CREATE TABLE public.audit_events (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
@@ -149,21 +243,6 @@ CREATE TABLE public.authentication_events (
 
 
 --
--- Name: buildings; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.buildings (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    name text NOT NULL,
-    latitude double precision,
-    longitude double precision,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    organization_id uuid NOT NULL
-);
-
-
---
 -- Name: beacons; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -181,13 +260,102 @@ CREATE TABLE public.beacons (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     deleted_at timestamp with time zone,
-    CONSTRAINT beacons_format_type_chk CHECK ((format_type = 'ibeacon'::text)),
     CONSTRAINT beacons_format_config_object_chk CHECK ((jsonb_typeof(format_config) = 'object'::text)),
+    CONSTRAINT beacons_format_type_chk CHECK ((format_type = 'ibeacon'::text)),
     CONSTRAINT beacons_name_nonempty_chk CHECK ((length(btrim(name)) > 0)),
-    CONSTRAINT beacons_pixel_x_nonnegative_chk CHECK ((pixel_x >= 0)),
-    CONSTRAINT beacons_pixel_y_nonnegative_chk CHECK ((pixel_y >= 0))
+    CONSTRAINT beacons_pixel_x_nonnegative_chk CHECK ((pixel_x >= (0)::double precision)),
+    CONSTRAINT beacons_pixel_y_nonnegative_chk CHECK ((pixel_y >= (0)::double precision))
 );
 
+
+--
+-- Name: buildings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.buildings (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name text NOT NULL,
+    latitude double precision,
+    longitude double precision,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    organization_id uuid NOT NULL
+);
+
+
+--
+-- Name: data_asset_objects; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.data_asset_objects (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    data_asset_id uuid NOT NULL,
+    object_role text DEFAULT 'primary'::text NOT NULL,
+    format text NOT NULL,
+    object_key text NOT NULL,
+    content_type text NOT NULL,
+    byte_size bigint,
+    checksum_sha256 text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT data_asset_objects_byte_size_chk CHECK (((byte_size IS NULL) OR (byte_size > 0))),
+    CONSTRAINT data_asset_objects_checksum_sha256_chk CHECK (((checksum_sha256 IS NULL) OR (length(btrim(checksum_sha256)) > 0))),
+    CONSTRAINT data_asset_objects_content_type_nonempty_chk CHECK ((length(btrim(content_type)) > 0)),
+    CONSTRAINT data_asset_objects_format_nonempty_chk CHECK ((length(btrim(format)) > 0)),
+    CONSTRAINT data_asset_objects_role_nonempty_chk CHECK ((length(btrim(object_role)) > 0))
+);
+
+
+--
+-- Name: data_assets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.data_assets (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    data_type text NOT NULL,
+    schema_version text NOT NULL,
+    sample_count integer,
+    started_at timestamp with time zone,
+    ended_at timestamp with time zone,
+    validation_status text DEFAULT 'pending'::text NOT NULL,
+    validation_error jsonb,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT data_assets_data_type_nonempty_chk CHECK ((length(btrim(data_type)) > 0)),
+    CONSTRAINT data_assets_metadata_object_chk CHECK ((jsonb_typeof(metadata) = 'object'::text)),
+    CONSTRAINT data_assets_sample_count_chk CHECK (((sample_count IS NULL) OR (sample_count >= 0))),
+    CONSTRAINT data_assets_schema_version_nonempty_chk CHECK ((length(btrim(schema_version)) > 0)),
+    CONSTRAINT data_assets_time_range_chk CHECK (((ended_at IS NULL) OR (started_at IS NULL) OR (ended_at >= started_at))),
+    CONSTRAINT data_assets_validation_status_chk CHECK ((validation_status = ANY (ARRAY['pending'::text, 'valid'::text, 'invalid'::text])))
+);
+
+
+--
+-- Name: floor_map_revisions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.floor_map_revisions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    floor_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    revision integer NOT NULL,
+    image_object_path text NOT NULL,
+    map_width_px integer,
+    map_height_px integer,
+    scale double precision,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    archived_beacons jsonb,
+    beacons_need_review boolean DEFAULT false NOT NULL,
+    CONSTRAINT floor_map_revisions_check CHECK (((map_width_px IS NULL) = (map_height_px IS NULL))),
+    CONSTRAINT floor_map_revisions_check1 CHECK (((map_width_px IS NULL) OR ((map_width_px > 0) AND (map_height_px > 0) AND (map_width_px <= 20000) AND (map_height_px <= 20000) AND (((map_width_px)::bigint * map_height_px) <= 100000000)))),
+    CONSTRAINT floor_map_revisions_image_object_path_check CHECK ((image_object_path ~ '^(maps/[0-9a-fA-F-]+/[0-9a-fA-F-]+|organizations/[0-9a-fA-F-]+/floors/[0-9a-fA-F-]+/(map|revisions/[0-9a-fA-F-]+/map))\.(png|svg)$'::text)),
+    CONSTRAINT floor_map_revisions_revision_check CHECK ((revision > 0)),
+    CONSTRAINT floor_map_revisions_scale_check CHECK ((scale > (0)::double precision))
+);
+
+
+--
 -- Name: floors; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -203,10 +371,36 @@ CREATE TABLE public.floors (
     organization_id uuid NOT NULL,
     map_width_px integer,
     map_height_px integer,
-    CONSTRAINT floors_image_object_path_format_chk CHECK (((image_object_path ~ '^maps/[0-9a-fA-F-]+/[0-9a-fA-F-]+\.(svg|png)$'::text) OR (image_object_path ~ '^organizations/[0-9a-fA-F-]+/floors/[0-9a-fA-F-]+/map\.(svg|png)$'::text))),
+    deleted_at timestamp with time zone,
+    current_map_revision_id uuid,
+    initial_map_revision_id uuid,
+    CONSTRAINT floors_image_object_path_format_chk CHECK ((image_object_path ~ '^(maps/[0-9a-fA-F-]+/[0-9a-fA-F-]+|organizations/[0-9a-fA-F-]+/floors/[0-9a-fA-F-]+/(map|revisions/[0-9a-fA-F-]+/map))\.(png|svg)$'::text)),
     CONSTRAINT floors_map_dimensions_bounds_chk CHECK (((map_width_px IS NULL) OR ((map_width_px > 0) AND (map_height_px > 0) AND (map_width_px <= 20000) AND (map_height_px <= 20000) AND (((map_width_px)::bigint * (map_height_px)::bigint) <= 100000000)))),
     CONSTRAINT floors_map_dimensions_presence_chk CHECK ((((map_width_px IS NULL) AND (map_height_px IS NULL)) OR ((map_width_px IS NOT NULL) AND (map_height_px IS NOT NULL))))
 );
+
+
+--
+-- Name: mobile_session_exchange_codes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.mobile_session_exchange_codes (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    code_hash text NOT NULL,
+    code_challenge text,
+    oidc_transaction_id uuid,
+    session_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    organization_id uuid,
+    intent text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    consumed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT mobile_session_exchange_codes_hash_nonempty_chk CHECK ((length(btrim(code_hash)) > 0)),
+    CONSTRAINT mobile_session_exchange_codes_intent_chk CHECK ((intent = ANY (ARRAY['login'::text, 'reauthenticate'::text]))),
+    CONSTRAINT mobile_session_exchange_codes_binding_chk CHECK (((oidc_transaction_id IS NOT NULL) AND (organization_id IS NOT NULL) AND (code_challenge IS NULL)) OR ((oidc_transaction_id IS NULL) AND (organization_id IS NULL) AND (intent = 'login') AND (code_challenge IS NOT NULL) AND (code_challenge ~ '^[A-Za-z0-9_-]{43}$')))
+);
+
 
 --
 -- Name: oidc_identities; Type: TABLE; Schema: public; Owner: -
@@ -250,32 +444,12 @@ CREATE TABLE public.oidc_login_transactions (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT oidc_login_transactions_intent_chk CHECK ((intent = ANY (ARRAY['login'::text, 'reauthenticate'::text, 'accept_invite'::text, 'link_identity'::text]))),
     CONSTRAINT oidc_login_transactions_intent_state_chk CHECK ((((intent = 'login'::text) AND (session_id IS NULL) AND (invite_id IS NULL)) OR ((intent = 'reauthenticate'::text) AND (session_id IS NOT NULL) AND (invite_id IS NULL)) OR ((intent = 'accept_invite'::text) AND (invite_id IS NOT NULL)) OR ((intent = 'link_identity'::text) AND (session_id IS NOT NULL) AND (invite_id IS NULL)))),
+    CONSTRAINT oidc_login_transactions_mobile_fields_chk CHECK ((((mobile_redirect_uri IS NULL) AND (mobile_code_challenge IS NULL) AND (mobile_code_challenge_method IS NULL)) OR ((mobile_redirect_uri IS NOT NULL) AND (mobile_code_challenge IS NOT NULL) AND (mobile_code_challenge_method = 'S256'::text)))),
     CONSTRAINT oidc_login_transactions_nonce_nonempty_chk CHECK ((length(btrim(nonce)) > 0)),
     CONSTRAINT oidc_login_transactions_pkce_nonempty_chk CHECK ((length(btrim(pkce_code_verifier_ciphertext)) > 0)),
-    CONSTRAINT oidc_login_transactions_mobile_fields_chk CHECK (((mobile_redirect_uri IS NULL AND mobile_code_challenge IS NULL AND mobile_code_challenge_method IS NULL) OR (mobile_redirect_uri IS NOT NULL AND mobile_code_challenge IS NOT NULL AND mobile_code_challenge_method = 'S256'::text))),
     CONSTRAINT oidc_login_transactions_return_to_chk CHECK ((("left"(return_to, 1) = '/'::text) AND ("left"(return_to, 2) <> '//'::text) AND (POSITION(('\'::text) IN (return_to)) = 0))),
     CONSTRAINT oidc_login_transactions_state_hash_nonempty_chk CHECK ((length(btrim(state_hash)) > 0))
 );
-
-CREATE TABLE public.mobile_session_exchange_codes (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    code_hash text NOT NULL,
-    code_challenge text,
-    oidc_transaction_id uuid,
-    session_id uuid NOT NULL,
-    user_id uuid NOT NULL,
-    organization_id uuid,
-    intent text NOT NULL,
-    expires_at timestamp with time zone NOT NULL,
-    consumed_at timestamp with time zone,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT mobile_session_exchange_codes_hash_nonempty_chk CHECK ((length(btrim(code_hash)) > 0)),
-    CONSTRAINT mobile_session_exchange_codes_intent_chk CHECK ((intent = ANY (ARRAY['login'::text, 'reauthenticate'::text]))),
-    CONSTRAINT mobile_session_exchange_codes_binding_chk CHECK (((oidc_transaction_id IS NOT NULL) AND (organization_id IS NOT NULL) AND (code_challenge IS NULL)) OR ((oidc_transaction_id IS NULL) AND (organization_id IS NULL) AND (intent = 'login') AND (code_challenge IS NOT NULL) AND (code_challenge ~ '^[A-Za-z0-9_-]{43}$')))
-);
-
-CREATE UNIQUE INDEX mobile_session_exchange_codes_code_hash_idx ON public.mobile_session_exchange_codes USING btree (code_hash);
-CREATE INDEX mobile_session_exchange_codes_expiry_idx ON public.mobile_session_exchange_codes USING btree (expires_at) WHERE (consumed_at IS NULL);
 
 
 --
@@ -485,6 +659,30 @@ CREATE TABLE public.organizations (
 
 
 --
+-- Name: outbox_jobs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.outbox_jobs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    job_type text NOT NULL,
+    payload jsonb NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    max_attempts integer DEFAULT 3 NOT NULL,
+    run_at timestamp with time zone DEFAULT now() NOT NULL,
+    lease_token text,
+    leased_until timestamp with time zone,
+    last_error text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT outbox_jobs_attempts_chk CHECK ((attempts >= 0)),
+    CONSTRAINT outbox_jobs_max_attempts_chk CHECK ((max_attempts > 0)),
+    CONSTRAINT outbox_jobs_payload_chk CHECK ((jsonb_typeof(payload) = 'object'::text)),
+    CONSTRAINT outbox_jobs_status_chk CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
+);
+
+
+--
 -- Name: pedestrians; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -504,6 +702,85 @@ CREATE TABLE public.pedestrians (
 
 
 --
+-- Name: positioning_analysis_callbacks; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.positioning_analysis_callbacks (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    event_id text NOT NULL,
+    analysis_run_item_id uuid NOT NULL,
+    status text NOT NULL,
+    payload jsonb NOT NULL,
+    received_at timestamp with time zone DEFAULT now() NOT NULL,
+    processed_at timestamp with time zone,
+    CONSTRAINT positioning_analysis_callbacks_payload_chk CHECK ((jsonb_typeof(payload) = 'object'::text)),
+    CONSTRAINT positioning_analysis_callbacks_status_chk CHECK ((status = ANY (ARRAY['queued'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
+);
+
+
+--
+-- Name: positioning_analysis_run_items; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.positioning_analysis_run_items (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    analysis_run_id uuid NOT NULL,
+    recording_id uuid NOT NULL,
+    pipeline_id text NOT NULL,
+    status text DEFAULT 'queued'::text NOT NULL,
+    slot_bindings jsonb NOT NULL,
+    pipeline_snapshot jsonb NOT NULL,
+    pipeline_digest text NOT NULL,
+    pipeline_version text NOT NULL,
+    parameters jsonb DEFAULT '{}'::jsonb NOT NULL,
+    input_manifest jsonb NOT NULL,
+    result_trajectory_id uuid,
+    error jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    output_manifest jsonb DEFAULT '{}'::jsonb NOT NULL,
+    CONSTRAINT positioning_analysis_run_items_json_chk CHECK (((jsonb_typeof(slot_bindings) = 'object'::text) AND (jsonb_typeof(pipeline_snapshot) = 'object'::text) AND (jsonb_typeof(parameters) = 'object'::text) AND (jsonb_typeof(input_manifest) = 'object'::text))),
+    CONSTRAINT positioning_analysis_run_items_output_manifest_chk CHECK ((jsonb_typeof(output_manifest) = 'object'::text)),
+    CONSTRAINT positioning_analysis_run_items_state_chk CHECK ((((status = ANY (ARRAY['queued'::text, 'processing'::text])) AND (error IS NULL) AND ((result_trajectory_id IS NULL) OR ((result_trajectory_id = id) AND COALESCE((((input_manifest -> '__legacy_trajectory__'::text) ->> 'version'::text) = '1'::text), false)))) OR ((status = 'completed'::text) AND (result_trajectory_id IS NOT NULL) AND (error IS NULL)) OR ((status = 'failed'::text) AND (error IS NOT NULL) AND (jsonb_typeof(error) = 'object'::text) AND ((result_trajectory_id IS NULL) OR ((result_trajectory_id = id) AND COALESCE((((input_manifest -> '__legacy_trajectory__'::text) ->> 'version'::text) = '1'::text), false)))))),
+    CONSTRAINT positioning_analysis_run_items_status_chk CHECK ((status = ANY (ARRAY['queued'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
+);
+
+
+--
+-- Name: positioning_analysis_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.positioning_analysis_runs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    status text DEFAULT 'accepted'::text NOT NULL,
+    idempotency_key text NOT NULL,
+    request_digest text NOT NULL,
+    retry_of_run_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    comparison_run_id uuid,
+    CONSTRAINT positioning_analysis_runs_idempotency_key_chk CHECK ((length(btrim(idempotency_key)) > 0)),
+    CONSTRAINT positioning_analysis_runs_status_chk CHECK ((status = ANY (ARRAY['accepted'::text, 'processing'::text, 'completed'::text, 'partially_completed'::text, 'failed'::text])))
+);
+
+
+--
+-- Name: recording_data_assets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.recording_data_assets (
+    recording_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    data_asset_id uuid NOT NULL,
+    data_type text NOT NULL,
+    client_asset_key text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT recording_data_assets_data_type_nonempty_chk CHECK ((length(btrim(data_type)) > 0))
+);
+
+
+--
 -- Name: recordings; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -519,54 +796,10 @@ CREATE TABLE public.recordings (
     organization_id uuid NOT NULL,
     constraints jsonb DEFAULT '[]'::jsonb NOT NULL,
     upload_failure jsonb,
+    floor_map_revision_id uuid NOT NULL,
     CONSTRAINT recordings_constraints_array_check CHECK ((jsonb_typeof(constraints) = 'array'::text)),
     CONSTRAINT recordings_upload_status_chk CHECK ((upload_status = ANY (ARRAY['accepted'::text, 'ready'::text, 'failed'::text]))),
     CONSTRAINT recordings_upload_targets_nonempty_chk CHECK ((cardinality(upload_targets) >= 1))
-);
-
--- Name: data_assets; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.data_assets (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    organization_id uuid NOT NULL,
-    data_type text NOT NULL,
-    schema_version text NOT NULL,
-    sample_count integer,
-    started_at timestamp with time zone,
-    ended_at timestamp with time zone,
-    validation_status text DEFAULT 'pending'::text NOT NULL,
-    validation_error jsonb,
-    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
--- Name: data_asset_objects; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.data_asset_objects (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    data_asset_id uuid NOT NULL,
-    object_role text DEFAULT 'primary'::text NOT NULL,
-    format text NOT NULL,
-    object_key text NOT NULL,
-    content_type text NOT NULL,
-    byte_size bigint,
-    checksum_sha256 text,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
--- Name: recording_data_assets; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.recording_data_assets (
-    recording_id uuid NOT NULL,
-    organization_id uuid NOT NULL,
-    data_asset_id uuid NOT NULL,
-    data_type text NOT NULL,
-    client_asset_key text,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -637,6 +870,7 @@ CREATE TABLE public.trajectories (
     deleted_at timestamp with time zone,
     organization_id uuid NOT NULL,
     constraints jsonb DEFAULT '[]'::jsonb NOT NULL,
+    floor_map_revision_id uuid NOT NULL,
     CONSTRAINT trajectories_constraints_array_check CHECK ((jsonb_typeof(constraints) = 'array'::text)),
     CONSTRAINT trajectories_failed_at_chk CHECK ((((status = 'failed'::text) AND (failed_at IS NOT NULL)) OR ((status <> 'failed'::text) AND (failed_at IS NULL)))),
     CONSTRAINT trajectories_status_chk CHECK ((status = ANY (ARRAY['accepted'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
@@ -730,6 +964,14 @@ ALTER TABLE ONLY public.analysis_runs
 
 
 --
+-- Name: application_data_migrations application_data_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.application_data_migrations
+    ADD CONSTRAINT application_data_migrations_pkey PRIMARY KEY (name);
+
+
+--
 -- Name: audit_events audit_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -762,6 +1004,14 @@ ALTER TABLE ONLY public.authentication_events
 
 
 --
+-- Name: beacons beacons_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.beacons
+    ADD CONSTRAINT beacons_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: buildings buildings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -770,11 +1020,59 @@ ALTER TABLE ONLY public.buildings
 
 
 --
--- Name: beacons beacons_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: data_asset_objects data_asset_objects_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.beacons
-    ADD CONSTRAINT beacons_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.data_asset_objects
+    ADD CONSTRAINT data_asset_objects_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: data_assets data_assets_id_organization_type_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.data_assets
+    ADD CONSTRAINT data_assets_id_organization_type_key UNIQUE (id, organization_id, data_type);
+
+
+--
+-- Name: data_assets data_assets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.data_assets
+    ADD CONSTRAINT data_assets_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: floor_map_revisions floor_map_revisions_floor_id_revision_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.floor_map_revisions
+    ADD CONSTRAINT floor_map_revisions_floor_id_revision_key UNIQUE (floor_id, revision);
+
+
+--
+-- Name: floor_map_revisions floor_map_revisions_id_floor_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.floor_map_revisions
+    ADD CONSTRAINT floor_map_revisions_id_floor_id_organization_id_key UNIQUE (id, floor_id, organization_id);
+
+
+--
+-- Name: floor_map_revisions floor_map_revisions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.floor_map_revisions
+    ADD CONSTRAINT floor_map_revisions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: floors floors_id_organization_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.floors
+    ADD CONSTRAINT floors_id_organization_unique UNIQUE (id, organization_id);
 
 
 --
@@ -1042,6 +1340,14 @@ ALTER TABLE public.organizations
 
 
 --
+-- Name: outbox_jobs outbox_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.outbox_jobs
+    ADD CONSTRAINT outbox_jobs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: pedestrians pedestrians_height_meter_bounds_chk; Type: CHECK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1074,44 +1380,75 @@ ALTER TABLE ONLY public.pedestrians
 
 
 --
+-- Name: positioning_analysis_callbacks positioning_analysis_callbacks_event_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.positioning_analysis_callbacks
+    ADD CONSTRAINT positioning_analysis_callbacks_event_id_key UNIQUE (event_id);
+
+
+--
+-- Name: positioning_analysis_callbacks positioning_analysis_callbacks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.positioning_analysis_callbacks
+    ADD CONSTRAINT positioning_analysis_callbacks_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: positioning_analysis_run_items positioning_analysis_run_item_analysis_run_id_recording_id__key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.positioning_analysis_run_items
+    ADD CONSTRAINT positioning_analysis_run_item_analysis_run_id_recording_id__key UNIQUE (analysis_run_id, recording_id, pipeline_id);
+
+
+--
+-- Name: positioning_analysis_run_items positioning_analysis_run_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.positioning_analysis_run_items
+    ADD CONSTRAINT positioning_analysis_run_items_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: positioning_analysis_runs positioning_analysis_runs_organization_id_idempotency_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.positioning_analysis_runs
+    ADD CONSTRAINT positioning_analysis_runs_organization_id_idempotency_key_key UNIQUE (organization_id, idempotency_key);
+
+
+--
+-- Name: positioning_analysis_runs positioning_analysis_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.positioning_analysis_runs
+    ADD CONSTRAINT positioning_analysis_runs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: recording_data_assets recording_data_assets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.recording_data_assets
+    ADD CONSTRAINT recording_data_assets_pkey PRIMARY KEY (recording_id, data_asset_id);
+
+
+--
+-- Name: recordings recordings_id_organization_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.recordings
+    ADD CONSTRAINT recordings_id_organization_key UNIQUE (id, organization_id);
+
+
+--
 -- Name: recordings recordings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.recordings
     ADD CONSTRAINT recordings_pkey PRIMARY KEY (id);
-
-ALTER TABLE ONLY public.recordings
-    ADD CONSTRAINT recordings_id_organization_key UNIQUE (id, organization_id);
-
-ALTER TABLE ONLY public.data_assets
-    ADD CONSTRAINT data_assets_pkey PRIMARY KEY (id);
-
-ALTER TABLE ONLY public.data_assets
-    ADD CONSTRAINT data_assets_id_organization_type_key UNIQUE (id, organization_id, data_type);
-
-ALTER TABLE public.data_assets
-    ADD CONSTRAINT data_assets_data_type_nonempty_chk CHECK (length(btrim(data_type)) > 0),
-    ADD CONSTRAINT data_assets_schema_version_nonempty_chk CHECK (length(btrim(schema_version)) > 0),
-    ADD CONSTRAINT data_assets_sample_count_chk CHECK ((sample_count IS NULL) OR (sample_count >= 0)),
-    ADD CONSTRAINT data_assets_time_range_chk CHECK ((ended_at IS NULL) OR (started_at IS NULL) OR (ended_at >= started_at)),
-    ADD CONSTRAINT data_assets_validation_status_chk CHECK (validation_status = ANY (ARRAY['pending'::text, 'valid'::text, 'invalid'::text])),
-    ADD CONSTRAINT data_assets_metadata_object_chk CHECK (jsonb_typeof(metadata) = 'object');
-
-ALTER TABLE ONLY public.data_asset_objects
-    ADD CONSTRAINT data_asset_objects_pkey PRIMARY KEY (id);
-
-ALTER TABLE public.data_asset_objects
-    ADD CONSTRAINT data_asset_objects_role_nonempty_chk CHECK (length(btrim(object_role)) > 0),
-    ADD CONSTRAINT data_asset_objects_format_nonempty_chk CHECK (length(btrim(format)) > 0),
-    ADD CONSTRAINT data_asset_objects_content_type_nonempty_chk CHECK (length(btrim(content_type)) > 0),
-    ADD CONSTRAINT data_asset_objects_byte_size_chk CHECK ((byte_size IS NULL) OR (byte_size > 0)),
-    ADD CONSTRAINT data_asset_objects_checksum_sha256_chk CHECK ((checksum_sha256 IS NULL) OR (length(btrim(checksum_sha256)) > 0));
-
-ALTER TABLE ONLY public.recording_data_assets
-    ADD CONSTRAINT recording_data_assets_pkey PRIMARY KEY (recording_id, data_asset_id);
-
-ALTER TABLE public.recording_data_assets
-    ADD CONSTRAINT recording_data_assets_data_type_nonempty_chk CHECK (length(btrim(data_type)) > 0);
 
 
 --
@@ -1273,17 +1610,24 @@ CREATE INDEX authentication_events_user_occurred_at_idx ON public.authentication
 
 
 --
--- Name: buildings_organization_id_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX buildings_organization_id_idx ON public.buildings USING btree (organization_id);
-
-
---
 -- Name: beacons_floor_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX beacons_floor_id_idx ON public.beacons USING btree (floor_id);
+
+
+--
+-- Name: beacons_org_active_ibeacon_identity_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX beacons_org_active_ibeacon_identity_key ON public.beacons USING btree (organization_id, ((format_config ->> 'uuid'::text)), (((format_config ->> 'major'::text))::integer), (((format_config ->> 'minor'::text))::integer)) WHERE ((deleted_at IS NULL) AND (format_type = 'ibeacon'::text));
+
+
+--
+-- Name: beacons_org_active_name_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX beacons_org_active_name_key ON public.beacons USING btree (organization_id, lower(btrim(name))) WHERE (deleted_at IS NULL);
 
 
 --
@@ -1294,17 +1638,31 @@ CREATE INDEX beacons_organization_id_idx ON public.beacons USING btree (organiza
 
 
 --
--- Name: beacons_org_active_ibeacon_identity_key; Type: INDEX; Schema: public; Owner: -
+-- Name: buildings_organization_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX beacons_org_active_ibeacon_identity_key ON public.beacons USING btree (organization_id, (format_config ->> 'uuid'::text), (((format_config ->> 'major'::text))::integer), (((format_config ->> 'minor'::text))::integer)) WHERE ((deleted_at IS NULL) AND (format_type = 'ibeacon'::text));
+CREATE INDEX buildings_organization_id_idx ON public.buildings USING btree (organization_id);
 
 
 --
--- Name: beacons_org_active_name_key; Type: INDEX; Schema: public; Owner: -
+-- Name: data_asset_objects_asset_role_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX beacons_org_active_name_key ON public.beacons USING btree (organization_id, lower(btrim(name))) WHERE (deleted_at IS NULL);
+CREATE UNIQUE INDEX data_asset_objects_asset_role_idx ON public.data_asset_objects USING btree (data_asset_id, object_role);
+
+
+--
+-- Name: data_assets_organization_created_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX data_assets_organization_created_at_idx ON public.data_assets USING btree (organization_id, created_at DESC, id DESC);
+
+
+--
+-- Name: floors_building_id_active_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX floors_building_id_active_idx ON public.floors USING btree (building_id, level, name, id) WHERE (deleted_at IS NULL);
 
 
 --
@@ -1319,6 +1677,20 @@ CREATE INDEX floors_building_id_idx ON public.floors USING btree (building_id);
 --
 
 CREATE INDEX floors_organization_id_idx ON public.floors USING btree (organization_id);
+
+
+--
+-- Name: mobile_session_exchange_codes_code_hash_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX mobile_session_exchange_codes_code_hash_idx ON public.mobile_session_exchange_codes USING btree (code_hash);
+
+
+--
+-- Name: mobile_session_exchange_codes_expiry_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX mobile_session_exchange_codes_expiry_idx ON public.mobile_session_exchange_codes USING btree (expires_at) WHERE (consumed_at IS NULL);
 
 
 --
@@ -1446,14 +1818,6 @@ CREATE UNIQUE INDEX organization_memberships_id_organization_key ON public.organ
 
 CREATE UNIQUE INDEX organization_memberships_id_user_key ON public.organization_memberships USING btree (id, user_id);
 
-CREATE UNIQUE INDEX data_asset_objects_asset_role_idx ON public.data_asset_objects USING btree (data_asset_id, object_role);
-
-CREATE UNIQUE INDEX recording_data_assets_recording_data_type_idx ON public.recording_data_assets USING btree (recording_id, data_type);
-
-CREATE INDEX data_assets_organization_created_at_idx ON public.data_assets USING btree (organization_id, created_at DESC, id DESC);
-
-CREATE INDEX recording_data_assets_asset_id_idx ON public.recording_data_assets USING btree (data_asset_id);
-
 
 --
 -- Name: organization_memberships_org_status_role_idx; Type: INDEX; Schema: public; Owner: -
@@ -1477,6 +1841,20 @@ CREATE INDEX organization_memberships_user_status_idx ON public.organization_mem
 
 
 --
+-- Name: outbox_jobs_lease_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX outbox_jobs_lease_idx ON public.outbox_jobs USING btree (lease_token, leased_until) WHERE (lease_token IS NOT NULL);
+
+
+--
+-- Name: outbox_jobs_pending_claim_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX outbox_jobs_pending_claim_idx ON public.outbox_jobs USING btree (status, run_at) WHERE (status = ANY (ARRAY['pending'::text, 'processing'::text]));
+
+
+--
 -- Name: pedestrians_membership_id_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1488,6 +1866,62 @@ CREATE UNIQUE INDEX pedestrians_membership_id_key ON public.pedestrians USING bt
 --
 
 CREATE INDEX pedestrians_organization_id_idx ON public.pedestrians USING btree (organization_id);
+
+
+--
+-- Name: positioning_analysis_callbacks_item_received_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX positioning_analysis_callbacks_item_received_idx ON public.positioning_analysis_callbacks USING btree (analysis_run_item_id, received_at);
+
+
+--
+-- Name: positioning_analysis_run_items_queued_claim_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX positioning_analysis_run_items_queued_claim_idx ON public.positioning_analysis_run_items USING btree (status, created_at, id) WHERE (status = 'queued'::text);
+
+
+--
+-- Name: positioning_analysis_run_items_result_trajectory_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX positioning_analysis_run_items_result_trajectory_id_idx ON public.positioning_analysis_run_items USING btree (result_trajectory_id) WHERE (result_trajectory_id IS NOT NULL);
+
+
+--
+-- Name: positioning_analysis_run_items_run_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX positioning_analysis_run_items_run_idx ON public.positioning_analysis_run_items USING btree (analysis_run_id, created_at, id);
+
+
+--
+-- Name: positioning_analysis_runs_id_organization_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX positioning_analysis_runs_id_organization_key ON public.positioning_analysis_runs USING btree (id, organization_id);
+
+
+--
+-- Name: positioning_analysis_runs_org_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX positioning_analysis_runs_org_created_idx ON public.positioning_analysis_runs USING btree (organization_id, created_at DESC, id DESC);
+
+
+--
+-- Name: recording_data_assets_asset_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX recording_data_assets_asset_id_idx ON public.recording_data_assets USING btree (data_asset_id);
+
+
+--
+-- Name: recording_data_assets_recording_data_type_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX recording_data_assets_recording_data_type_idx ON public.recording_data_assets USING btree (recording_id, data_type);
 
 
 --
@@ -1659,6 +2093,27 @@ CREATE INDEX user_activation_tokens_user_id_idx ON public.user_activation_tokens
 
 
 --
+-- Name: recordings default_recording_map_revision; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER default_recording_map_revision BEFORE INSERT ON public.recordings FOR EACH ROW EXECUTE FUNCTION public.default_recording_map_revision();
+
+
+--
+-- Name: trajectories default_trajectory_map_revision; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER default_trajectory_map_revision BEFORE INSERT ON public.trajectories FOR EACH ROW EXECUTE FUNCTION public.default_trajectory_map_revision();
+
+
+--
+-- Name: floor_map_revisions protect_floor_map_revision; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER protect_floor_map_revision BEFORE UPDATE ON public.floor_map_revisions FOR EACH ROW EXECUTE FUNCTION public.protect_floor_map_revision();
+
+
+--
 -- Name: auth_identities set_updated_at_auth_identities; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -1666,17 +2121,17 @@ CREATE TRIGGER set_updated_at_auth_identities BEFORE UPDATE ON public.auth_ident
 
 
 --
--- Name: buildings set_updated_at_buildings; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER set_updated_at_buildings BEFORE UPDATE ON public.buildings FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
-
-
---
 -- Name: beacons set_updated_at_beacons; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER set_updated_at_beacons BEFORE UPDATE ON public.beacons FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: buildings set_updated_at_buildings; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER set_updated_at_buildings BEFORE UPDATE ON public.buildings FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 
 --
@@ -1799,6 +2254,13 @@ CREATE TRIGGER set_updated_at_users BEFORE UPDATE ON public.users FOR EACH ROW E
 
 
 --
+-- Name: floors version_floor_map; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER version_floor_map AFTER INSERT OR UPDATE OF image_object_path, scale ON public.floors FOR EACH ROW EXECUTE FUNCTION public.version_floor_map();
+
+
+--
 -- Name: analysis_run_trajectories analysis_run_trajectories_analysis_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1823,6 +2285,14 @@ ALTER TABLE ONLY public.analysis_runs
 
 
 --
+-- Name: analysis_runs analysis_runs_map_revision_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.analysis_runs
+    ADD CONSTRAINT analysis_runs_map_revision_fk FOREIGN KEY (floor_map_revision_id, floor_id, organization_id) REFERENCES public.floor_map_revisions(id, floor_id, organization_id);
+
+
+--
 -- Name: analysis_runs analysis_runs_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1836,14 +2306,6 @@ ALTER TABLE ONLY public.analysis_runs
 
 ALTER TABLE ONLY public.auth_identities
     ADD CONSTRAINT auth_identities_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
-
-
---
--- Name: buildings buildings_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.buildings
-    ADD CONSTRAINT buildings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
 
 
 --
@@ -1863,11 +2325,67 @@ ALTER TABLE ONLY public.beacons
 
 
 --
+-- Name: buildings buildings_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.buildings
+    ADD CONSTRAINT buildings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: data_asset_objects data_asset_objects_data_asset_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.data_asset_objects
+    ADD CONSTRAINT data_asset_objects_data_asset_id_fkey FOREIGN KEY (data_asset_id) REFERENCES public.data_assets(id) ON DELETE CASCADE;
+
+
+--
+-- Name: data_assets data_assets_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.data_assets
+    ADD CONSTRAINT data_assets_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+
+--
+-- Name: floor_map_revisions floor_map_revisions_floor_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.floor_map_revisions
+    ADD CONSTRAINT floor_map_revisions_floor_id_organization_id_fkey FOREIGN KEY (floor_id, organization_id) REFERENCES public.floors(id, organization_id);
+
+
+--
+-- Name: floor_map_revisions floor_map_revisions_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.floor_map_revisions
+    ADD CONSTRAINT floor_map_revisions_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+
+--
 -- Name: floors floors_building_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.floors
     ADD CONSTRAINT floors_building_id_fkey FOREIGN KEY (building_id) REFERENCES public.buildings(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: floors floors_current_map_revision_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.floors
+    ADD CONSTRAINT floors_current_map_revision_fk FOREIGN KEY (current_map_revision_id, id, organization_id) REFERENCES public.floor_map_revisions(id, floor_id, organization_id);
+
+
+--
+-- Name: floors floors_initial_map_revision_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.floors
+    ADD CONSTRAINT floors_initial_map_revision_fk FOREIGN KEY (initial_map_revision_id, id, organization_id) REFERENCES public.floor_map_revisions(id, floor_id, organization_id);
 
 
 --
@@ -2095,11 +2613,107 @@ ALTER TABLE ONLY public.pedestrians
 
 
 --
+-- Name: positioning_analysis_callbacks positioning_analysis_callbacks_analysis_run_item_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.positioning_analysis_callbacks
+    ADD CONSTRAINT positioning_analysis_callbacks_analysis_run_item_id_fkey FOREIGN KEY (analysis_run_item_id) REFERENCES public.positioning_analysis_run_items(id) ON DELETE CASCADE;
+
+
+--
+-- Name: positioning_analysis_run_items positioning_analysis_run_items_analysis_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.positioning_analysis_run_items
+    ADD CONSTRAINT positioning_analysis_run_items_analysis_run_id_fkey FOREIGN KEY (analysis_run_id) REFERENCES public.positioning_analysis_runs(id) ON DELETE CASCADE;
+
+
+--
+-- Name: positioning_analysis_run_items positioning_analysis_run_items_recording_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.positioning_analysis_run_items
+    ADD CONSTRAINT positioning_analysis_run_items_recording_id_fkey FOREIGN KEY (recording_id) REFERENCES public.recordings(id);
+
+
+--
+-- Name: positioning_analysis_run_items positioning_analysis_run_items_result_trajectory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.positioning_analysis_run_items
+    ADD CONSTRAINT positioning_analysis_run_items_result_trajectory_id_fkey FOREIGN KEY (result_trajectory_id) REFERENCES public.trajectories(id);
+
+
+--
+-- Name: positioning_analysis_runs positioning_analysis_runs_comparison_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.positioning_analysis_runs
+    ADD CONSTRAINT positioning_analysis_runs_comparison_run_id_fkey FOREIGN KEY (comparison_run_id) REFERENCES public.positioning_analysis_runs(id);
+
+
+--
+-- Name: positioning_analysis_runs positioning_analysis_runs_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.positioning_analysis_runs
+    ADD CONSTRAINT positioning_analysis_runs_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+
+--
+-- Name: positioning_analysis_runs positioning_analysis_runs_retry_same_org_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.positioning_analysis_runs
+    ADD CONSTRAINT positioning_analysis_runs_retry_same_org_fk FOREIGN KEY (retry_of_run_id, organization_id) REFERENCES public.positioning_analysis_runs(id, organization_id);
+
+
+--
+-- Name: recording_data_assets recording_data_assets_asset_org_type_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.recording_data_assets
+    ADD CONSTRAINT recording_data_assets_asset_org_type_fkey FOREIGN KEY (data_asset_id, organization_id, data_type) REFERENCES public.data_assets(id, organization_id, data_type);
+
+
+--
+-- Name: recording_data_assets recording_data_assets_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.recording_data_assets
+    ADD CONSTRAINT recording_data_assets_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+
+--
+-- Name: recording_data_assets recording_data_assets_recording_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.recording_data_assets
+    ADD CONSTRAINT recording_data_assets_recording_id_fkey FOREIGN KEY (recording_id) REFERENCES public.recordings(id) ON DELETE CASCADE;
+
+
+--
+-- Name: recording_data_assets recording_data_assets_recording_org_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.recording_data_assets
+    ADD CONSTRAINT recording_data_assets_recording_org_fkey FOREIGN KEY (recording_id, organization_id) REFERENCES public.recordings(id, organization_id);
+
+
+--
 -- Name: recordings recordings_floor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.recordings
     ADD CONSTRAINT recordings_floor_id_fkey FOREIGN KEY (floor_id) REFERENCES public.floors(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: recordings recordings_map_revision_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.recordings
+    ADD CONSTRAINT recordings_map_revision_fk FOREIGN KEY (floor_map_revision_id, floor_id, organization_id) REFERENCES public.floor_map_revisions(id, floor_id, organization_id);
 
 
 --
@@ -2116,24 +2730,6 @@ ALTER TABLE ONLY public.recordings
 
 ALTER TABLE ONLY public.recordings
     ADD CONSTRAINT recordings_pedestrian_id_fkey FOREIGN KEY (pedestrian_id) REFERENCES public.pedestrians(id) ON DELETE RESTRICT;
-
-ALTER TABLE ONLY public.data_assets
-    ADD CONSTRAINT data_assets_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
-
-ALTER TABLE ONLY public.data_asset_objects
-    ADD CONSTRAINT data_asset_objects_data_asset_id_fkey FOREIGN KEY (data_asset_id) REFERENCES public.data_assets(id) ON DELETE CASCADE;
-
-ALTER TABLE ONLY public.recording_data_assets
-    ADD CONSTRAINT recording_data_assets_recording_org_fkey FOREIGN KEY (recording_id, organization_id) REFERENCES public.recordings(id, organization_id);
-
-ALTER TABLE ONLY public.recording_data_assets
-    ADD CONSTRAINT recording_data_assets_asset_org_type_fkey FOREIGN KEY (data_asset_id, organization_id, data_type) REFERENCES public.data_assets(id, organization_id, data_type);
-
-ALTER TABLE ONLY public.recording_data_assets
-    ADD CONSTRAINT recording_data_assets_recording_id_fkey FOREIGN KEY (recording_id) REFERENCES public.recordings(id) ON DELETE CASCADE;
-
-ALTER TABLE ONLY public.recording_data_assets
-    ADD CONSTRAINT recording_data_assets_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
 
 --
@@ -2182,6 +2778,14 @@ ALTER TABLE ONLY public.sessions
 
 ALTER TABLE ONLY public.trajectories
     ADD CONSTRAINT trajectories_floor_id_fkey FOREIGN KEY (floor_id) REFERENCES public.floors(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: trajectories trajectories_map_revision_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.trajectories
+    ADD CONSTRAINT trajectories_map_revision_fk FOREIGN KEY (floor_map_revision_id, floor_id, organization_id) REFERENCES public.floor_map_revisions(id, floor_id, organization_id);
 
 
 --
@@ -2239,49 +2843,54 @@ ALTER TABLE ONLY public.user_profiles
 \unrestrict dbmate
 
 
---
 -- Dbmate schema migrations
---
-
-INSERT INTO public.schema_migrations (version) VALUES
-    ('20260425120000'),
-    ('20260501110000'),
-    ('20260531160000'),
-    ('20260610050000'),
-    ('20260610060000'),
-    ('20260610070000'),
-    ('20260610080000'),
-    ('20260616090000'),
-    ('20260616100000'),
-    ('20260623010000'),
-    ('20260626010000'),
-    ('20260708010000'),
-    ('20260728010000'),
-    ('20260728010100'),
-    ('20260728010200'),
-    ('20260728010300'),
-    ('20260801010000'),
-    ('20260804010000'),
-    ('20260804020000'),
-    ('20260811010000'),
-    ('20260811010051'),
-    ('20260811010052'),
-    ('20260811010053'),
-    ('20260811010054'),
-    ('20260811010055'),
-    ('20260811010056'),
-    ('20260811010057'),
-    ('20260811010058'),
-    ('20260811010100'),
-    ('20260811010200'),
-    ('20260811010250'),
-    ('20260811010300'),
-    ('20260811010400'),
-    ('20260811010500'),
-    ('20260811010551'),
-    ('20260811010552'),
-    ('20260811010553'),
-    ('20260812010000'),
-    ('20260812020000'),
-    ('20260812020100'),
-    ('20260830010000');
+INSERT INTO public.schema_migrations (version) VALUES ('20260425120000');
+INSERT INTO public.schema_migrations (version) VALUES ('20260501110000');
+INSERT INTO public.schema_migrations (version) VALUES ('20260531160000');
+INSERT INTO public.schema_migrations (version) VALUES ('20260610050000');
+INSERT INTO public.schema_migrations (version) VALUES ('20260610060000');
+INSERT INTO public.schema_migrations (version) VALUES ('20260610070000');
+INSERT INTO public.schema_migrations (version) VALUES ('20260610080000');
+INSERT INTO public.schema_migrations (version) VALUES ('20260616090000');
+INSERT INTO public.schema_migrations (version) VALUES ('20260616100000');
+INSERT INTO public.schema_migrations (version) VALUES ('20260623010000');
+INSERT INTO public.schema_migrations (version) VALUES ('20260626010000');
+INSERT INTO public.schema_migrations (version) VALUES ('20260708010000');
+INSERT INTO public.schema_migrations (version) VALUES ('20260728010000');
+INSERT INTO public.schema_migrations (version) VALUES ('20260728010100');
+INSERT INTO public.schema_migrations (version) VALUES ('20260728010200');
+INSERT INTO public.schema_migrations (version) VALUES ('20260728010300');
+INSERT INTO public.schema_migrations (version) VALUES ('20260801010000');
+INSERT INTO public.schema_migrations (version) VALUES ('20260804010000');
+INSERT INTO public.schema_migrations (version) VALUES ('20260804020000');
+INSERT INTO public.schema_migrations (version) VALUES ('20260811010000');
+INSERT INTO public.schema_migrations (version) VALUES ('20260811010051');
+INSERT INTO public.schema_migrations (version) VALUES ('20260811010052');
+INSERT INTO public.schema_migrations (version) VALUES ('20260811010053');
+INSERT INTO public.schema_migrations (version) VALUES ('20260811010054');
+INSERT INTO public.schema_migrations (version) VALUES ('20260811010055');
+INSERT INTO public.schema_migrations (version) VALUES ('20260811010056');
+INSERT INTO public.schema_migrations (version) VALUES ('20260811010057');
+INSERT INTO public.schema_migrations (version) VALUES ('20260811010058');
+INSERT INTO public.schema_migrations (version) VALUES ('20260811010100');
+INSERT INTO public.schema_migrations (version) VALUES ('20260811010200');
+INSERT INTO public.schema_migrations (version) VALUES ('20260811010250');
+INSERT INTO public.schema_migrations (version) VALUES ('20260811010300');
+INSERT INTO public.schema_migrations (version) VALUES ('20260811010400');
+INSERT INTO public.schema_migrations (version) VALUES ('20260811010500');
+INSERT INTO public.schema_migrations (version) VALUES ('20260811010551');
+INSERT INTO public.schema_migrations (version) VALUES ('20260811010552');
+INSERT INTO public.schema_migrations (version) VALUES ('20260811010553');
+INSERT INTO public.schema_migrations (version) VALUES ('20260812010000');
+INSERT INTO public.schema_migrations (version) VALUES ('20260812020000');
+INSERT INTO public.schema_migrations (version) VALUES ('20260812020100');
+INSERT INTO public.schema_migrations (version) VALUES ('20260830010000');
+INSERT INTO public.schema_migrations (version) VALUES ('20261006020000');
+INSERT INTO public.schema_migrations (version) VALUES ('20261007020000');
+INSERT INTO public.schema_migrations (version) VALUES ('20261007030000');
+INSERT INTO public.schema_migrations (version) VALUES ('20261008010000');
+INSERT INTO public.schema_migrations (version) VALUES ('20261015010000');
+INSERT INTO public.schema_migrations (version) VALUES ('20261021010000');
+INSERT INTO public.schema_migrations (version) VALUES ('20261110010000');
+INSERT INTO public.schema_migrations (version) VALUES ('20261118010000');
+INSERT INTO public.schema_migrations (version) VALUES ('20261118030000');

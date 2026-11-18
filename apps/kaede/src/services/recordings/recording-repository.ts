@@ -9,7 +9,8 @@ import type { DB } from '../db/index.js'
 type DbExecutor = Kysely<DB> | Transaction<DB>
 type Recording = Selectable<Recordings>
 type NewRecording = Insertable<Recordings>
-type NewRecordingInput = Omit<NewRecording, 'constraints'> & {
+type NewRecordingInput = Omit<NewRecording, 'constraints' | 'floor_map_revision_id'> & {
+  floor_map_revision_id?: string
   constraints?: TrajectoryConstraints
 }
 type RecordingUpdate = Updateable<Recordings>
@@ -188,12 +189,21 @@ export const insertRecording = async (
   newRecording: NewRecordingInput,
   executor: DbExecutor = db
 ): Promise<Recording> => {
-  const values: NewRecording =
+  const values =
     newRecording.constraints === undefined
       ? newRecording
       : { ...newRecording, constraints: JSON.stringify(newRecording.constraints) }
 
-  return executor.insertInto('recordings').values(values).returningAll().executeTakeFirstOrThrow()
+  return executor
+    .insertInto('recordings')
+    .values({
+      ...values,
+      floor_map_revision_id:
+        newRecording.floor_map_revision_id ??
+        sql<string>`(select initial_map_revision_id from floors where id = ${newRecording.floor_id})`,
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow()
 }
 
 export const updateRecording = async (

@@ -120,7 +120,10 @@ export const registerOrganizationBeaconRoutes = (app: OpenAPIHono) => {
     method: 'get',
     path: '/{organizationId}/floors/{floorId}/beacons/recording-config',
     tags: ['Organization Recordings'],
-    request: { params: floorBeaconParamsSchema },
+    request: {
+      params: floorBeaconParamsSchema,
+      query: z.object({ revision_id: z.uuid().optional() }),
+    },
     responses: {
       200: {
         description: 'recording beacon config',
@@ -141,7 +144,8 @@ export const registerOrganizationBeaconRoutes = (app: OpenAPIHono) => {
     const result = await getRecordingBeaconConfig(
       requireRequestActor(c as RequestActorContext),
       params.organizationId,
-      params.floorId
+      params.floorId,
+      c.req.valid('query').revision_id
     )
     if (!result.ok) {
       const error = errorResponse(result.error)

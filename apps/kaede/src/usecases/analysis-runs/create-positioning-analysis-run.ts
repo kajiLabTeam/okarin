@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import type { RequestActor } from '../../middleware/request-actor-context.js'
 import type { Pipeline } from '../../schemas/pipelines.js'
 import type { PositioningAnalysisRunRequest } from '../../schemas/positioning-analysis-runs.js'
+import type { TrajectoryConstraints } from '../../schemas/trajectories.js'
 import { trajectoryConstraintsSchema } from '../../schemas/trajectories.js'
 import { insertOutboxJobs } from '../../services/analysis-runs/outbox-repository.js'
 import {
@@ -13,7 +14,7 @@ import {
 } from '../../services/analysis-runs/positioning-analysis-run-repository.js'
 import type { PositioningRunItem } from '../../services/analysis-runs/positioning-analysis-run-repository.js'
 import { db } from '../../services/db/index.js'
-import { findFloorById } from '../../services/floors/index.js'
+import { findMapRevision } from '../../services/floor-maps/revisions.js'
 import { resolvePipelineForExecution } from '../../services/nozomi/pipeline-availability.js'
 import type { ResolvedPipelineRecording } from '../../services/nozomi/pipeline-availability.js'
 import { NozomiPipelineError } from '../../services/nozomi/pipeline-client.js'
@@ -23,6 +24,7 @@ import {
 } from '../../services/recordings/index.js'
 import { putAnalysisGroundTruthCsv } from '../../services/storage/object-store.js'
 import { buildAnalysisGroundTruthObjectKey } from '../../services/storage/presigned-url.js'
+import { insertTrajectory } from '../../services/trajectories/index.js'
 import { requireOrganizationManager, requireRecordingAccess } from '../authorization.js'
 
 interface Failure {
@@ -133,6 +135,7 @@ const retrySnapshot = (item: PositioningRunItem) => {
     throw new Error('Incomplete saved snapshot')
   // hashのなかった旧入力を現在の内容で確定すると、元の解析条件が変わってしまう。
   for (const [slot, value] of Object.entries(inputManifest)) {
+    if (slot === '__legacy_trajectory__') continue
     const assets = slot === '__ground_truth__' ? [value] : value
     if (!Array.isArray(assets) || assets.length === 0) throw new Error('Invalid saved inputs')
     for (const value of assets) {
@@ -166,7 +169,8 @@ export const createPositioningAnalysisRun = async (
   actor: RequestActor,
   organizationId: string,
   key: string,
-  body: PositioningAnalysisRunRequest
+  body: PositioningAnalysisRunRequest,
+  legacyTrajectory?: { trajectoryId: string; constraints: TrajectoryConstraints }
 ): Promise<
   | {
       ok: true
@@ -261,6 +265,7 @@ export const createPositioningAnalysisRun = async (
   const recordings = [] as {
     id: string
     floor_id: string
+    floor_map_revision_id?: string
     constraints: unknown
   }[]
   for (const recordingId of body.recording_ids) {
@@ -273,15 +278,29 @@ export const createPositioningAnalysisRun = async (
     recordings.push({
       id: recording.id,
       floor_id: recording.floor_id,
+      floor_map_revision_id: recording.floor_map_revision_id,
       constraints: recording.constraints,
     })
   }
-  if (!parent && new Set(recordings.map((recording) => recording.floor_id)).size > 1)
+  if (
+    !parent &&
+    new Set(
+      recordings.map(
+        (recording) => `${recording.floor_id}:${recording.floor_map_revision_id ?? 'initial'}`
+      )
+    ).size > 1
+  )
     return {
       ok: false,
       error: { type: 'RECORDING_SCOPE_INVALID', status: 409 },
     }
-  const floor = parent ? undefined : await findFloorById(recordings[0].floor_id)
+  const floor = parent
+    ? undefined
+    : await findMapRevision(
+        recordings[0].floor_id,
+        organizationId,
+        recordings[0].floor_map_revision_id
+      )
   const resolutions = [] as {
     pipeline: Pipeline
     recordings: (ResolvedPipelineRecording & {
@@ -291,7 +310,12 @@ export const createPositioningAnalysisRun = async (
   for (const pipelineId of parent ? [] : body.pipeline_ids) {
     let resolved: Awaited<ReturnType<typeof resolvePipelineForExecution>>
     try {
-      resolved = await resolvePipelineForExecution(pipelineId, body.recording_ids)
+      resolved = await resolvePipelineForExecution(
+        pipelineId,
+        body.recording_ids,
+        undefined,
+        !!legacyTrajectory
+      )
     } catch (error) {
       if (error instanceof NozomiPipelineError && error.code === 'PIPELINE_NOT_FOUND')
         return {
@@ -312,6 +336,28 @@ export const createPositioningAnalysisRun = async (
       }
     }
     if (!resolved.ok) return { ok: false, error: { type: resolved.error.type, status: 409 } }
+    if (
+      legacyTrajectory &&
+      resolved.value.recordings.some(
+        ({ assets }) =>
+          !assets.some(
+            (asset) =>
+              asset.data_type === 'resource.floor_map' &&
+              asset.checksum_sha256 &&
+              asset.floor_map_revision_id === floor?.id
+          )
+      )
+    )
+      return { ok: false, error: { type: 'PIPELINE_INPUT_UNAVAILABLE', status: 409 } }
+
+    if (
+      resolved.value.recordings.some((recording) =>
+        recording.assets.some(
+          (asset) => asset.data_type === 'resource.floor_map' && asset.validation_status !== 'valid'
+        )
+      )
+    )
+      return { ok: false, error: { type: 'FLOOR_MAP_IMAGE_UNAVAILABLE', status: 409 } }
     const explicitParameters = body.parameters_by_pipeline[pipelineId] ?? {}
     const parameterProperties =
       resolved.value.pipeline.definition.parameters_schema.properties &&
@@ -324,7 +370,9 @@ export const createPositioningAnalysisRun = async (
       const recording = recordings.find(
         (candidate) => candidate.id === resolvedRecording.recording_id
       )
-      const constraints = trajectoryConstraintsSchema.safeParse(recording?.constraints)
+      const constraints = trajectoryConstraintsSchema.safeParse(
+        legacyTrajectory?.constraints ?? recording?.constraints
+      )
       const start = constraints.success
         ? constraints.data.find((constraint) => constraint.point_type === 'start')
         : undefined
@@ -335,15 +383,35 @@ export const createPositioningAnalysisRun = async (
         if (start.direction !== undefined && acceptsParameter('initial_direction'))
           derivedParameters.initial_direction = start.direction
       }
-      if (floor?.scale !== null && floor?.scale !== undefined && acceptsParameter('floor_scale')) {
+      if (
+        (!legacyTrajectory || start) &&
+        floor?.scale !== null &&
+        floor?.scale !== undefined &&
+        acceptsParameter('floor_scale')
+      ) {
         derivedParameters.floor_scale = floor.scale
       }
       return {
         ...resolvedRecording,
-        parameters: { ...derivedParameters, ...explicitParameters },
+        parameters: {
+          ...derivedParameters,
+          ...explicitParameters,
+          ...(legacyTrajectory
+            ? {
+                initial_direction: start?.direction ?? 90,
+                floor_scale: floor?.scale ?? 0.01,
+              }
+            : {}),
+          ...((!legacyTrajectory || start) &&
+          floor?.scale != null &&
+          acceptsParameter('floor_scale')
+            ? { floor_scale: floor.scale }
+            : {}),
+        },
       }
     })
     if (
+      !legacyTrajectory &&
       recordingsWithParameters.some(
         ({ parameters }) =>
           !parametersMatchSchema(parameters, resolved.value.pipeline.definition.parameters_schema)
@@ -382,6 +450,20 @@ export const createPositioningAnalysisRun = async (
             format: 'csv',
           }
         : undefined
+      if (legacyTrajectory) {
+        await insertTrajectory(
+          {
+            id: legacyTrajectory.trajectoryId,
+            organization_id: organizationId,
+            recording_id: recordings[0].id,
+            floor_id: recordings[0].floor_id,
+            floor_map_revision_id: floor?.id,
+            status: 'processing',
+            constraints: legacyTrajectory.constraints,
+          },
+          transaction
+        )
+      }
       const items = parent
         ? retrySnapshots.map((snapshot) => ({
             ...snapshot,
@@ -391,6 +473,12 @@ export const createPositioningAnalysisRun = async (
           }))
         : resolutions.flatMap(({ pipeline, recordings }) =>
             recordings.map(({ recording_id, bindings, assets, parameters }) => ({
+              ...(legacyTrajectory
+                ? {
+                    id: legacyTrajectory.trajectoryId,
+                    result_trajectory_id: legacyTrajectory.trajectoryId,
+                  }
+                : {}),
               analysis_run_id: run.id,
               recording_id,
               pipeline_id: pipeline.definition.pipeline_id,
@@ -401,6 +489,46 @@ export const createPositioningAnalysisRun = async (
               pipeline_version: pipeline.definition.definition_version,
               parameters,
               input_manifest: {
+                ...(legacyTrajectory
+                  ? {
+                      __legacy_trajectory__: {
+                        version: 1,
+                        profile: 'legacy-single-trajectory-v1',
+                        csv_columns: [
+                          'step_index',
+                          'rikka_timestamp_s',
+                          'rikka_x',
+                          'rikka_y',
+                          'x',
+                          'y',
+                        ],
+                        timestamp_origin: 'first_step',
+                        coordinate_system: legacyTrajectory.constraints.some(
+                          (point) => point.point_type === 'start'
+                        )
+                          ? 'pixel'
+                          : 'local_meter',
+                        defaulted_parameters: [
+                          ...(floor?.scale == null ? ['floor_scale'] : []),
+                          ...(!legacyTrajectory.constraints.some(
+                            (point) => point.point_type === 'start' && point.direction !== undefined
+                          )
+                            ? ['initial_direction']
+                            : []),
+                        ],
+                        waypoints_applied: false,
+                        goals_applied: false,
+                        constraints: legacyTrajectory.constraints,
+                      },
+                    }
+                  : {}),
+                ...(assets.some((asset) => asset.data_type === 'resource.floor_map')
+                  ? {
+                      __floor_map__: assets.filter(
+                        (asset) => asset.data_type === 'resource.floor_map'
+                      ),
+                    }
+                  : {}),
                 ...Object.fromEntries(
                   Object.entries(bindings).map(([slot_id, assetId]) => [
                     slot_id,
@@ -414,6 +542,14 @@ export const createPositioningAnalysisRun = async (
                         data_type: asset.data_type,
                         schema_version: asset.schema_version,
                         format: asset.format,
+                        ...(asset.floor_map_revision_id
+                          ? {
+                              floor_map_revision_id: asset.floor_map_revision_id,
+                              scale: asset.scale,
+                              map_width_px: asset.map_width_px,
+                              map_height_px: asset.map_height_px,
+                            }
+                          : {}),
                       })),
                   ])
                 ),
