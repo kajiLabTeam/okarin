@@ -17,16 +17,14 @@ import pytest
 from fastapi import BackgroundTasks
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
+from rikka.analysis_backend import _trajectory_payload
 from rikka.cli import commands as rikka_commands
 from rikka.common.lib.models import Landmark, TrajectoryResult
 from rikka.common.lib.sensors import ACC_COLUMNS, GYRO_COLUMNS
 from rikka.plot import pipeline as plot_pipeline
 
 from src.registry.catalog import initial_catalog
-from src.registry.rikka_executor import (
-    RikkaComponentExecutor,
-    _trajectory_payload,
-)
+from src.registry.rikka_executor import RikkaComponentExecutor
 from src.routes import executions as execution_routes
 from src.routes.executions import start_execution
 from src.schemas.execution import (
@@ -850,9 +848,7 @@ def test_particle_animation_is_deferred_and_preserves_map_after_cleanup(
         generated.append(output)
         return output
 
-    monkeypatch.setattr(
-        "src.registry.rikka_executor.save_particle_animation", fake_save
-    )
+    monkeypatch.setattr("rikka.analysis_backend.save_particle_animation", fake_save)
     outputs = RikkaComponentExecutor().execute(
         _component("pdr-particle-filter"),
         {
