@@ -8,13 +8,13 @@ import numpy as np
 import pytest
 from fastapi import BackgroundTasks, HTTPException
 from pydantic import ValidationError
+from rikka.analysis_backend import ParticleAnimation
 from rikka.common.lib.models import (
     Landmark,
     LandmarkCorrection,
     LandmarkCorrectionResult,
 )
 
-from src.registry.rikka_executor import ParticleAnimation
 from src.routes import executions as routes
 from src.schemas.execution import (
     ArtifactRetryRequest,
@@ -140,7 +140,7 @@ def test_retry_after_restart_deduplicates_and_only_renders_video(
         path.write_bytes(b"video")
         return path
 
-    monkeypatch.setattr("src.registry.rikka_executor.save_particle_animation", save)
+    monkeypatch.setattr("rikka.analysis_backend.save_particle_animation", save)
     monkeypatch.setattr(
         routes,
         "execute_pipeline",
@@ -217,7 +217,7 @@ def test_repeated_video_failures_can_be_retried_again(monkeypatch: Any) -> None:
     def fail(*_args: Any, **_kwargs: Any) -> None:
         raise RuntimeError("encoder failed")
 
-    monkeypatch.setattr("src.registry.rikka_executor.save_particle_animation", fail)
+    monkeypatch.setattr("rikka.analysis_backend.save_particle_animation", fail)
     ids = []
     for attempt in (1, 2):
         tasks = BackgroundTasks()
