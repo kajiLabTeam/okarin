@@ -229,16 +229,17 @@ export interface OidcLoginTransactions {
 }
 
 export interface MobileSessionExchangeCodes {
-  id: Generated<string>
+  code_challenge: string | null
   code_hash: string
-  oidc_transaction_id: string
-  session_id: string
-  user_id: string
-  organization_id: string
-  intent: string
-  expires_at: Timestamp
   consumed_at: Timestamp | null
   created_at: Generated<Timestamp>
+  expires_at: Timestamp
+  id: Generated<string>
+  intent: string
+  oidc_transaction_id: string | null
+  organization_id: string | null
+  session_id: string
+  user_id: string
 }
 
 export interface OrganizationAuthSettings {
