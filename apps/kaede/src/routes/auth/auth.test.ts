@@ -4,6 +4,11 @@ import { resetRuntimeConfigForTests } from '../../config/runtime.js'
 import { parseGoogleOidcStateCookie, serializeGoogleOidcStateCookie } from './oidc-cookie.js'
 import { authRoutes } from './index.js'
 
+const issueGoogleMobileSessionExchangeCodeMock = vi.hoisted(() => vi.fn())
+vi.mock('../../services/mobile-session-exchange/index.js', () => ({
+  issueGoogleMobileSessionExchangeCode: issueGoogleMobileSessionExchangeCodeMock,
+}))
+
 const originalAppEnv = process.env.APP_ENV
 
 const {
@@ -291,7 +296,12 @@ describe('auth routes', () => {
     resetRuntimeConfigForTests()
 
     const app = createAuthTestApp()
-    const response = await app.request('/api/auth/oidc/google/login?client=mobile')
+    const response = await app.request(
+      '/api/auth/oidc/google/login?client=mobile&redirect_uri=https%3A%2F%2Fayumi.okarin.app%2Fauth%2Fcallback&code_challenge=' +
+        'a'.repeat(43) +
+        '&code_challenge_method=S256&mobile_state=' +
+        'b'.repeat(43)
+    )
 
     expect(response.status).toBe(302)
     const setCookie = response.headers.get('set-cookie')
@@ -380,10 +390,16 @@ describe('auth routes', () => {
         expiresAt: '2099-06-17T00:10:00.000Z',
         intent: 'login',
         client: 'mobile',
+        mobile: {
+          redirectUri: 'https://ayumi.okarin.app/auth/callback',
+          codeChallenge: 'a'.repeat(43),
+          state: 'b'.repeat(43),
+        },
       },
       'state-cookie-secret'
     )
 
+    issueGoogleMobileSessionExchangeCodeMock.mockResolvedValue('exchange-code')
     const app = createAuthTestApp()
     const response = await app.request(
       '/api/auth/oidc/google/callback?code=authorization-code&state=state-value',
@@ -395,6 +411,16 @@ describe('auth routes', () => {
     )
 
     expect(response.status).toBe(302)
+    expect(response.headers.get('location')).toBe(
+      'https://ayumi.okarin.app/auth/callback?mobile_state=' +
+        'b'.repeat(43) +
+        '&mobile_session_exchange_code=exchange-code'
+    )
+    expect(response.headers.get('set-cookie')).not.toContain('okarin_session=')
+    expect(issueGoogleMobileSessionExchangeCodeMock).toHaveBeenCalledWith(
+      'session-token',
+      'a'.repeat(43)
+    )
     expect(completeGoogleOidcLoginMock).toHaveBeenCalledWith(
       {
         code: 'authorization-code',
@@ -485,6 +511,160 @@ describe('auth routes', () => {
     )
     expect(completeGoogleOidcLoginMock).not.toHaveBeenCalled()
     expect(completeGoogleOidcLinkMock).not.toHaveBeenCalled()
+  })
+
+  describe('mobile Google callback validation', () => {
+    beforeEach(() => {
+      process.env.OIDC_ENABLED = 'true'
+      process.env.OIDC_GOOGLE_CLIENT_ID = 'client-id'
+      process.env.OIDC_GOOGLE_CLIENT_SECRET = 'client-secret'
+      process.env.OIDC_GOOGLE_REDIRECT_URI =
+        'https://api.example.test/api/auth/oidc/google/callback'
+      process.env.OIDC_STATE_COOKIE_SECRET = 'state-cookie-secret'
+      process.env.FRONTEND_ORIGIN = 'https://app.example.test'
+      resetRuntimeConfigForTests()
+    })
+    const cookie = (
+      expiresAt = '2099-01-01T00:00:00Z',
+      redirectUri = 'https://ayumi.okarin.app/auth/callback'
+    ) =>
+      'okarin_oidc_google=' +
+      serializeGoogleOidcStateCookie(
+        {
+          state: 'state-value',
+          nonce: 'nonce-value',
+          codeVerifier: 'google-verifier',
+          expiresAt,
+          intent: 'login',
+          client: 'mobile',
+          mobile: { redirectUri, codeChallenge: 'a'.repeat(43), state: 'b'.repeat(43) },
+        },
+        'state-cookie-secret'
+      )
+
+    it('keeps ordinary Web login cookie issuance and the Mio success redirect', async () => {
+      completeGoogleOidcLoginMock.mockResolvedValue({
+        ok: true,
+        value: { sessionToken: 'web-token' },
+      })
+      const webCookie = serializeGoogleOidcStateCookie(
+        {
+          state: 'web-state',
+          nonce: 'web-nonce',
+          codeVerifier: 'web-google-verifier',
+          expiresAt: '2099-01-01T00:00:00Z',
+          intent: 'login',
+          client: 'web',
+        },
+        'state-cookie-secret'
+      )
+      const app = createAuthTestApp()
+      const login = await app.request('/api/auth/oidc/google/login')
+      expect(login.headers.get('location')).toBe('https://accounts.example.test/auth')
+      const response = await app.request(
+        '/api/auth/oidc/google/callback?state=web-state&code=test',
+        {
+          headers: { cookie: 'okarin_oidc_google=' + webCookie },
+        }
+      )
+      expect(response.headers.get('location')).toBe('https://app.example.test/')
+      expect(response.headers.get('set-cookie')).toContain('okarin_session=web-token')
+      expect(completeGoogleOidcLoginMock).toHaveBeenCalledWith(
+        expect.objectContaining({ allowUserCreation: true }),
+        expect.any(Object)
+      )
+      expect(issueGoogleMobileSessionExchangeCodeMock).not.toHaveBeenCalled()
+    })
+
+    it('returns exchange-code issuance failure to the app for retry', async () => {
+      completeGoogleOidcLoginMock.mockResolvedValue({
+        ok: true,
+        value: { sessionToken: 'session-token' },
+      })
+      issueGoogleMobileSessionExchangeCodeMock.mockRejectedValueOnce(new Error('unavailable'))
+      const response = await createAuthTestApp().request(
+        '/api/auth/oidc/google/callback?state=state-value&code=test',
+        {
+          headers: { cookie: cookie() },
+        }
+      )
+      expect(response.headers.get('location')).toContain('error=mobile_session_exchange_failed')
+      expect(response.headers.get('set-cookie')).not.toContain('okarin_session=')
+    })
+
+    it('returns provider cancellation and login failure to the app without issuing a code', async () => {
+      const app = createAuthTestApp()
+      const canceled = await app.request(
+        '/api/auth/oidc/google/callback?state=state-value&error=access_denied',
+        {
+          headers: { cookie: cookie() },
+        }
+      )
+      expect(canceled.headers.get('location')).toBe(
+        'https://ayumi.okarin.app/auth/callback?mobile_state=' +
+          'b'.repeat(43) +
+          '&error=oidc_provider_error'
+      )
+      expect(completeGoogleOidcLoginMock).not.toHaveBeenCalled()
+      completeGoogleOidcLoginMock.mockResolvedValue({
+        ok: false,
+        error: { type: 'OIDC_IDENTITY_CONFLICT' },
+      })
+      const failure = await app.request(
+        '/api/auth/oidc/google/callback?state=state-value&code=test',
+        { headers: { cookie: cookie() } }
+      )
+      expect(failure.headers.get('location')).toContain('error=oidc_identity_conflict')
+      expect(issueGoogleMobileSessionExchangeCodeMock).not.toHaveBeenCalled()
+    })
+    it.each([
+      ['wrong', cookie()],
+      ['state-value', cookie('2000-01-01T00:00:00Z')],
+      ['state-value', cookie(undefined, 'https://evil.example/auth/callback')],
+      ['state-value', ''],
+    ])(
+      'rejects mismatched, expired, unapproved or missing state before login',
+      async (state, value) => {
+        const response = await createAuthTestApp().request(
+          '/api/auth/oidc/google/callback?code=test&state=' + state,
+          { headers: { cookie: value } }
+        )
+        expect(response.headers.get('location')).toMatch(
+          /^https:\/\/app.example.test\/login\?error=/
+        )
+        expect(completeGoogleOidcLoginMock).not.toHaveBeenCalled()
+        expect(issueGoogleMobileSessionExchangeCodeMock).not.toHaveBeenCalled()
+      }
+    )
+    it.each([
+      '',
+      '&redirect_uri=https://evil.example',
+      '&redirect_uri=https://ayumi.okarin.app/auth/callback&code_challenge=bad',
+    ])('rejects incomplete mobile login parameters', async (params) => {
+      const response = await createAuthTestApp().request(
+        '/api/auth/oidc/google/login?client=mobile' + params
+      )
+      expect([302, 400]).toContain(response.status)
+      expect(response.headers.get('set-cookie')).toBeNull()
+    })
+    it('preserves organization mobile exchange dispatch', async () => {
+      isOrganizationOidcTransactionStateMock.mockResolvedValue(true)
+      completeOrganizationOidcMock.mockResolvedValue({
+        ok: true,
+        value: {
+          return_to: '/',
+          mobileRedirectUri: 'https://ayumi.okarin.app/auth/callback',
+          mobileSessionExchangeCode: 'org-code',
+        },
+      })
+      const response = await createAuthTestApp().request(
+        '/api/auth/oidc/google/callback?state=org-state&code=test'
+      )
+      expect(response.headers.get('location')).toBe(
+        'https://ayumi.okarin.app/auth/callback?mobile_session_exchange_code=org-code'
+      )
+      expect(completeGoogleOidcLoginMock).not.toHaveBeenCalled()
+    })
   })
 
   it('GET /api/auth/me は cookie の session token で user を返す', async () => {

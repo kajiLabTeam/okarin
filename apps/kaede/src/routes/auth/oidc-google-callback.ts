@@ -104,14 +104,32 @@ export const registerGoogleOidcCallbackRoute = (app: OpenAPIHono) => {
     }
 
     clearGoogleOidcStateCookie(c)
-    if (query.error) {
-      return c.redirect(withError(failureRedirectUrl, query.error), 302)
-    }
-
     const stateCookie = getGoogleOidcStateCookie(c, config.stateCookieSecret)
 
     if (!stateCookie) {
       return c.redirect(withError(failureRedirectUrl, 'invalid_state'), 302)
+    }
+
+    const mobile =
+      stateCookie.intent === 'login' &&
+      stateCookie.client === 'mobile' &&
+      stateCookie.mobile?.redirectUri === config.mobileRedirectUri
+        ? stateCookie.mobile
+        : undefined
+    const fail = (code: string) => {
+      if (!mobile) return withError(failureRedirectUrl, code)
+      const url = new URL(mobile.redirectUri)
+      url.searchParams.set('mobile_state', mobile.state)
+      url.searchParams.set('error', code)
+      return url.toString()
+    }
+    // Do not trust provider errors or return app state until the OAuth state matches.
+    if (!query.state || query.state !== stateCookie.state) {
+      return c.redirect(withError(failureRedirectUrl, 'invalid_state'), 302)
+    }
+    if (query.error) return c.redirect(fail(mobile ? 'oidc_provider_error' : query.error), 302)
+    if (stateCookie.client === 'mobile' && !mobile) {
+      return c.redirect(withError(failureRedirectUrl, 'invalid_mobile_request'), 302)
     }
 
     const params = {
@@ -126,7 +144,7 @@ export const registerGoogleOidcCallbackRoute = (app: OpenAPIHono) => {
       const result = await completeGoogleOidcLink(getSessionTokenFromCookie(c), params, client)
 
       if (!result.ok) {
-        return c.redirect(withError(failureRedirectUrl, result.error.type.toLowerCase()), 302)
+        return c.redirect(fail(result.error.type.toLowerCase()), 302)
       }
 
       return c.redirect(config.loginSuccessRedirectUrl, 302)
@@ -145,9 +163,26 @@ export const registerGoogleOidcCallbackRoute = (app: OpenAPIHono) => {
     )
 
     if (!result.ok) {
-      return c.redirect(withError(failureRedirectUrl, result.error.type.toLowerCase()), 302)
+      return c.redirect(fail(result.error.type.toLowerCase()), 302)
     }
 
+    if (mobile) {
+      const { issueGoogleMobileSessionExchangeCode } =
+        await import('../../services/mobile-session-exchange/index.js')
+      let code: string
+      try {
+        code = await issueGoogleMobileSessionExchangeCode(
+          result.value.sessionToken,
+          mobile.codeChallenge
+        )
+      } catch {
+        return c.redirect(fail('mobile_session_exchange_failed'), 302)
+      }
+      const url = new URL(mobile.redirectUri)
+      url.searchParams.set('mobile_state', mobile.state)
+      url.searchParams.set('mobile_session_exchange_code', code)
+      return c.redirect(url.toString(), 302)
+    }
     setSessionCookie(c, result.value.sessionToken)
 
     return c.redirect(config.loginSuccessRedirectUrl, 302)

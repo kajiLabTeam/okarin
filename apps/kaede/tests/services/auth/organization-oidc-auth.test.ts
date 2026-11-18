@@ -1,7 +1,9 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { hashActivationToken } from '../../../src/services/auth/activation-token.js'
+import { createPkceCodeChallenge } from '../../../src/services/auth/google-oidc-client.js'
 import { createSession } from '../../../src/services/auth/session-repository.js'
 import { createDb } from '../../../src/services/db/client.js'
+import { consumeMobileSessionExchangeCode } from '../../../src/services/mobile-session-exchange/index.js'
 import { acceptOrganizationInviteWithOidc } from '../../../src/usecases/organization-invites/index.js'
 import {
   completeOrganizationOidc,
@@ -223,6 +225,51 @@ const completeInvite = (
   })
 
 describe('organization OIDC authentication', () => {
+  it('preserves mobile PKCE exchange for organization OIDC', async () => {
+    const fixture = await createFixture()
+    await linkIdentity(fixture)
+    const verifier = 'v'.repeat(43)
+    const start = await startOrganizationOidc(
+      fixture.organization.slug,
+      fixture.provider.id,
+      undefined,
+      {
+        intent: 'login',
+        mobile: {
+          redirect_uri: 'https://ayumi.okarin.app/auth/callback',
+          code_challenge: createPkceCodeChallenge(verifier),
+          code_challenge_method: 'S256',
+        },
+      },
+      {
+        client: {
+          createAuthorizationUrl: ({ state }) => 'https://accounts.example/auth?state=' + state,
+        },
+        configuredClientId,
+        transactionSecret,
+        now,
+        executor: db,
+      }
+    )
+    if (!start.ok) throw new Error(start.error.type)
+    const state = new URL(start.value.authorization_url).searchParams.get('state') ?? ''
+    const completed = await completeOrganizationOidc('code', state, {
+      client: callbackClient(),
+      configuredClientId,
+      transactionSecret,
+      now,
+      executor: db,
+    })
+    if (!completed.ok) throw new Error(completed.error.type)
+    expect(completed.value.sessionToken).toBeUndefined()
+    expect(completed.value.mobileRedirectUri).toBe('https://ayumi.okarin.app/auth/callback')
+    const code = completed.value.mobileSessionExchangeCode
+    if (!code) throw new Error('exchange code missing')
+    expect(await consumeMobileSessionExchangeCode(code, 'x'.repeat(43), now, db)).toBeUndefined()
+    expect(await consumeMobileSessionExchangeCode(code, verifier, now, db)).toBeDefined()
+    expect(await consumeMobileSessionExchangeCode(code, verifier, now, db)).toBeUndefined()
+  })
+
   beforeEach(async () => {
     await resetDatabase(db)
   })

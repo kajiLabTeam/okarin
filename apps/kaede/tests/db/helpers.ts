@@ -8,6 +8,7 @@ export const resetDatabase = async (db: Kysely<DB>) => {
       application_data_migrations,
       audit_events,
       authentication_events,
+      mobile_session_exchange_codes,
       oidc_login_transactions,
       session_membership_authentications,
       organization_member_oidc_identities,
