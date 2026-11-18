@@ -6,11 +6,12 @@ from collections.abc import Callable
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from rikka.analysis_api import render_artifact
 
 from src.execution_timing import timed_stage
 from src.registry.catalog import initial_catalog
 from src.registry.registry import PipelineRegistry
-from src.registry.rikka_executor import ParticleAnimation, RikkaComponentExecutor
+from src.registry.rikka_executor import RikkaComponentExecutor
 from src.schemas.execution import (
     ArtifactRetryAccepted,
     ArtifactRetryRequest,
@@ -438,11 +439,7 @@ def retry_particle_animation(
         background_tasks.add_task(
             _finish_deferred_artifacts,
             event,
-            {
-                "particle_animation": lambda: ParticleAnimation.deserialize(
-                    source
-                ).render()
-            },
+            {"particle_animation": lambda: render_artifact(source)},
             request.output_artifacts,
             record.fingerprint,
         )

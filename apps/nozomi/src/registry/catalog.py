@@ -1,162 +1,52 @@
 from __future__ import annotations
 
-from typing import Any
+from rikka.analysis_api import list_methods
+from rikka.analysis_contracts import MethodDefinition
 
 from src.schemas.pipeline import (
-    AssetContract,
     ComponentContract,
-    DataType,
-    InternalValueContract,
     PipelineDefinition,
     PipelineOutput,
     Slot,
     SlotBinding,
 )
 
-ACCE = AssetContract(data_type=DataType.ACCE, schema_version="1", format="csv")
-GYRO = AssetContract(data_type=DataType.GYRO, schema_version="1", format="csv")
-METADATA = AssetContract(data_type=DataType.METADATA, schema_version="1", format="json")
-BLE = AssetContract(data_type=DataType.BLE, schema_version="1", format="csv")
-FLOOR_MAP_PNG = AssetContract(
-    data_type=DataType.FLOOR_MAP, schema_version="1", format="png"
-)
-BEACON_LAYOUT = AssetContract(
-    data_type=DataType.BEACON_LAYOUT, schema_version="1", format="json"
-)
-TRAJECTORY = InternalValueContract(value_type="trajectory")
 
-
-def _slot(slot_id: str, *contracts: AssetContract | InternalValueContract) -> Slot:
-    return Slot(slot_id=slot_id, accepted_contracts=contracts)
-
-
-def _parameters_schema(
-    *, map_required: bool, particle: bool, ble: bool
-) -> dict[str, Any]:
-    properties: dict[str, Any] = {
-        "initial_direction": {"type": "number", "minimum": 0, "maximum": 360},
-        "user_height_m": {"type": "number", "exclusiveMinimum": 0},
-    }
-    required: list[str] = []
-    properties.update(
-        {
-            "origin_x": {"type": "integer", "minimum": 0},
-            "origin_y": {"type": "integer", "minimum": 0},
-            "floor_scale": {"type": "number", "exclusiveMinimum": 0},
-        }
-    )
-    if map_required:
-        required.extend(("origin_x", "origin_y", "floor_scale"))
-    if particle:
-        properties.update(
-            {
-                "particle_count": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 100_000,
-                },
-                "particle_seed": {"type": ["integer", "null"]},
-            }
-        )
-    if ble:
-        properties["rssi_threshold_dbm"] = {
-            "type": "number",
-            "minimum": -150,
-            "maximum": 0,
-        }
-    return {
-        "type": "object",
-        "additionalProperties": False,
-        "properties": properties,
-        "required": required,
-    }
-
-
-def _pipeline(
-    *,
-    pipeline_id: str,
-    display_name: str,
-    component_id: str,
-    inputs: tuple[Slot, ...],
-    parameters_schema: dict[str, Any],
-) -> PipelineDefinition:
-    output = _slot("trajectory", TRAJECTORY)
+def pipeline_from_method(method: MethodDefinition) -> PipelineDefinition:
+    inputs = tuple(Slot.model_validate(slot) for slot in method.input_slots)
+    outputs = tuple(Slot.model_validate(slot) for slot in method.output_slots)
     component = ComponentContract(
-        component_id=component_id,
+        component_id=method.component_id,
         instance_id="rikka-1",
         input_slots=inputs,
-        output_slots=(output,),
-        parameters_schema=parameters_schema,
-    )
-    bindings = tuple(
-        SlotBinding(
-            target_component_instance="rikka-1",
-            target_slot_id=slot.slot_id,
-            source_slot_id=slot.slot_id,
-        )
-        for slot in inputs
+        output_slots=outputs,
+        parameters_schema=method.parameters_schema,
     )
     return PipelineDefinition(
-        pipeline_id=pipeline_id,
-        display_name=display_name,
-        definition_version=("1.2.0" if pipeline_id.endswith("-ble") else "1.1.0"),
+        pipeline_id=method.method_id,
+        display_name=method.display_name,
+        definition_version=method.definition_version,
         components=(component,),
         input_slots=inputs,
-        outputs=(
+        outputs=tuple(
             PipelineOutput(
-                output_slot_id="trajectory",
+                output_slot_id=slot.slot_id,
                 source_component_instance="rikka-1",
-                source_slot_id="trajectory",
-            ),
+                source_slot_id=slot.slot_id,
+            )
+            for slot in outputs
         ),
-        bindings=bindings,
-        parameters_schema=parameters_schema,
+        bindings=tuple(
+            SlotBinding(
+                target_component_instance="rikka-1",
+                target_slot_id=slot.slot_id,
+                source_slot_id=slot.slot_id,
+            )
+            for slot in inputs
+        ),
+        parameters_schema=method.parameters_schema,
     )
 
 
 def initial_catalog() -> tuple[PipelineDefinition, ...]:
-    acce = _slot("acce", ACCE)
-    gyro = _slot("gyro", GYRO)
-    metadata = _slot("metadata", METADATA)
-    ble = _slot("ble", BLE)
-    floor_map = _slot("floor_map", FLOOR_MAP_PNG)
-    beacon_layout = _slot("beacon_layout", BEACON_LAYOUT)
-
-    return (
-        _pipeline(
-            pipeline_id="pdr",
-            display_name="PDR",
-            component_id="rikka-pdr",
-            inputs=(acce, gyro, metadata),
-            parameters_schema=_parameters_schema(
-                map_required=False, particle=False, ble=False
-            ),
-        ),
-        _pipeline(
-            pipeline_id="pdr-particle-filter",
-            display_name="PDR + Particle Filter",
-            component_id="rikka-pdr-particle-filter",
-            inputs=(acce, gyro, metadata, floor_map),
-            parameters_schema=_parameters_schema(
-                map_required=True, particle=True, ble=False
-            ),
-        ),
-        _pipeline(
-            pipeline_id="pdr-ble",
-            display_name="PDR + BLE",
-            component_id="rikka-pdr-ble",
-            inputs=(acce, gyro, metadata, ble, floor_map, beacon_layout),
-            parameters_schema=_parameters_schema(
-                map_required=True, particle=False, ble=True
-            ),
-        ),
-        _pipeline(
-            pipeline_id="pdr-particle-filter-ble",
-            display_name="PDR + Particle Filter + BLE",
-            component_id="rikka-pdr-particle-filter-ble",
-            inputs=(acce, gyro, metadata, ble, floor_map, beacon_layout),
-            parameters_schema=_parameters_schema(
-                map_required=True, particle=True, ble=True
-            ),
-        ),
-    )
+    return tuple(pipeline_from_method(method) for method in list_methods())

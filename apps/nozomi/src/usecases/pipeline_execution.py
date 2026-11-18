@@ -17,6 +17,8 @@ from typing import Any, Protocol, cast
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
+from rikka.analysis_api import AnalysisInputError, validate_parameters
+
 from src.execution_timing import execution_context, timed_stage
 from src.network_policy import (
     UrlPurpose,
@@ -764,50 +766,10 @@ def retry_pending_callbacks(
 
 
 def validate_request(snapshot: PipelineSnapshot, request: ExecutionRequest) -> None:
-    schema = snapshot.definition.parameters_schema
-    properties = schema.get("properties", {})
-    required = set(schema.get("required", []))
-    if set(request.parameters) - set(properties) or not required.issubset(
-        request.parameters
-    ):
-        raise PermanentComponentError("parameters do not match schema")
-    for key, value in request.parameters.items():
-        expected = properties.get(key, {}).get("type")
-        expected_types = (
-            {expected} if isinstance(expected, str) else set(expected or [])
-        )
-        if "null" in expected_types and value is None:
-            continue
-        if "string" in expected_types and not isinstance(value, str):
-            raise PermanentComponentError(f"parameter {key} must be a string")
-        if "number" in expected_types and (
-            not isinstance(value, (int, float)) or isinstance(value, bool)
-        ):
-            raise PermanentComponentError(f"parameter {key} must be a number")
-        if "integer" in expected_types and (
-            not isinstance(value, int) or isinstance(value, bool)
-        ):
-            raise PermanentComponentError(f"parameter {key} must be an integer")
-        if isinstance(value, (int, float)) and not isinstance(value, bool):
-            if not math.isfinite(value):
-                raise PermanentComponentError(f"parameter {key} must be finite")
-            constraints = properties[key]
-            if "minimum" in constraints and value < constraints["minimum"]:
-                raise PermanentComponentError(
-                    f"parameter {key} must be at least {constraints['minimum']}"
-                )
-            if "maximum" in constraints and value > constraints["maximum"]:
-                raise PermanentComponentError(
-                    f"parameter {key} must be at most {constraints['maximum']}"
-                )
-            if (
-                "exclusiveMinimum" in constraints
-                and value <= constraints["exclusiveMinimum"]
-            ):
-                raise PermanentComponentError(
-                    f"parameter {key} must be greater than "
-                    f"{constraints['exclusiveMinimum']}"
-                )
+    try:
+        validate_parameters(snapshot.definition.parameters_schema, request.parameters)
+    except AnalysisInputError as exc:
+        raise PermanentComponentError(str(exc)) from exc
 
     if len(
         {(b.target_component_instance, b.target_slot_id) for b in request.bindings}
@@ -831,7 +793,8 @@ def validate_request(snapshot: PipelineSnapshot, request: ExecutionRequest) -> N
 
     slots = {slot.slot_id: slot for slot in snapshot.definition.input_slots}
     provided = {item.slot_id: item for item in request.inputs}
-    if set(provided) != set(slots):
+    required_slots = {key for key, slot in slots.items() if slot.required}
+    if not required_slots.issubset(provided) or set(provided) - set(slots):
         raise PermanentComponentError(
             "input manifest does not match pipeline input slots"
         )
@@ -875,6 +838,8 @@ def execute_pipeline(
                     else (binding.source_component_instance, binding.source_slot_id)
                 )
                 if key not in values:
+                    if not slot.required:
+                        continue
                     raise PermanentComponentError(
                         f"missing input for {component.instance_id}.{slot.slot_id}"
                     )

@@ -1,5 +1,5 @@
 import json
-from types import SimpleNamespace
+from io import BytesIO
 from typing import Any
 
 import pandas as pd
@@ -79,22 +79,23 @@ def test_default_rikka_strategy_runs_pdr_uploads_result_and_marks_completed(
             return StubResponse(gyro_csv)
         return StubResponse()
 
-    pdr_calls: list[tuple[pd.DataFrame, pd.DataFrame]] = []
+    pdr_calls: list[tuple[str, dict[str, bytes], dict[str, Any]]] = []
 
-    def fake_run_pdr(
-        _settings: object,
-        *,
-        df_acc: pd.DataFrame,
-        df_gyro: pd.DataFrame,
-    ) -> SimpleNamespace:
-        pdr_calls.append((df_acc, df_gyro))
-        return SimpleNamespace(trajectory=[[0.0, 0.0], [1.5, 2.5]], t_at_steps=[10.0])
+    def fake_execute_method(
+        method_id: str, inputs: dict[str, bytes], parameters: dict[str, Any]
+    ) -> dict[str, Any]:
+        pdr_calls.append((method_id, inputs, parameters))
+        return {
+            "trajectory": {
+                "points": [
+                    {"x": 0.0, "y": 0.0, "timestamp_s": None},
+                    {"x": 1.5, "y": 2.5, "timestamp_s": 10.0},
+                ]
+            }
+        }
 
     monkeypatch.setattr("src.analysis.default_rikka_strategy.urlopen", fake_urlopen)
-    monkeypatch.setattr(
-        "src.analysis.default_rikka_strategy.run_pdr",
-        fake_run_pdr,
-    )
+    monkeypatch.setattr("rikka.analysis_api.execute_method", fake_execute_method)
 
     DefaultRikkaStrategy().run(valid_analyze_request())
 
@@ -129,8 +130,12 @@ def test_default_rikka_strategy_runs_pdr_uploads_result_and_marks_completed(
             "dddddddd-dddd-dddd-dddd-dddddddddddd/analyzed/result.csv"
         ),
     }
-    assert list(pdr_calls[0][0].columns) == ["t", "x", "y", "z"]
-    assert list(pdr_calls[0][1].columns) == ["t", "x", "y", "z"]
+    method_id, inputs, parameters = pdr_calls[0]
+    assert method_id == "pdr"
+    assert parameters == {"initial_direction": 45.0}
+    assert list(pd.read_csv(BytesIO(inputs["acce"])).columns) == ["t", "x", "y", "z"]
+    assert list(pd.read_csv(BytesIO(inputs["gyro"])).columns) == ["t", "x", "y", "z"]
+    assert json.loads(inputs["metadata"]) == {"recording_start_wall_time_ms": 0}
 
 
 def test_default_rikka_strategy_falls_back_to_rikka_floor_scale(
@@ -139,10 +144,15 @@ def test_default_rikka_strategy_falls_back_to_rikka_floor_scale(
     request = valid_analyze_request()
     request.floor_scale = None
     monkeypatch.setattr(
-        "src.analysis.default_rikka_strategy.run_pdr",
-        lambda *_args, **_kwargs: SimpleNamespace(
-            trajectory=[[0.0, 0.0], [1.0, 1.0]], t_at_steps=[10.0]
-        ),
+        "rikka.analysis_api.execute_method",
+        lambda *_args, **_kwargs: {
+            "trajectory": {
+                "points": [
+                    {"x": 0.0, "y": 0.0, "timestamp_s": None},
+                    {"x": 1.0, "y": 1.0, "timestamp_s": 10.0},
+                ]
+            }
+        },
     )
 
     result_csv = DefaultRikkaStrategy()._analyze_to_csv(
@@ -196,3 +206,46 @@ def test_default_rikka_strategy_normalizes_mobile_sensor_headers() -> None:
         "y": [0.2, 0.21],
         "z": [0.3, 0.31],
     }
+
+
+def test_legacy_metadata_offset_and_timestamp_origin(monkeypatch: Any) -> None:
+    from rikka import legacy_analysis
+
+    calls = []
+    monkeypatch.setattr(legacy_analysis, "INITIAL_DIRECTION", 123.0)
+
+    def execute(
+        method_id: str, inputs: dict[str, bytes], parameters: dict[str, Any]
+    ) -> dict[str, Any]:
+        calls.append((method_id, inputs, parameters))
+        return {
+            "trajectory": {
+                "points": [
+                    {"x": 0.0, "y": 0.0, "timestamp_s": None},
+                    {"x": 1.0, "y": 1.0, "timestamp_s": 5.0},
+                    {"x": 2.0, "y": 2.0, "timestamp_s": 6.5},
+                ]
+            }
+        }
+
+    monkeypatch.setattr("rikka.analysis_api.execute_method", execute)
+    sensor = (
+        b"timestamp_ns,wall_time_ms,x,y,z\n"
+        b"1000000000,12000,0,0,0\n1020000000,12020,0,0,0\n"
+    )
+    result = legacy_analysis.analyze_to_csv(
+        {
+            "acce": sensor,
+            "gyro": sensor,
+            "metadata": b'{"recording_start_wall_time_ms":10000}',
+        },
+        {},
+    )
+    assert pd.read_csv(BytesIO(calls[0][1]["acce"]))["t"].tolist() == [2.0, 2.02]
+    assert calls[0][2] == {"initial_direction": 123.0}
+    assert result == (
+        b"step_index,rikka_timestamp_s,rikka_x,rikka_y,x,y\n"
+        b"0,,0.0,0.0,0.0,0.0\n"
+        b"1,0.0,1.0,1.0,1.0,1.0\n"
+        b"2,1.5,2.0,2.0,2.0,2.0\n"
+    )

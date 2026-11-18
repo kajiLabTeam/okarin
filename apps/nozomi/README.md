@@ -111,4 +111,57 @@ callbackが`404`かつJSONの`error_code: RUN_ITEM_NOT_FOUND`を返した場合�
 
 `Nozomi trajectory publication finished`は、バックグラウンド実行開始から初回結果の通知試行終了までの合計です。通知が失敗した場合も出力するため、mioへの反映時刻を保証するログではありません。後続の動画処理時間は含みません。
 
-区間には親子関係があり、`pipeline`の中に`input_download`と`component`、`component`の中に`pdr`と`particle_filter`が含まれます。全区間を単純に足さないでください。CPU使用量や受付からバックグラウンド開始までの待機時間は計測しません。過去の実行の内訳は復元できないため、反映後に同一条件で再計測してください。
+区間には親子関係があり、`pipeline`の中に`input_download`と`component`が含まれます。共通API移行後はRikka内部のPDR・PFをNozomiでは個別計測しません。全区間を単純に足さないでください。CPU使用量や受付からバックグラウンド開始までの待機時間は計測しません。過去の実行の内訳は復元できないため、反映後に同一条件で再計測してください。
+
+## Rikkaとの責務境界
+
+パイプライン一覧はRikkaの `analysis_api.list_methods()` から起動時に構築します。
+`registry/catalog.py` はRikkaの契約をNozomiのスロット・バインディングへ変換し、
+`registry/rikka_executor.py` は方式IDとダウンロード済みbytesを
+`execute_method()` へ渡します。PF/BLEの使用判断、前処理、設定変換、評価、描画は
+Rikkaにあります。旧 `/analyze` もRikkaの互換窓口を通じて共通APIを使用します。
+
+Nozomiは受付、入力取得・digest検証、実行状態・再送・復旧、成果物アップロード、
+Kaedeへの通知を担当します。動画は軌跡公開後に生成し、素材は不透明なbytesとして
+保存します。単体再生成は `render_artifact(source)` に委譲し、Rikkaの粒子型やNPZ構造を
+参照しません。従来の素材、HTTPパス、成果物名、generation_attempt、event_id、
+通知の重複対策は維持します。
+
+方式定義のversionとsnapshot digest、入力digest、パラメータを使う既存の実行識別を
+維持します。Rikkaの固定コミットはlockと合わせて記録し、契約・既定値・計算条件を
+変える変更ではRikkaの方式バージョンも更新してください。
+
+新方式はRikka内の定義・実行処理の明示登録後、依存コミット更新と再起動で取得できます。
+テスト `test_rikka_extension.py` は方式固有コードを追加せず、追加方式の一覧取得、
+可用性、入力・パラメータ検証、実行までを確認します。
+新data_type、新しい入力取得元、軌跡以外の主出力、現在の部分JSON Schema契約を
+超える検証、新たな通知や再試行エンドポイントが必要な場合はNozomi側の対応も必要です。
+
+### 配布・依存更新
+
+Rikkaの公開コミット `bbaea8b9e5fd8d16196db220f5539a27ce041df1` を
+`pyproject.toml` / `uv.lock` へ固定しています。共通APIを含むコミットはGitから取得でき、
+通常の依存解決で起動・テストできます。[Rikka PR #33](https://github.com/kajiLabTeam/rikka/pull/33)
+を先にマージしてください。squash/rebaseで最終コミットが変わる場合は、Nozomiのpin・lockも
+マージ後のコミットへ更新して再検証します。
+
+新方式を公開した場合の更新手順:
+
+1. Rikkaの変更をレビュー・コミットし、取得可能なGitリモートへ公開します。
+2. Nozomiの `[tool.uv.sources].rikka.rev` をその実在するコミットへ更新します。
+3. `uv lock` で `uv.lock` を更新します。他の依存は一括更新しません。
+4. `PYTHONPATH` の指定を外し、`uv sync --locked --all-groups` 後に
+   Ruff・format・Mypy・pytestとDockerビルドを実施します。
+5. 通常のレビュー・リリース手順で反映します。ローカル検証やPR作成はデプロイ完了を意味しません。
+
+既存の保存済み動画素材を維持し、新形式の素材が残る間は
+対応するRikkaの復元処理も維持してください。
+
+隣接ワークスペースでの検証例（Nozomiディレクトリから）:
+
+```sh
+PYTHONPATH=../../../rikka/src uv run ruff check .
+PYTHONPATH=../../../rikka/src uv run ruff format --check .
+PYTHONPATH=../../../rikka/src uv run mypy .
+PYTHONPATH=../../../rikka/src uv run pytest
+```
