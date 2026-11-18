@@ -135,14 +135,17 @@ describe('createFloor', () => {
     })
     expect(result.value.map_image.download_expires_at).toEqual(expect.any(String))
     const mapDownloadUrl = new URL(result.value.map_image.download_url)
-    const expectedMapPath = `/okarin-test/organizations/${organization.id}/floors/${result.value.floor_id}/map.svg`
     expect(result.value.map_image).toMatchObject({
       content_type: 'image/svg+xml',
       extension: 'svg',
     })
     expect(mapDownloadUrl.pathname).toBe('/okarin-test/floor-map')
     expect(putFloorMapObjectMock).toHaveBeenCalledWith(
-      expectedMapPath.slice('/okarin-test/'.length),
+      expect.stringMatching(
+        new RegExp(
+          `^organizations/${organization.id}/floors/${result.value.floor_id}/revisions/[0-9a-f-]+/map\\.svg$`
+        )
+      ),
       'svg',
       validSvg
     )
@@ -160,7 +163,7 @@ describe('createFloor', () => {
       level: 2,
       name: '2F',
       scale: 25,
-      image_object_path: `organizations/${organization.id}/floors/${result.value.floor_id}/map.svg`,
+      image_object_path: putFloorMapObjectMock.mock.calls[0]?.[0],
       map_width_px: 1280,
       map_height_px: 720,
     })

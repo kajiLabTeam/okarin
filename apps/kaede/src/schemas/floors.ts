@@ -4,6 +4,11 @@ import { isoDatetimeSchema, uuidSchema } from './common.js'
 
 export const floorSchema = z
   .object({
+    current_map_revision_id: uuidSchema.nullable().optional(),
+    initial_map_revision_id: uuidSchema.nullable().optional(),
+    floor_map_revision_id: uuidSchema.optional(),
+    revision: z.number().int().positive().optional(),
+    beacons_need_review: z.boolean().optional(),
     floor_id: uuidSchema.openapi({
       description: 'floor の ID',
     }),
@@ -145,3 +150,11 @@ export type CreateFloorMultipartRequest = z.infer<typeof createFloorMultipartReq
 export type UpdateFloorRequest = z.infer<typeof updateFloorRequestSchema>
 export type FloorIdParams = z.infer<typeof floorIdParamsSchema>
 export type FloorResponse = z.infer<typeof floorSchema>
+
+export const mapRevisionParamsSchema = organizationFloorIdParamsSchema.extend({
+  revisionId: uuidSchema,
+})
+export const updateMapMultipartSchema = z.object({
+  map_image: z.any().openapi({ type: 'string', format: 'binary' }),
+  scale: z.string().optional(),
+})

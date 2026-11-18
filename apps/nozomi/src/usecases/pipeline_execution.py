@@ -160,7 +160,7 @@ class HttpOutputWriter:
             ):
                 raise PermanentComponentError("trajectory point timestamp is invalid")
             buffer.write(f"{index},{'' if timestamp is None else timestamp},{x},{y}\n")
-        body = buffer.getvalue().encode()
+        body = trajectory.pop("_legacy_csv", buffer.getvalue().encode())
         digest = hashlib.sha256(body).hexdigest()
         try:
             with build_opener(_NoRedirect).open(
@@ -605,6 +605,7 @@ def request_fingerprint(request: ExecutionRequest) -> str:
             )
         ],
         "parameters": request.parameters,
+        **({"legacy_trajectory": True} if request.legacy_trajectory else {}),
         "ground_truth": (
             None
             if request.ground_truth is None
@@ -766,8 +767,31 @@ def retry_pending_callbacks(
 
 
 def validate_request(snapshot: PipelineSnapshot, request: ExecutionRequest) -> None:
+    if request.legacy_trajectory and snapshot.definition.pipeline_id != "pdr":
+        raise PermanentComponentError("legacy trajectory compatibility requires pdr")
     try:
-        validate_parameters(snapshot.definition.parameters_schema, request.parameters)
+        parameters = request.parameters
+        if request.legacy_trajectory:
+            if set(parameters) - {
+                "origin_x",
+                "origin_y",
+                "floor_scale",
+                "initial_direction",
+            }:
+                raise PermanentComponentError("unsupported legacy parameters")
+            for name in ("origin_x", "origin_y"):
+                if name in parameters and (
+                    isinstance(parameters[name], bool)
+                    or not isinstance(parameters[name], (int, float))
+                    or not math.isfinite(parameters[name])
+                ):
+                    raise PermanentComponentError("invalid legacy origin")
+            parameters = {
+                key: value
+                for key, value in parameters.items()
+                if key not in {"origin_x", "origin_y"}
+            }
+        validate_parameters(snapshot.definition.parameters_schema, parameters)
     except AnalysisInputError as exc:
         raise PermanentComponentError(str(exc)) from exc
 
@@ -794,6 +818,8 @@ def validate_request(snapshot: PipelineSnapshot, request: ExecutionRequest) -> N
     slots = {slot.slot_id: slot for slot in snapshot.definition.input_slots}
     provided = {item.slot_id: item for item in request.inputs}
     required_slots = {key for key, slot in slots.items() if slot.required}
+    if request.legacy_trajectory:
+        required_slots.discard("metadata")
     if not required_slots.issubset(provided) or set(provided) - set(slots):
         raise PermanentComponentError(
             "input manifest does not match pipeline input slots"
@@ -838,7 +864,9 @@ def execute_pipeline(
                     else (binding.source_component_instance, binding.source_slot_id)
                 )
                 if key not in values:
-                    if not slot.required:
+                    if not slot.required or (
+                        request.legacy_trajectory and slot.slot_id == "metadata"
+                    ):
                         continue
                     raise PermanentComponentError(
                         f"missing input for {component.instance_id}.{slot.slot_id}"
@@ -854,7 +882,11 @@ def execute_pipeline(
                 timed_stage("component", component_id=component.component_id),
             ):
                 outputs = executor.execute(
-                    component, component_inputs, request.parameters
+                    component,
+                    component_inputs,
+                    {**request.parameters, "_legacy_trajectory": True}
+                    if request.legacy_trajectory
+                    else request.parameters,
                 )
             for slot in component.output_slots:
                 if slot.slot_id not in outputs:

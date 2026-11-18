@@ -40,9 +40,9 @@ export interface ResolvedPipelineRecording {
   issues: Issue[]
 }
 
-export const recordingAssetProvider: PipelineResourceProvider = {
+const createRecordingAssetProvider = (legacyTrajectory = false): PipelineResourceProvider => ({
   listAssets: async (recordingId) => {
-    const assets = (await listRecordingDataAssets(recordingId)) as Asset[]
+    const assets = legacyTrajectory ? [] : ((await listRecordingDataAssets(recordingId)) as Asset[])
     const recording = await findRecordingById(recordingId)
     if (!recording) return assets
 
@@ -71,7 +71,10 @@ export const recordingAssetProvider: PipelineResourceProvider = {
     const resources = await resolveFloorResources(recording, snapshot.metadata)
     return [...snapshot.assets, ...resources]
   },
-}
+})
+
+export const recordingAssetProvider = createRecordingAssetProvider()
+const legacyRecordingAssetProvider = createRecordingAssetProvider(true)
 
 const matches = (asset: Asset, accepted: AssetContract) =>
   asset.data_type === accepted.data_type &&
@@ -166,7 +169,8 @@ export const listPipelineAvailability = async (
 export const resolvePipelineForExecution = async (
   pipelineId: string,
   recordingIds: string[],
-  resourceProvider = recordingAssetProvider
+  resourceProvider = recordingAssetProvider,
+  legacyTrajectory = false
 ) => {
   const pipeline = await resolveActivePipeline(pipelineId)
   if (pipeline.definition.state !== 'active' || !pipeline.availability.available) {
@@ -181,7 +185,11 @@ export const resolvePipelineForExecution = async (
   const recordings = await Promise.all(
     recordingIds.map(async (recording_id) => ({
       recording_id,
-      assets: await resourceProvider.listAssets(recording_id),
+      assets: await (
+        legacyTrajectory && resourceProvider === recordingAssetProvider
+          ? legacyRecordingAssetProvider
+          : resourceProvider
+      ).listAssets(recording_id),
     }))
   )
   const resolvedRecordings: ResolvedPipelineRecording[] = recordings.map(
@@ -191,6 +199,12 @@ export const resolvePipelineForExecution = async (
       ...bindingFor(pipeline.definition, assets),
     })
   )
+  if (legacyTrajectory && pipelineId === 'pdr') {
+    for (const recording of resolvedRecordings) {
+      if (!recording.assets.some((asset) => asset.data_type === 'metadata'))
+        recording.issues = recording.issues.filter((issue) => issue.slot_id !== 'metadata')
+    }
+  }
   const unavailableRecordings = resolvedRecordings
     .filter((recording) => recording.issues.length > 0)
     .map(({ recording_id, issues }) => ({ recording_id, issues }))

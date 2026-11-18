@@ -1,5 +1,6 @@
 import type { RequestActor } from '../../middleware/request-actor-context.js'
 import type { PositioningAnalysisCallbackRequest } from '../../schemas/positioning-analysis-callbacks.js'
+import { trajectoryConstraintsSchema } from '../../schemas/trajectories.js'
 import { aggregatePositioningRunStatus } from '../../services/analysis-runs/outbox-worker.js'
 import { outputArtifactsFromCallback } from '../../services/analysis-runs/output-manifest.js'
 import {
@@ -12,7 +13,11 @@ import {
 } from '../../services/analysis-runs/positioning-analysis-callback-repository.js'
 import { db } from '../../services/db/index.js'
 import { findRecordingById } from '../../services/recordings/index.js'
-import { insertTrajectory } from '../../services/trajectories/index.js'
+import {
+  insertTrajectory,
+  markTrajectoryCompleted,
+  markTrajectoryFailed,
+} from '../../services/trajectories/index.js'
 
 export type ReceivePositioningAnalysisCallbackResult =
   | {
@@ -94,6 +99,17 @@ export const receivePositioningAnalysisCallback = async (
       throw new Error(`analysis run item ${payload.analysis_run_item_id} disappeared`)
     }
 
+    const manifest =
+      typeof lockedItem.input_manifest === 'string'
+        ? (JSON.parse(lockedItem.input_manifest) as Record<string, unknown>)
+        : ((lockedItem.input_manifest ?? {}) as Record<string, unknown>)
+    const legacy = manifest.__legacy_trajectory__ as { constraints?: unknown } | undefined
+    if (
+      legacy &&
+      (lockedItem.status === 'completed' || lockedItem.status === 'failed') &&
+      payload.status !== lockedItem.status
+    )
+      return { status: 'already_processed' as const }
     const outputArtifacts = outputArtifactsFromCallback(payload.outputs)
     if (Object.keys(outputArtifacts).length > 0) {
       await mergePositioningRunItemOutputManifest(
@@ -115,6 +131,9 @@ export const receivePositioningAnalysisCallback = async (
             recording_id: lockedItem.recording_id,
             floor_id: recording?.floor_id ?? '',
             status: 'completed',
+            ...(legacy?.constraints
+              ? { constraints: trajectoryConstraintsSchema.parse(legacy.constraints) }
+              : {}),
           },
           transaction
         )
@@ -122,6 +141,18 @@ export const receivePositioningAnalysisCallback = async (
       }
     }
 
+    if (legacy && lockedItem.result_trajectory_id) {
+      if (payload.status === 'completed')
+        await markTrajectoryCompleted(lockedItem.result_trajectory_id, transaction)
+      if (payload.status === 'failed')
+        await markTrajectoryFailed(
+          lockedItem.result_trajectory_id,
+          payload.error?.code ?? 'EXECUTION_FAILED',
+          payload.error?.message ?? 'Pipeline execution failed',
+          new Date(),
+          transaction
+        )
+    }
     await updatePositioningRunItemState(
       payload.analysis_run_item_id,
       {

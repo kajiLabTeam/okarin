@@ -1,3 +1,7 @@
+vi.mock('../../services/floor-maps/revisions.js', () => ({
+  findMapRevision: vi.fn(),
+  listRevisionBeacons: vi.fn(),
+}))
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RequestActor } from '../../middleware/request-actor-context.js'
 

@@ -4,7 +4,7 @@ import { createStayHeatmap } from './create-stay-heatmap.js'
 
 const mocks = vi.hoisted(() => ({
   findTrajectoryById: vi.fn(),
-  findFloorById: vi.fn(),
+  findMapRevision: vi.fn(),
   insertAnalysisRun: vi.fn(),
   insertInputs: vi.fn(),
   markProcessing: vi.fn(),
@@ -32,7 +32,9 @@ vi.mock('../../services/trajectories/index.js', () => ({
 vi.mock('../../services/trajectories/callback-token.js', () => ({
   generateAnalysisCallbackToken: mocks.callbackToken,
 }))
-vi.mock('../../services/floors/index.js', () => ({ findFloorById: mocks.findFloorById }))
+vi.mock('../../services/floor-maps/revisions.js', () => ({
+  findMapRevision: mocks.findMapRevision,
+}))
 vi.mock('../../services/nozomi/index.js', () => ({
   submitStayHeatmapAnalyzeRequest: mocks.submit,
 }))
@@ -71,7 +73,7 @@ describe('createStayHeatmap', () => {
         { seq: 1, point_type: 'goal', x: 30, y: 40 },
       ],
     })
-    mocks.findFloorById.mockResolvedValue({
+    mocks.findMapRevision.mockResolvedValue({
       id: floorId,
       organization_id: organizationId,
       scale: 0.01,

@@ -53,7 +53,10 @@ vi.mock('./pipeline-client.js', () => ({
 vi.mock('../data-assets/index.js', () => ({
   listRecordingDataAssets: listRecordingAssetsMock,
 }))
-vi.mock('../floors/index.js', () => ({ findFloorDetailById: findFloorMock }))
+vi.mock('../floor-maps/revisions.js', () => ({
+  findMapRevision: findFloorMock,
+  listRevisionBeacons: listBeaconsMock,
+}))
 vi.mock('../recordings/index.js', () => ({ findRecordingById: findRecordingMock }))
 vi.mock('../beacons/index.js', () => ({
   beaconLayout: beaconLayoutMock,
@@ -224,6 +227,7 @@ describe('pipeline availability', () => {
       organization_id: 'org-1',
     })
     findFloorMock.mockResolvedValue({
+      id: 'floor-1',
       floor_id: 'floor-1',
       organization_id: 'org-1',
       image_object_path: 'organizations/org-1/floors/floor-1/map.png',
@@ -250,6 +254,7 @@ describe('pipeline availability', () => {
       organization_id: 'org-1',
     })
     findFloorMock.mockResolvedValue({
+      id: 'floor-1',
       floor_id: 'floor-1',
       organization_id: 'org-1',
       image_object_path: 'organizations/org-1/floors/floor-1/map.jpg',
@@ -320,7 +325,11 @@ describe('pipeline availability', () => {
         asset('acce-1', 'acce'),
         ...(kind === 'typed' ? [metadata] : []),
       ])
-      findFloorMock.mockResolvedValue({ floor_id: 'floor-1', image_object_path: 'floor/map.png' })
+      findFloorMock.mockResolvedValue({
+        id: 'floor-1',
+        floor_id: 'floor-1',
+        image_object_path: 'floor/map.png',
+      })
       getFloorMapBytesMock.mockResolvedValue(new Uint8Array([1, 2, 3]))
       getObjectBytesMock.mockResolvedValue(
         new TextEncoder().encode(
@@ -395,7 +404,11 @@ describe('pipeline availability', () => {
       })
     )
     listRecordingAssetsMock.mockResolvedValue([asset('acce-1', 'acce')])
-    findFloorMock.mockResolvedValue({ floor_id: 'floor-1', image_object_path: 'floor/map.png' })
+    findFloorMock.mockResolvedValue({
+      id: 'floor-1',
+      floor_id: 'floor-1',
+      image_object_path: 'floor/map.png',
+    })
     getFloorMapBytesMock.mockResolvedValue(new Uint8Array([1, 2, 3]))
     getObjectBytesMock.mockRejectedValueOnce(new Error('metadata not found'))
     const result = await listPipelineAvailability(['missing', 'ready'])
@@ -438,7 +451,11 @@ describe('pipeline availability', () => {
       organization_id: 'org-1',
     })
     listRecordingAssetsMock.mockResolvedValue([asset('acce-1', 'acce')])
-    findFloorMock.mockResolvedValue({ floor_id: 'floor-1', image_object_path: 'floor/map.png' })
+    findFloorMock.mockResolvedValue({
+      id: 'floor-1',
+      floor_id: 'floor-1',
+      image_object_path: 'floor/map.png',
+    })
     getFloorMapBytesMock.mockResolvedValue(new Uint8Array([1, 2, 3]))
     putMetadataMock.mockRejectedValueOnce(new Error('snapshot storage unavailable'))
     const result = await listPipelineAvailability(['recording-1'])
@@ -459,7 +476,11 @@ describe('pipeline availability', () => {
       organization_id: 'org-1',
     })
     listRecordingAssetsMock.mockResolvedValue([asset('acce-1', 'acce')])
-    findFloorMock.mockResolvedValue({ floor_id: 'floor-1', image_object_path: 'floor/map.png' })
+    findFloorMock.mockResolvedValue({
+      id: 'floor-1',
+      floor_id: 'floor-1',
+      image_object_path: 'floor/map.png',
+    })
     getFloorMapBytesMock.mockResolvedValue(new Uint8Array([1, 2, 3]))
     getObjectBytesMock.mockResolvedValue(
       new TextEncoder().encode(
@@ -496,6 +517,7 @@ describe('pipeline availability', () => {
     })
     listRecordingAssetsMock.mockResolvedValue([asset('acce-1', 'acce')])
     findFloorMock.mockResolvedValue({
+      id: 'floor-1',
       floor_id: 'floor-1',
       organization_id: 'org-1',
       image_object_path: 'organizations/org-1/floors/floor-1/map.png',
@@ -534,6 +556,7 @@ describe('pipeline availability', () => {
     })
     listRecordingAssetsMock.mockResolvedValue([asset('acce-1', 'acce')])
     findFloorMock.mockResolvedValue({
+      id: 'floor-1',
       floor_id: 'floor-1',
       organization_id: 'org-1',
       image_object_path: 'organizations/org-1/floors/floor-1/map.png',
@@ -643,6 +666,53 @@ describe('pipeline availability', () => {
           },
         ],
       },
+    })
+  })
+
+  it('旧APIはtyped assetがあっても従来のraw入力を使用する', async () => {
+    resolvePipelineMock.mockResolvedValue(pdrPipeline())
+    findRecordingMock.mockResolvedValue({
+      id: 'old-recording',
+      organization_id: 'org-1',
+      floor_id: 'floor-1',
+      upload_targets: ['acce', 'gyro'],
+    })
+    listRecordingAssetsMock.mockResolvedValue([
+      asset('different-acce', 'acce'),
+      asset('different-gyro', 'gyro'),
+    ])
+    const result = await resolvePipelineForExecution('pdr', ['old-recording'], undefined, true)
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        recordings: [
+          {
+            bindings: {
+              acce: 'legacy:old-recording:acce',
+              gyro: 'legacy:old-recording:gyro',
+            },
+          },
+        ],
+      },
+    })
+    expect(listRecordingAssetsMock).not.toHaveBeenCalled()
+  })
+
+  it('metadata省略は旧APIのPDRだけ許容する', async () => {
+    const pdr = pdrPipeline()
+    pdr.definition.input_slots.push({
+      slot_id: 'metadata',
+      required: true,
+      max_assets: 1,
+      accepted_contracts: [assetContract('metadata', 'json')],
+    })
+    resolvePipelineMock.mockResolvedValue(pdr)
+    const inputProvider = provider({ rec: [asset('a', 'acce'), asset('g', 'gyro')] })
+    expect(await resolvePipelineForExecution('pdr', ['rec'], inputProvider)).toMatchObject({
+      ok: false,
+    })
+    expect(await resolvePipelineForExecution('pdr', ['rec'], inputProvider, true)).toMatchObject({
+      ok: true,
     })
   })
 

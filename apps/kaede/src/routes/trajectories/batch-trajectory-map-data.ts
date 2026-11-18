@@ -74,12 +74,14 @@ export const registerBatchTrajectoryMapDataRoute = (app: OpenAPIHono) => {
       }
       values.push(result.value)
     }
-    const floorIds = new Set(values.map((value) => value.floor_id))
+    const floorIds = new Set(
+      values.map((value) => `${value.floor_id}:${value.floor_map_revision_id ?? 'initial'}`)
+    )
     if (floorIds.size !== 1) {
       return c.json(
         {
           error_code: 'TRAJECTORY_FLOOR_MISMATCH',
-          error_message: 'trajectories must belong to the same floor',
+          error_message: 'trajectories must belong to the same floor and map revision',
         },
         400
       )
@@ -87,6 +89,7 @@ export const registerBatchTrajectoryMapDataRoute = (app: OpenAPIHono) => {
     return c.json(
       {
         floor_id: values[0]?.floor_id ?? '',
+        floor_map_revision_id: values[0]?.floor_map_revision_id,
         trajectories: values.map(({ trajectory_id, data_type, points }) => ({
           trajectory_id,
           data_type,

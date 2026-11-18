@@ -63,6 +63,7 @@ export interface NozomiExecutionRequest {
     secret?: string | null
   }
   parameters: Record<string, unknown>
+  legacy_trajectory?: boolean
   ground_truth?: NozomiGroundTruthInput
 }
 

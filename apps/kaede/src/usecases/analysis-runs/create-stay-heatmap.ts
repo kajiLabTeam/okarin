@@ -10,7 +10,7 @@ import {
   markAnalysisRunProcessing,
 } from '../../services/analysis-runs/index.js'
 import { db } from '../../services/db/index.js'
-import { findFloorById } from '../../services/floors/index.js'
+import { findMapRevision } from '../../services/floor-maps/revisions.js'
 import { submitStayHeatmapAnalyzeRequest } from '../../services/nozomi/index.js'
 import {
   issueInternalAnalysisHeatmapUploadUrl,
@@ -70,12 +70,16 @@ export const createStayHeatmap = async (
 
   const first = validatedTrajectories[0]
   for (const trajectory of validatedTrajectories) {
-    if (trajectory.organization_id !== organizationId || trajectory.floor_id !== first.floor_id) {
+    if (
+      trajectory.organization_id !== organizationId ||
+      trajectory.floor_id !== first.floor_id ||
+      trajectory.floor_map_revision_id !== first.floor_map_revision_id
+    ) {
       return { ok: false, error: { type: 'TRAJECTORY_SCOPE_INVALID', trajectoryId: trajectory.id } }
     }
   }
 
-  const floor = await findFloorById(first.floor_id)
+  const floor = await findMapRevision(first.floor_id, organizationId, first.floor_map_revision_id)
   if (floor?.organization_id !== organizationId) {
     return { ok: false, error: { type: 'FLOOR_NOT_FOUND', floorId: first.floor_id } }
   }
@@ -119,7 +123,8 @@ export const createStayHeatmap = async (
     const run = await insertAnalysisRun(
       {
         organization_id: organizationId,
-        floor_id: floor.id,
+        floor_id: first.floor_id,
+        floor_map_revision_id: floor.id,
         analysis_type: 'stay_heatmap',
         parameters: payload.parameters,
         definition_version: 'original-v1',
@@ -166,7 +171,7 @@ export const createStayHeatmap = async (
       definition_version: 'original-v1',
       parameters: payload.parameters,
       floor: {
-        floor_id: floor.id,
+        floor_id: first.floor_id,
         map_width_px: floor.map_width_px,
         map_height_px: floor.map_height_px,
         scale_m_per_px: floor.scale,

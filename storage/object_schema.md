@@ -13,7 +13,7 @@
 ## 基本方針
 
 - 保存先キーは DB に冗長保存せず、ID と規約から導出する
-- 例外として、フロア画像だけは `floors.image_object_path` に実キーを保存する
+- 例外として、フロア画像は `floor_map_revisions.image_object_path` に版ごとの実キーを保存する（`floors` の画像・寸法・縮尺は現在版の投影）
 - 当面は 1 バケット内で prefix により論理分離する
 - bucket 名は環境ごとに分ける
 - prefix 規約は環境をまたいで共通にする
@@ -34,7 +34,7 @@ organizations/
 キー規約:
 
 ```text
-organizations/{organization_id}/floors/{floor_id}/map.{ext}
+organizations/{organization_id}/floors/{floor_id}/revisions/{object_revision_id}/map.{ext}
 ```
 
 例:
@@ -50,7 +50,9 @@ organizations/99999999-9999-4999-8999-999999999999/floors/33333333-3333-4333-833
 - `{floor_id}` は `floors.id`
 - `{ext}` は `svg` または `png`
 - `jpg` / `jpeg` は当面許可しない
-- `floors.image_object_path` に拡張子込みの実キーを保存する
+- `floor_map_revisions.image_object_path` に拡張子込みの実キーを保存する。object_revision_idは保存先のUUIDで、DBの版IDとは独立する。
+- 既存の `maps/...` と `organizations/.../floors/.../map.{ext}` は初期版から引き続き参照する。
+- 画像更新では常に新しい保存先へ追加し、旧オブジェクトを上書き・削除しない。縮尺だけの変更は同じ画像キーを参照する新しい版を作る。
 
 ## recordings
 
@@ -172,7 +174,7 @@ organizations/99999999-9999-4999-8999-999999999999/trajectories/bbbbbbbb-bbbb-4b
 
 ## 保持期間
 
-- `organizations/*/floors/*/map.*` は手動削除まで保持
+- `organizations/*/floors/*/map.*` と `organizations/*/floors/*/revisions/*/map.*` は過去データ・実行から参照されるため保持する。フロアの非表示でも削除しない。
 - `organizations/*/recordings/*/raw` は当面削除しない
 - `organizations/*/recordings/*/ground_truth` は当面削除しない
 - `organizations/*/trajectories/*/analyzed/result.csv` は当面削除しない

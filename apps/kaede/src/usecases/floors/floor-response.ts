@@ -6,6 +6,11 @@ import {
 } from '../../services/storage/index.js'
 
 interface FloorResponseRow {
+  current_map_revision_id?: string | null
+  initial_map_revision_id?: string | null
+  beacons_need_review?: boolean | null
+  floor_map_revision_id?: string
+  revision?: number
   floor_id: string
   building_id: string
   organization_id: string | null
@@ -39,6 +44,12 @@ export const toFloorResponse = async (floor: FloorResponseRow): Promise<FloorRes
 
   return {
     floor_id: floor.floor_id,
+    current_map_revision_id: floor.current_map_revision_id,
+    initial_map_revision_id: floor.initial_map_revision_id,
+    floor_map_revision_id:
+      floor.floor_map_revision_id ?? floor.current_map_revision_id ?? undefined,
+    revision: floor.revision,
+    beacons_need_review: floor.beacons_need_review ?? false,
     building_id: floor.building_id,
     organization_id: requireOrganizationId(floor.floor_id, floor.organization_id),
     building_name: floor.building_name,

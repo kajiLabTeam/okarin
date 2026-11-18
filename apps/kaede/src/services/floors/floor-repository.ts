@@ -14,6 +14,9 @@ export interface ListFloorsOptions {
 
 export interface FloorRow {
   floor_id: string
+  current_map_revision_id?: string | null
+  initial_map_revision_id?: string | null
+  beacons_need_review?: boolean | null
   building_id: string
   organization_id: string | null
   building_name: string
@@ -30,9 +33,17 @@ export interface FloorRow {
 const floorRowsQuery = (executor: DbExecutor = db) =>
   executor
     .selectFrom('floors')
+    .leftJoin(
+      'floor_map_revisions as current_map',
+      'current_map.id',
+      'floors.current_map_revision_id'
+    )
     .innerJoin('buildings', 'buildings.id', 'floors.building_id')
     .select([
       'floors.id as floor_id',
+      'floors.current_map_revision_id',
+      'floors.initial_map_revision_id',
+      'current_map.beacons_need_review',
       'floors.building_id',
       'floors.organization_id',
       'buildings.name as building_name',
@@ -96,12 +107,24 @@ export const insertFloor = async (
   newFloor: NewFloor,
   executor: DbExecutor = db
 ): Promise<Floor> => {
-  return executor.insertInto('floors').values(newFloor).returningAll().executeTakeFirstOrThrow()
+  const inserted = await executor
+    .insertInto('floors')
+    .values(newFloor)
+    .returning('id')
+    .executeTakeFirstOrThrow()
+  return executor
+    .selectFrom('floors')
+    .selectAll()
+    .where('id', '=', inserted.id)
+    .executeTakeFirstOrThrow()
 }
 
 export const updateFloor = async (
   floorId: string,
-  patch: Pick<Updateable<Floors>, 'level' | 'name' | 'scale'>,
+  patch: Pick<
+    Updateable<Floors>,
+    'level' | 'name' | 'scale' | 'image_object_path' | 'map_width_px' | 'map_height_px'
+  >,
   executor: DbExecutor = db
 ): Promise<Floor | undefined> => {
   return executor

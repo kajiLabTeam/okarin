@@ -59,6 +59,10 @@ export const getRecordingConstraints = async (
 
   return {
     ok: true,
-    value: { recording_id: recording.id, constraints: constraints.data },
+    value: {
+      recording_id: recording.id,
+      floor_map_revision_id: recording.floor_map_revision_id,
+      constraints: constraints.data,
+    },
   }
 }

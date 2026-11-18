@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from io import BytesIO
 from typing import Any
 
+import pandas as pd
+import rikka.legacy_analysis as legacy_analysis
 from rikka.analysis_api import AnalysisInputError, execute_method, list_methods
 from rikka.analysis_contracts import ExecutionOptions
 
@@ -37,6 +40,28 @@ class RikkaComponentExecutor:
                 f"unsupported Rikka component: {component.component_id}"
             )
         try:
+            if parameters.get("_legacy_trajectory"):
+                if method.method_id != "pdr":
+                    raise PermanentComponentError(
+                        "legacy trajectory compatibility requires pdr"
+                    )
+                body = legacy_analysis.analyze_to_csv(inputs, parameters)
+                frame = pd.read_csv(BytesIO(body))
+                return {
+                    "trajectory": {
+                        "points": [
+                            {
+                                "x": row.x,
+                                "y": row.y,
+                                "timestamp_s": None
+                                if pd.isna(row.rikka_timestamp_s)
+                                else row.rikka_timestamp_s,
+                            }
+                            for row in frame.itertuples()
+                        ],
+                        "_legacy_csv": body,
+                    }
+                }
             return execute_method(
                 method.method_id,
                 {

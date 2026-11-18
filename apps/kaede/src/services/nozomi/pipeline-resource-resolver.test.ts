@@ -11,7 +11,10 @@ const { findFloor, getMap, getObject, listBeacons, putLayout } = vi.hoisted(() =
   putLayout: vi.fn(),
 }))
 
-vi.mock('../floors/index.js', () => ({ findFloorDetailById: findFloor }))
+vi.mock('../floor-maps/revisions.js', () => ({
+  findMapRevision: findFloor,
+  listRevisionBeacons: listBeacons,
+}))
 vi.mock('../beacons/index.js', async () => {
   const { beaconLayout } = await import('../beacons/configuration-version.js')
   return { beaconLayout, listBeacons }
@@ -41,7 +44,11 @@ describe('recorded beacon layout resources', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     metadata = { status: 'absent' }
-    findFloor.mockResolvedValue({ floor_id: 'floor-1', image_object_path: 'floor/map.png' })
+    findFloor.mockResolvedValue({
+      id: 'floor-1',
+      floor_id: 'floor-1',
+      image_object_path: 'floor/map.png',
+    })
     getMap.mockResolvedValue(new Uint8Array([1, 2, 3]))
     listBeacons.mockResolvedValue([
       {
@@ -90,7 +97,7 @@ describe('recorded beacon layout resources', () => {
   it.each([{}, { ble: {} }])('配置のない旧metadataだけ現在のDBを利用する: %j', async (document) => {
     loadMetadata(document)
     await resolveFloorResources(recording, metadata)
-    expect(listBeacons).toHaveBeenCalledWith('floor-1')
+    expect(listBeacons).toHaveBeenCalledWith('floor-1', undefined, 'floor-1')
     expect(storedLayout()).toEqual({
       beacons: [{ beacon_id: 'beacon-1', pixel_x: 999, pixel_y: 888 }],
     })
@@ -99,7 +106,7 @@ describe('recorded beacon layout resources', () => {
   it('metadata自体がない旧計測の互換性を維持する', async () => {
     await resolveFloorResources(recording)
     expect(getObject).not.toHaveBeenCalled()
-    expect(listBeacons).toHaveBeenCalledWith('floor-1')
+    expect(listBeacons).toHaveBeenCalledWith('floor-1', undefined, 'floor-1')
     expect(layoutAsset(await resolveFloorResources(recording))).toBeDefined()
   })
 
@@ -141,5 +148,29 @@ describe('recorded beacon layout resources', () => {
     metadata = { status: 'unavailable' }
     expect(layoutAsset(await resolveFloorResources(recording, metadata))).toBeUndefined()
     expect(listBeacons).not.toHaveBeenCalled()
+  })
+  it('指定された旧版の画像・寸法・縮尺とchecksumを返し、現在版へ読み替えない', async () => {
+    findFloor.mockResolvedValue({
+      id: 'map-v1',
+      floor_id: 'floor-1',
+      organization_id: 'org-1',
+      image_object_path: 'floor/revisions/v1/map.png',
+      scale: 0.01,
+      map_width_px: 100,
+      map_height_px: 200,
+    })
+    const assets = await resolveFloorResources({ ...recording, floor_map_revision_id: 'map-v1' })
+    expect(findFloor).toHaveBeenCalledWith('floor-1', 'org-1', 'map-v1')
+    expect(assets).toContainEqual(
+      expect.objectContaining({
+        data_type: 'resource.floor_map',
+        floor_map_revision_id: 'map-v1',
+        object_key: 'floor/revisions/v1/map.png',
+        scale: 0.01,
+        map_width_px: 100,
+        map_height_px: 200,
+        checksum_sha256: '039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81',
+      })
+    )
   })
 })

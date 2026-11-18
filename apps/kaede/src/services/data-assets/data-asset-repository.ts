@@ -1,4 +1,4 @@
-import type { Insertable, Kysely, Selectable, Transaction } from 'kysely'
+import type { Insertable, Kysely, Selectable, Transaction, Updateable } from 'kysely'
 import type { DataAssetObjects, DataAssets, RecordingDataAssets } from '../db/generated.js'
 import { db } from '../db/index.js'
 import type { DB } from '../db/index.js'
@@ -25,7 +25,7 @@ export const linkRecordingDataAsset = (value: NewRecordingDataAsset, executor: E
 
 export const updateDataAssetObject = (
   objectId: string,
-  patch: Partial<Pick<DataAssetObjects, 'byte_size' | 'checksum_sha256'>>,
+  patch: Pick<Updateable<DataAssetObjects>, 'byte_size' | 'checksum_sha256'>,
   executor: Executor = db
 ) => executor.updateTable('data_asset_objects').set(patch).where('id', '=', objectId).execute()
 

@@ -63,9 +63,10 @@ const validateObjectKeyUuid = (value: string, name: string) => {
 export const buildFloorMapObjectKey = (
   organizationId: string,
   floorId: string,
-  extension: FloorMapImageExtension
+  extension: FloorMapImageExtension,
+  revisionId?: string
 ) => {
-  return `organizations/${validateObjectKeyUuid(organizationId, 'organizationId')}/floors/${validateObjectKeyUuid(floorId, 'floorId')}/map.${extension}`
+  return `organizations/${validateObjectKeyUuid(organizationId, 'organizationId')}/floors/${validateObjectKeyUuid(floorId, 'floorId')}/${revisionId ? `revisions/${validateObjectKeyUuid(revisionId, 'revisionId')}/` : ''}map.${extension}`
 }
 
 export const buildRecordingRawObjectKey = (

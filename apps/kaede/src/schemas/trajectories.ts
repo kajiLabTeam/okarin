@@ -325,6 +325,7 @@ export const organizationTrajectoriesResponseSchema = z
           recording_id: uuidSchema.openapi({
             description: '紐づく recording の ID',
           }),
+          floor_map_revision_id: uuidSchema.optional(),
           floor_id: uuidSchema.openapi({
             description: '解析対象 floor の ID',
           }),
@@ -417,6 +418,7 @@ export const trajectoryMapDataResponseSchema = z
     trajectory_id: uuidSchema.openapi({
       description: '地図描画対象 trajectory の ID',
     }),
+    floor_map_revision_id: uuidSchema.optional(),
     floor_id: uuidSchema.openapi({
       description: '描画対象 floor の ID',
     }),
@@ -440,6 +442,7 @@ export const batchTrajectoryMapDataRequestSchema = z
 
 export const batchTrajectoryMapDataResponseSchema = z
   .object({
+    floor_map_revision_id: uuidSchema.optional(),
     floor_id: uuidSchema.openapi({
       description: '返却した軌跡群が属する floor の ID',
     }),
