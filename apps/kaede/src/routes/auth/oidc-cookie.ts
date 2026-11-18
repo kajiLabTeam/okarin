@@ -12,6 +12,7 @@ export interface GoogleOidcStateCookiePayload {
   expiresAt: string
   intent: 'login' | 'link'
   client?: 'web' | 'mobile'
+  mobile?: { redirectUri: string; codeChallenge: string; state: string }
   inviteToken?: string
 }
 

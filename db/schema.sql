@@ -260,16 +260,18 @@ CREATE TABLE public.oidc_login_transactions (
 CREATE TABLE public.mobile_session_exchange_codes (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     code_hash text NOT NULL,
-    oidc_transaction_id uuid NOT NULL,
+    code_challenge text,
+    oidc_transaction_id uuid,
     session_id uuid NOT NULL,
     user_id uuid NOT NULL,
-    organization_id uuid NOT NULL,
+    organization_id uuid,
     intent text NOT NULL,
     expires_at timestamp with time zone NOT NULL,
     consumed_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT mobile_session_exchange_codes_hash_nonempty_chk CHECK ((length(btrim(code_hash)) > 0)),
-    CONSTRAINT mobile_session_exchange_codes_intent_chk CHECK ((intent = ANY (ARRAY['login'::text, 'reauthenticate'::text])))
+    CONSTRAINT mobile_session_exchange_codes_intent_chk CHECK ((intent = ANY (ARRAY['login'::text, 'reauthenticate'::text]))),
+    CONSTRAINT mobile_session_exchange_codes_binding_chk CHECK (((oidc_transaction_id IS NOT NULL) AND (organization_id IS NOT NULL) AND (code_challenge IS NULL)) OR ((oidc_transaction_id IS NULL) AND (organization_id IS NULL) AND (intent = 'login') AND (code_challenge IS NOT NULL) AND (code_challenge ~ '^[A-Za-z0-9_-]{43}$')))
 );
 
 CREATE UNIQUE INDEX mobile_session_exchange_codes_code_hash_idx ON public.mobile_session_exchange_codes USING btree (code_hash);
