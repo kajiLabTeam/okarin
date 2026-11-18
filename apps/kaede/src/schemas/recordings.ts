@@ -55,6 +55,7 @@ export const initRecordingRequestSchema = z
     pedestrian_id: uuidSchema.openapi({
       description: '計測対象 pedestrian の ID',
     }),
+    floor_map_revision_id: uuidSchema.optional(),
     floor_id: uuidSchema.openapi({
       description: '計測対象 floor の ID',
     }),
@@ -117,6 +118,7 @@ export const initRecordingRequestSchema = z
 
 export const initRecordingResponseSchema = z
   .object({
+    floor_map_revision_id: uuidSchema.optional(),
     recording_id: uuidSchema.openapi({
       description: '作成された recording の ID',
     }),
@@ -151,6 +153,7 @@ export const updateRecordingConstraintsRequestSchema = z
 
 export const recordingConstraintsResponseSchema = z
   .object({
+    floor_map_revision_id: uuidSchema.optional(),
     recording_id: uuidSchema.openapi({
       description: 'recording の ID',
     }),
@@ -236,6 +239,7 @@ export const failRecordingRequestSchema = z
 
 export const recordingDetailResponseSchema = z
   .object({
+    floor_map_revision_id: uuidSchema.optional(),
     recording_id: uuidSchema.openapi({
       description: 'recording の ID',
     }),

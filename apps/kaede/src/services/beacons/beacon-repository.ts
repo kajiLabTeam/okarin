@@ -62,9 +62,9 @@ export const findBeacon = async (
 
 export const insertBeaconWithFloorLock = async (value: NewBeacon) =>
   db.transaction().execute(async (tx) => {
-    await tx
+    const floor = await tx
       .selectFrom('floors')
-      .select('id')
+      .select(['id', 'current_map_revision_id'])
       .where('id', '=', value.floor_id)
       .forUpdate()
       .executeTakeFirstOrThrow()
@@ -75,18 +75,46 @@ export const insertBeaconWithFloorLock = async (value: NewBeacon) =>
       .where('deleted_at', 'is', null)
       .executeTakeFirstOrThrow()
     if (Number(count.count) >= 1000) return undefined
-    return tx.insertInto('beacons').values(value).returningAll().executeTakeFirstOrThrow()
+    const beacon = await tx
+      .insertInto('beacons')
+      .values(value)
+      .returningAll()
+      .executeTakeFirstOrThrow()
+    if (floor.current_map_revision_id)
+      await tx
+        .updateTable('floor_map_revisions')
+        .set({ beacons_need_review: false })
+        .where('id', '=', floor.current_map_revision_id)
+        .execute()
+    return beacon
   })
 
 export const updateBeacon = async (organizationId: string, beaconId: string, patch: BeaconUpdate) =>
-  db
-    .updateTable('beacons')
-    .set(patch)
-    .where('id', '=', beaconId)
-    .where('organization_id', '=', organizationId)
-    .where('deleted_at', 'is', null)
-    .returningAll()
-    .executeTakeFirst()
+  db.transaction().execute(async (tx) => {
+    const existing = await findBeacon(organizationId, beaconId, tx)
+    if (!existing) return undefined
+    const floor = await tx
+      .selectFrom('floors')
+      .select(['id', 'current_map_revision_id'])
+      .where('id', '=', existing.floor_id)
+      .forUpdate()
+      .executeTakeFirstOrThrow()
+    const updated = await tx
+      .updateTable('beacons')
+      .set(patch)
+      .where('id', '=', beaconId)
+      .where('organization_id', '=', organizationId)
+      .where('deleted_at', 'is', null)
+      .returningAll()
+      .executeTakeFirst()
+    if (updated && floor.current_map_revision_id)
+      await tx
+        .updateTable('floor_map_revisions')
+        .set({ beacons_need_review: false })
+        .where('id', '=', floor.current_map_revision_id)
+        .execute()
+    return updated
+  })
 
 export const softDeleteBeacon = async (organizationId: string, beaconId: string) =>
   updateBeacon(organizationId, beaconId, { deleted_at: new Date(), enabled: false })

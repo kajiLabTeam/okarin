@@ -14,6 +14,7 @@ import {
   issueInternalPositioningAnalysisArtifactUploadUrl,
   issueInternalTrajectoryResultUploadUrl,
 } from '../storage/presigned-url.js'
+import { markTrajectoryFailed } from '../trajectories/index.js'
 import { claimPendingOutboxJobs, completeOutboxJob, failOutboxJob } from './outbox-repository.js'
 import type { OutboxJob } from './outbox-repository.js'
 import {
@@ -74,6 +75,14 @@ export const checkExecutionTimeouts = async (
       },
       executor
     )
+    if (item.result_trajectory_id)
+      await markTrajectoryFailed(
+        item.result_trajectory_id,
+        'EXECUTION_TIMEOUT',
+        'Execution timed out',
+        new Date(),
+        executor
+      )
     await aggregatePositioningRunStatus(item.analysis_run_id, executor)
   }
   return timedOutItems.length
@@ -145,7 +154,12 @@ export const processOutboxJob = async (
           })
         : undefined
     for (const [slot_id, assets] of Object.entries(rawInputManifest)) {
-      if (slot_id === '__ground_truth__') continue
+      if (
+        slot_id === '__ground_truth__' ||
+        slot_id === '__floor_map__' ||
+        slot_id === '__legacy_trajectory__'
+      )
+        continue
       const assetList = Array.isArray(assets)
         ? (assets as {
             object_key: string
@@ -297,6 +311,7 @@ export const processOutboxJob = async (
         secret: appConfig.apiSharedToken ?? null,
       },
       parameters: rawParameters,
+      ...(rawInputManifest.__legacy_trajectory__ ? { legacy_trajectory: true } : {}),
       ...(groundTruthRequest ? { ground_truth: groundTruthRequest } : {}),
     }
 
@@ -330,6 +345,14 @@ export const processOutboxJob = async (
         },
         executor
       )
+      if (item.result_trajectory_id)
+        await markTrajectoryFailed(
+          item.result_trajectory_id,
+          'NOZOMI_REQUEST_FAILED',
+          errorMessage,
+          new Date(),
+          executor
+        )
       await aggregatePositioningRunStatus(run.id, executor)
     } else {
       const backoffMs = Math.pow(2, job.attempts) * 1000

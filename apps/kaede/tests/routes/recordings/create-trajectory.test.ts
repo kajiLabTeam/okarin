@@ -3,36 +3,35 @@ import { resetRuntimeConfigForTests } from '../../../src/config/runtime.js'
 import type { RequestActor } from '../../../src/middleware/request-actor-context.js'
 import { createTrajectoryResponseSchema } from '../../../src/schemas/trajectories.js'
 import { createApp } from '../../../src/server.js'
+import { processOutboxJob } from '../../../src/services/analysis-runs/outbox-worker.js'
 import { createDb } from '../../../src/services/db/client.js'
-import type * as StorageService from '../../../src/services/storage/index.js'
+import type * as ExecutionClient from '../../../src/services/nozomi/nozomi-execution-client.js'
+import { FatalDispatchError } from '../../../src/services/nozomi/nozomi-execution-client.js'
+import type * as PresignedUrl from '../../../src/services/storage/presigned-url.js'
 import { updateRecordingConstraints } from '../../../src/usecases/recordings/update-recording-constraints.js'
 import { resetDatabase } from '../../db/helpers.js'
 import { createRecordingFixture } from '../../fixtures/recordings.js'
 
-const {
-  issueInternalRecordingRawDownloadUrlsMock,
-  issueInternalTrajectoryResultUploadUrlMock,
-  submitAnalyzeRequestMock,
-} = vi.hoisted(() => ({
-  issueInternalRecordingRawDownloadUrlsMock: vi.fn(),
-  issueInternalTrajectoryResultUploadUrlMock: vi.fn(),
+const { resolvePipelineMock, dispatchMock, submitAnalyzeRequestMock } = vi.hoisted(() => ({
+  resolvePipelineMock: vi.fn(),
+  dispatchMock: vi.fn(),
   submitAnalyzeRequestMock: vi.fn(),
 }))
-
-vi.mock('../../../src/services/storage/index.js', async () => {
-  const actual = await vi.importActual<typeof StorageService>(
-    '../../../src/services/storage/index.js'
-  )
-
-  return {
-    ...actual,
-    issueInternalRecordingRawDownloadUrls: issueInternalRecordingRawDownloadUrlsMock,
-    issueInternalTrajectoryResultUploadUrl: issueInternalTrajectoryResultUploadUrlMock,
-  }
-})
-
+vi.mock('../../../src/services/nozomi/pipeline-availability.js', () => ({
+  resolvePipelineForExecution: resolvePipelineMock,
+}))
+vi.mock('../../../src/services/nozomi/nozomi-execution-client.js', async (original) => ({
+  ...(await original<typeof ExecutionClient>()),
+  dispatchExecutionToNozomi: dispatchMock,
+}))
 vi.mock('../../../src/services/nozomi/index.js', () => ({
   submitAnalyzeRequest: submitAnalyzeRequestMock,
+}))
+vi.mock('../../../src/services/storage/presigned-url.js', async (original) => ({
+  ...(await original<typeof PresignedUrl>()),
+  issueInternalTrajectoryResultUploadUrl: vi
+    .fn()
+    .mockResolvedValue({ uploadUrl: 'http://storage/result' }),
 }))
 
 const db = createDb()
@@ -60,17 +59,53 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
     app = createApp()
     await resetDatabase(db)
     vi.clearAllMocks()
-    issueInternalRecordingRawDownloadUrlsMock.mockResolvedValue({
-      expiresAt: '2026-05-17T00:15:00.000Z',
-      rawDataUrls: {
-        acce: 'http://seaweedfs:8333/acce',
-        gyro: 'http://seaweedfs:8333/gyro',
-      },
-    })
-    issueInternalTrajectoryResultUploadUrlMock.mockResolvedValue({
-      expiresAt: '2026-05-17T00:15:00.000Z',
-      uploadUrl: 'http://seaweedfs:8333/result',
-      objectKey: 'trajectories/placeholder/analyzed/result.csv',
+    resolvePipelineMock.mockImplementation(async (_id: string, recordingIds: string[]) => {
+      const recording = await db
+        .selectFrom('recordings')
+        .selectAll()
+        .where('id', '=', recordingIds[0])
+        .executeTakeFirstOrThrow()
+      const revision = await db
+        .selectFrom('floor_map_revisions')
+        .selectAll()
+        .where('id', '=', recording.floor_map_revision_id)
+        .executeTakeFirstOrThrow()
+      return {
+        ok: true,
+        value: {
+          pipeline: {
+            definition: {
+              pipeline_id: 'pdr',
+              definition_version: '1',
+              state: 'active',
+              bindings: [],
+              parameters_schema: {
+                type: 'object',
+                properties: { origin_x: {}, origin_y: {}, initial_direction: {}, floor_scale: {} },
+              },
+            },
+            digest: 'a'.repeat(64),
+          },
+          recordings: [
+            {
+              recording_id: recording.id,
+              bindings: {},
+              issues: [],
+              assets: [
+                {
+                  data_asset_id: 'map',
+                  data_type: 'resource.floor_map',
+                  validation_status: 'valid',
+                  object_key: revision.image_object_path,
+                  checksum_sha256: 'b'.repeat(64),
+                  floor_map_revision_id: revision.id,
+                  scale: revision.scale,
+                },
+              ],
+            },
+          ],
+        },
+      }
     })
   })
 
@@ -85,11 +120,6 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
       uploadStatus: 'ready',
       uploadTargets: ['acce', 'gyro'],
     })
-
-    submitAnalyzeRequestMock.mockImplementation((payload: { trajectory_id: string }) => ({
-      trajectory_id: payload.trajectory_id,
-      status: 'accepted',
-    }))
 
     const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
       method: 'POST',
@@ -153,7 +183,21 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
       },
     ])
 
-    expect(submitAnalyzeRequestMock).toHaveBeenCalledTimes(1)
+    expect(submitAnalyzeRequestMock).not.toHaveBeenCalled()
+    const item = await db
+      .selectFrom('positioning_analysis_run_items')
+      .selectAll()
+      .where('id', '=', body.trajectory_id)
+      .executeTakeFirstOrThrow()
+    expect(item.result_trajectory_id).toBe(body.trajectory_id)
+    expect(item.status).toBe('queued')
+    expect(item.parameters).toMatchObject({
+      origin_x: 12.34,
+      origin_y: 56.78,
+      initial_direction: 90,
+    })
+    const jobs = await db.selectFrom('outbox_jobs').selectAll().execute()
+    expect(jobs).toHaveLength(1)
   })
 
   it('body constraints 省略時は recording constraints を snapshot に使う', async () => {
@@ -163,10 +207,6 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
       uploadTargets: ['acce', 'gyro'],
       constraints,
     })
-    submitAnalyzeRequestMock.mockImplementation((payload: { trajectory_id: string }) => ({
-      trajectory_id: payload.trajectory_id,
-      status: 'accepted',
-    }))
 
     const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
       method: 'POST',
@@ -182,7 +222,7 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
       .where('id', '=', body.trajectory_id)
       .executeTakeFirstOrThrow()
     expect(created.constraints).toEqual(constraints)
-    expect(submitAnalyzeRequestMock).toHaveBeenCalledWith(expect.objectContaining({ constraints }))
+    expect(submitAnalyzeRequestMock).not.toHaveBeenCalled()
   })
 
   it('body constraints が空配列なら recording constraints を使用しない', async () => {
@@ -191,10 +231,6 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
       uploadTargets: ['acce', 'gyro'],
       constraints: [{ seq: 0, point_type: 'start', x: 10, y: 20 }],
     })
-    submitAnalyzeRequestMock.mockImplementation((payload: { trajectory_id: string }) => ({
-      trajectory_id: payload.trajectory_id,
-      status: 'accepted',
-    }))
 
     const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
       method: 'POST',
@@ -210,9 +246,7 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
       .where('id', '=', body.trajectory_id)
       .executeTakeFirstOrThrow()
     expect(created.constraints).toEqual([])
-    expect(submitAnalyzeRequestMock).toHaveBeenCalledWith(
-      expect.objectContaining({ constraints: [] })
-    )
+    expect(submitAnalyzeRequestMock).not.toHaveBeenCalled()
   })
 
   it('fallback の recording constraints が不正なら 500 を返して Nozomi を呼ばない', async () => {
@@ -257,10 +291,6 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
       uploadTargets: ['acce', 'gyro'],
       constraints: initialConstraints,
     })
-    submitAnalyzeRequestMock.mockImplementation((payload: { trajectory_id: string }) => ({
-      trajectory_id: payload.trajectory_id,
-      status: 'accepted',
-    }))
 
     const firstResponse = await app.request(`/api/recordings/${recordingId}/trajectories`, {
       method: 'POST',
@@ -326,13 +356,13 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
     expect(submitAnalyzeRequestMock).not.toHaveBeenCalled()
   })
 
-  it('nozomi 依頼失敗時は 502 を返し trajectory を failed にする', async () => {
+  it('配送失敗は非同期に既存の軌跡IDへ反映し、旧経路を実行しない', async () => {
     const { recordingId } = await createRecordingFixture(db, {
       uploadStatus: 'ready',
       uploadTargets: ['acce', 'gyro'],
     })
 
-    submitAnalyzeRequestMock.mockRejectedValue(new Error('upstream failure'))
+    dispatchMock.mockRejectedValue(new FatalDispatchError('upstream failure'))
 
     const response = await app.request(`/api/recordings/${recordingId}/trajectories`, {
       method: 'POST',
@@ -345,9 +375,14 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
       }),
     })
 
-    expect(response.status).toBe(502)
-    const body = await response.json()
-    expect(body.error_code).toBe('NOZOMI_REQUEST_FAILED')
+    expect(response.status).toBe(201)
+    const body = createTrajectoryResponseSchema.parse(await response.json())
+    const job = await db.selectFrom('outbox_jobs').selectAll().executeTakeFirstOrThrow()
+    await processOutboxJob(job)
+    expect(submitAnalyzeRequestMock).not.toHaveBeenCalled()
+    expect(dispatchMock).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ analysis_run_item_id: body.trajectory_id })
+    )
 
     const created = await db
       .selectFrom('trajectories')
@@ -358,7 +393,7 @@ describe('POST /api/recordings/:recordingId/trajectories', () => {
     expect(created.recording_id).toBe(recordingId)
     expect(created.status).toBe('failed')
     expect(created.error_code).toBe('NOZOMI_REQUEST_FAILED')
-    expect(created.error_message).toBe('failed to submit analyze request to nozomi')
+    expect(created.error_message).toBe('upstream failure')
     expect(created.failed_at).not.toBeNull()
   })
 })

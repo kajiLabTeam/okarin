@@ -52,3 +52,5 @@ docker exec -i okarin-local-postgres-1 \
 ## 参照
 
 https://github.com/amacneil/dbmate
+
+地図版管理の移行手順・API・計測との関連付けは [FLOOR_MAP_REVISIONS.md](FLOOR_MAP_REVISIONS.md) を参照してください。

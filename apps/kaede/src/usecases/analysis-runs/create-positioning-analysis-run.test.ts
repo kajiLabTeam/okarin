@@ -5,6 +5,7 @@ import type { PositioningAnalysisRunRequest } from '../../schemas/positioning-an
 import { createPositioningAnalysisRun } from './create-positioning-analysis-run.js'
 
 const mocks = vi.hoisted(() => ({
+  trajectory: vi.fn(),
   findKey: vi.fn(),
   findInOrg: vi.fn(),
   listItems: vi.fn(),
@@ -35,13 +36,15 @@ vi.mock('../../services/recordings/index.js', () => ({
   findRecordingAuthorizationByIdForOrganization: mocks.findAuth,
 }))
 
-vi.mock('../../services/floors/index.js', () => ({
-  findFloorById: mocks.findFloor,
+vi.mock('../../services/floor-maps/revisions.js', () => ({
+  findMapRevision: mocks.findFloor,
 }))
 
 vi.mock('../../services/nozomi/pipeline-availability.js', () => ({
   resolvePipelineForExecution: mocks.resolvePipeline,
 }))
+
+vi.mock('../../services/trajectories/index.js', () => ({ insertTrajectory: mocks.trajectory }))
 
 vi.mock('../../services/db/index.js', () => ({
   db: {
@@ -172,6 +175,175 @@ describe('createPositioningAnalysisRun', () => {
     mocks.insertRun.mockResolvedValue({ id: runId })
     mocks.insertItems.mockResolvedValue([{ id: 'item-1' }])
     mocks.insertOutboxJobs.mockResolvedValue([])
+  })
+
+  it.each([
+    {
+      scale: null,
+      start: true,
+      expectedScale: 0.01,
+      defaults: ['floor_scale', 'initial_direction'],
+    },
+    { scale: 0.02, start: true, expectedScale: 0.02, defaults: ['initial_direction'] },
+    {
+      scale: null,
+      start: false,
+      expectedScale: 0.01,
+      defaults: ['floor_scale', 'initial_direction'],
+    },
+  ])(
+    '旧APIの補完後条件と互換処理を実行itemへ固定する: %j',
+    async ({ scale, start, expectedScale, defaults }) => {
+      const constraints = start ? [{ seq: 0, point_type: 'start' as const, x: 10, y: 20 }] : []
+      mocks.findRecording.mockResolvedValue({
+        id: recordingId,
+        floor_id: floorId,
+        floor_map_revision_id: 'revision-v1',
+      })
+      mocks.findFloor.mockResolvedValue({ id: 'revision-v1', scale })
+      const map = {
+        data_asset_id: 'map-v1',
+        data_type: 'resource.floor_map',
+        validation_status: 'valid',
+        floor_map_revision_id: 'revision-v1',
+        checksum_sha256: 'c'.repeat(64),
+      }
+      mocks.resolvePipeline.mockResolvedValue({
+        ok: true,
+        value: {
+          pipeline: mockPipeline,
+          recordings: [{ recording_id: recordingId, assets: [map], bindings: {}, issues: [] }],
+        },
+      })
+      mocks.insertItems.mockResolvedValue([{ id: 'trajectory-1' }])
+      const result = await createPositioningAnalysisRun(
+        managerActor,
+        orgId,
+        'legacy-defaults',
+        { recording_ids: [recordingId], pipeline_ids: ['pdr'], parameters_by_pipeline: {} },
+        { trajectoryId: 'trajectory-1', constraints }
+      )
+      expect(result.ok).toBe(true)
+      expect(mocks.insertItems).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({
+            parameters: expect.objectContaining({
+              initial_direction: 90,
+              floor_scale: expectedScale,
+            }),
+            input_manifest: expect.objectContaining({
+              __legacy_trajectory__: expect.objectContaining({
+                profile: 'legacy-single-trajectory-v1',
+                timestamp_origin: 'first_step',
+                csv_columns: ['step_index', 'rikka_timestamp_s', 'rikka_x', 'rikka_y', 'x', 'y'],
+                coordinate_system: start ? 'pixel' : 'local_meter',
+                defaulted_parameters: defaults,
+                constraints,
+              }),
+            }),
+          }),
+        ],
+        expect.anything()
+      )
+    }
+  )
+
+  it('旧APIは同一トランザクションで軌跡と1 item、1配送を登録し、地図と条件を固定する', async () => {
+    const constraints = [
+      { seq: 0, point_type: 'start' as const, x: -1.5, y: 20.25, direction: 123 },
+      { seq: 1, point_type: 'waypoint' as const, x: 3, y: 4, relative_timestamp: 5 },
+    ]
+    mocks.findRecording.mockResolvedValue({
+      id: recordingId,
+      floor_id: floorId,
+      floor_map_revision_id: 'revision-v1',
+    })
+    mocks.findFloor.mockResolvedValue({ id: 'revision-v1', scale: 0.02 })
+    const pipeline = structuredClone(mockPipeline)
+    pipeline.definition.parameters_schema = {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        origin_x: { type: 'integer', minimum: 0 },
+        origin_y: { type: 'integer', minimum: 0 },
+        initial_direction: { type: 'number' },
+        floor_scale: { type: 'number' },
+      },
+    }
+    const map = {
+      data_asset_id: 'map-v1',
+      validation_status: 'valid',
+      data_type: 'resource.floor_map',
+      floor_map_revision_id: 'revision-v1',
+      object_key: 'v1.png',
+      checksum_sha256: 'c'.repeat(64),
+      scale: 0.02,
+    }
+    mocks.resolvePipeline.mockResolvedValue({
+      ok: true,
+      value: {
+        pipeline,
+        recordings: [{ recording_id: recordingId, assets: [map], bindings: {}, issues: [] }],
+      },
+    })
+    mocks.insertItems.mockResolvedValue([{ id: 'trajectory-1' }])
+    const result = await createPositioningAnalysisRun(
+      managerActor,
+      orgId,
+      'legacy-1',
+      {
+        recording_ids: [recordingId],
+        pipeline_ids: ['pdr'],
+        parameters_by_pipeline: {},
+      },
+      { trajectoryId: 'trajectory-1', constraints }
+    )
+    expect(result.ok).toBe(true)
+    expect(mocks.findFloor).toHaveBeenCalledWith(floorId, orgId, 'revision-v1')
+    expect(mocks.trajectory).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        id: 'trajectory-1',
+        status: 'processing',
+        floor_map_revision_id: 'revision-v1',
+        constraints,
+      }),
+      expect.anything()
+    )
+    expect(mocks.insertItems).toHaveBeenCalledExactlyOnceWith(
+      [
+        expect.objectContaining({
+          id: 'trajectory-1',
+          result_trajectory_id: 'trajectory-1',
+          pipeline_id: 'pdr',
+          parameters: {
+            origin_x: -1.5,
+            origin_y: 20.25,
+            initial_direction: 123,
+            floor_scale: 0.02,
+          },
+          input_manifest: expect.objectContaining({
+            __floor_map__: [map],
+            __legacy_trajectory__: expect.objectContaining({
+              version: 1,
+              constraints,
+              profile: 'legacy-single-trajectory-v1',
+              timestamp_origin: 'first_step',
+              waypoints_applied: false,
+              goals_applied: false,
+            }),
+          }),
+        }),
+      ],
+      expect.anything()
+    )
+    expect(mocks.insertOutboxJobs).toHaveBeenCalledExactlyOnceWith(
+      [
+        expect.objectContaining({
+          payload: { analysis_run_item_id: 'trajectory-1' },
+        }),
+      ],
+      expect.anything()
+    )
   })
 
   it('正常に親Runと子Itemを作成して202 Acceptedを返し、Outboxジョブを同一トランザクションで登録する', async () => {
@@ -322,7 +494,7 @@ describe('createPositioningAnalysisRun', () => {
             floor_map: floorMap.data_asset_id,
             beacon_layout: beaconLayout.data_asset_id,
           },
-          input_manifest: {
+          input_manifest: expect.objectContaining({
             acce: [
               expect.objectContaining({
                 object_key: expect.stringContaining('/acce.csv'),
@@ -342,7 +514,7 @@ describe('createPositioningAnalysisRun', () => {
                 checksum_sha256: beaconLayout.checksum_sha256,
               }),
             ],
-          },
+          }),
         }),
       ],
       expect.anything()

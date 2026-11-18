@@ -80,6 +80,7 @@ class ExecutionRequest(StrictModel):
     callback: CallbackInfo
     parameters: dict[str, Any] = {}
     ground_truth: GroundTruthInput | None = None
+    legacy_trajectory: bool = False
 
     @field_validator("output_uri")
     @classmethod

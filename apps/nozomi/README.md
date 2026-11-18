@@ -165,3 +165,23 @@ PYTHONPATH=../../../rikka/src uv run ruff format --check .
 PYTHONPATH=../../../rikka/src uv run mypy .
 PYTHONPATH=../../../rikka/src uv run pytest
 ```
+
+### 旧Trajectory APIからのPDR実行
+
+Kaedeの `POST /api/recordings/:recordingId/trajectories` は、今後の新規要求を
+`pdr` のanalysis run itemとOutboxへ登録する。旧 `/analyze` へ同時送信しない。
+受付時に軌跡を作成し、itemと同じIDを返すため、既存の軌跡IDによる状態取得と
+結果URL取得を継続できる。過去の結果へitemを遡及作成したり、CSVを書き換えたりしない。
+
+内部実行要求の `legacy_trajectory: true` は `pdr` のみで使用する。
+共通PDRを1回だけ呼ぶ `rikka.legacy_analysis` を通し、従来のセンサー列別名、
+任意metadata、初期方位の既定値、開始位置と縮尺による座標変換、CSVの列順と
+最初の歩を0秒とする時刻基準を保持する。通常Pipelineの入出力契約は変えない。
+開始座標は旧APIに合わせて有限の小数・負値も受け付ける。経由点・終了点は従来どおり
+保存するが、PDRの補正には使わない。条件省略時は計測の条件を使い、明示した空配列は維持する。
+
+地図は計測に記録された版（版のない旧計測は初期版）で解決する。
+版・checksum・縮尺・寸法はitemの `input_manifest.__floor_map__` に固定し、
+地図を取得できない場合は受付を失敗させる。`__legacy_trajectory__` に互換処理の版と
+元の制約点を保存し、再実行でも引き継ぐ。配送の再試行は同じitem IDを使用し、
+Nozomiの実行予約とfingerprintで解析の重複起動を防ぐ。

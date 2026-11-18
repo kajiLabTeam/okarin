@@ -9,6 +9,7 @@ import { registerCreateOrganizationUserActivationLinkRoute } from './create-orga
 import { registerCreateOrganizationUserRoute } from './create-organization-user.js'
 import { registerCreateOrganizationRoute } from './create-organization.js'
 import { registerCreateStayHeatmapRoute } from './create-stay-heatmap.js'
+import { registerFloorMapRevisionRoutes } from './floor-map-revisions.js'
 import { registerGetOrganizationBuildingDetailRoute } from './get-organization-building-detail.js'
 import { registerGetOrganizationUserRoute } from './get-organization-user.js'
 import { registerGetOrganizationRoute } from './get-organization.js'
@@ -62,3 +63,5 @@ registerOrganizationScopedRecordingRoutes(organizationsRoutes)
 registerOrganizationBeaconRoutes(organizationsRoutes)
 registerPipelineAvailabilityRoute(organizationsRoutes)
 registerPositioningAnalysisRunRoutes(organizationsRoutes)
+
+registerFloorMapRevisionRoutes(organizationsRoutes)

@@ -42,6 +42,7 @@ const serializeRun = async (run: Awaited<ReturnType<typeof findOrganizationAnaly
     analysis_type: run.analysis_type,
     status: run.status as 'accepted' | 'processing' | 'completed' | 'failed',
     floor_id: run.floor_id,
+    floor_map_revision_id: run.floor_map_revision_id,
     parameters: stayHeatmapParametersSchema.parse(run.parameters),
     definition_version: run.definition_version,
     trajectory_counts: {

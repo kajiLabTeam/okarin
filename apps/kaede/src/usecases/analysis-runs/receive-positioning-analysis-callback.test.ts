@@ -4,6 +4,8 @@ import type { PositioningAnalysisCallbackRequest } from '../../schemas/positioni
 import { receivePositioningAnalysisCallback } from './receive-positioning-analysis-callback.js'
 
 const mocks = vi.hoisted(() => ({
+  completed: vi.fn(),
+  failed: vi.fn(),
   findCallback: vi.fn(),
   insertCallback: vi.fn(),
   findItem: vi.fn(),
@@ -30,6 +32,8 @@ vi.mock('../../services/recordings/index.js', () => ({
 
 vi.mock('../../services/trajectories/index.js', () => ({
   insertTrajectory: mocks.insertTrajectory,
+  markTrajectoryCompleted: mocks.completed,
+  markTrajectoryFailed: mocks.failed,
 }))
 
 vi.mock('../../services/analysis-runs/outbox-worker.js', () => ({
@@ -91,6 +95,43 @@ describe('receivePositioningAnalysisCallback', () => {
     mocks.updateItem.mockResolvedValue({})
     mocks.aggregateRunStatus.mockResolvedValue(undefined)
   })
+
+  it.each(['completed', 'failed'] as const)(
+    '旧APIの予約済み軌跡へ%sを反映し、結果を追加作成しない',
+    async (status) => {
+      mocks.findItemForUpdate.mockResolvedValue({
+        id: itemId,
+        recording_id: recordingId,
+        analysis_run_id: 'run',
+        result_trajectory_id: itemId,
+        status: 'processing',
+        input_manifest: { __legacy_trajectory__: { version: 1 } },
+      })
+      const result = await receivePositioningAnalysisCallback(serviceActor, {
+        event_id: `legacy-${status}`,
+        analysis_run_item_id: itemId,
+        status,
+        ...(status === 'failed' ? { error: { code: 'FAILED', message: 'failure' } } : {}),
+      })
+      expect(result.ok).toBe(true)
+      expect(mocks.insertTrajectory).not.toHaveBeenCalled()
+      if (status === 'completed')
+        expect(mocks.completed).toHaveBeenCalledWith(itemId, expect.anything())
+      else
+        expect(mocks.failed).toHaveBeenCalledWith(
+          itemId,
+          'FAILED',
+          'failure',
+          expect.any(Date),
+          expect.anything()
+        )
+      expect(mocks.updateItem).toHaveBeenCalledWith(
+        itemId,
+        expect.objectContaining({ result_trajectory_id: itemId, status }),
+        expect.anything()
+      )
+    }
+  )
 
   it('service_client 以外の actor からのリクエストは 401 UNAUTHORIZED を返す', async () => {
     const payload: PositioningAnalysisCallbackRequest = {
